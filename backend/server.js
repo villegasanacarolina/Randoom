@@ -291,7 +291,7 @@ app.post('/api/auth/verify', async (req, res) => {
       `INSERT INTO users(email,password_hash,name,age,gender,country,email_verified)
        VALUES($1,$2,$3,$4,$5,$6,true)
        ON CONFLICT(email) DO NOTHING`,
-      [d.email, d.password_hash, d.name, d.age, d.gender, d.country]
+      [d.email, d.passwordHash || d.password_hash, d.name, d.age, d.gender, d.country]
     );
     await pool.query('DELETE FROM pending_codes WHERE email=$1', [email]);
     const user = rowToUser((await pool.query('SELECT * FROM users WHERE email=$1', [email])).rows[0]);
