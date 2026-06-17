@@ -303,16 +303,24 @@ textarea.fc{resize:vertical;min-height:80px}
   display:flex;flex-direction:column;
   background:rgba(5,0,8,.98);flex-shrink:0;
   border-top:1px solid var(--bd);
-  height:auto;max-height:45vh;
-  overflow:hidden;
-  transition:max-height .3s ease;
+  /* Mobile: auto height, content is what collapses */
+  height:auto;
 }
-.chat-sidebar.collapsed{max-height:44px}
 @media(min-width:769px){
   .chat-sidebar{
-    width:300px;height:100%;max-height:none;
+    width:300px;height:100%;
     border-top:none;border-left:1px solid var(--bd);
   }
+}
+/* The collapsible content inside sidebar */
+.sidebar-body{
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  max-height:38vh;
+  transition:max-height .3s ease;
+}
+.chat-sidebar.collapsed .sidebar-body{
+  max-height:0;
 }
 
 .sb-head{
@@ -715,36 +723,38 @@ textarea.fc{resize:vertical;min-height:80px}
       <h3>💬 Chat</h3>
       <div style="display:flex;align-items:center;gap:8px">
         <div class="online-pill"><div class="dot-ok"></div><span id="online-num">—</span> en línea</div>
-        <span class="sb-toggle" id="sb-toggle-btn">▲ Ocultar</span>
+        <span class="sb-toggle" id="sb-toggle-btn">▼</span>
       </div>
     </div>
-    <div class="partner-bar" id="partner-bar"><h4>Conectado con</h4><div class="ptags" id="ptags"></div></div>
-    <div class="prem-filters" id="prem-filters">
-      <h4>⭐ Filtros Premium</h4>
-      <div class="frow"><label>Género</label>
-        <select class="fc" id="f-gender" onchange="applyFilters()">
-          <option value="any">Cualquiera</option><option value="male">Hombre</option><option value="female">Mujer</option>
-        </select>
-      </div>
-      <div class="frow"><label>País</label>
-        <div class="csr"><input class="fc" id="f-country-s" type="text" placeholder="Cualquiera…" autocomplete="off"/>
-          <div class="cdd" id="f-country-dd"></div><input type="hidden" id="f-country-v" value="any"/>
+    <div class="sidebar-body">
+      <div class="partner-bar" id="partner-bar"><h4>Conectado con</h4><div class="ptags" id="ptags"></div></div>
+      <div class="prem-filters" id="prem-filters">
+        <h4>⭐ Filtros Premium</h4>
+        <div class="frow"><label>Género</label>
+          <select class="fc" id="f-gender" onchange="applyFilters()">
+            <option value="any">Cualquiera</option><option value="male">Hombre</option><option value="female">Mujer</option>
+          </select>
+        </div>
+        <div class="frow"><label>País</label>
+          <div class="csr"><input class="fc" id="f-country-s" type="text" placeholder="Cualquiera…" autocomplete="off"/>
+            <div class="cdd" id="f-country-dd"></div><input type="hidden" id="f-country-v" value="any"/>
+          </div>
+        </div>
+        <div class="frow"><label>Edad</label>
+          <input class="fc" id="f-age-min" type="number" placeholder="Mín" min="18" max="99" style="width:56px" onchange="applyFilters()" inputmode="numeric"/>
+          <span style="color:var(--gray-l);font-size:12px;padding:0 3px">–</span>
+          <input class="fc" id="f-age-max" type="number" placeholder="Máx" min="18" max="99" style="width:56px" onchange="applyFilters()" inputmode="numeric"/>
         </div>
       </div>
-      <div class="frow"><label>Edad</label>
-        <input class="fc" id="f-age-min" type="number" placeholder="Mín" min="18" max="99" style="width:56px" onchange="applyFilters()" inputmode="numeric"/>
-        <span style="color:var(--gray-l);font-size:12px;padding:0 3px">–</span>
-        <input class="fc" id="f-age-max" type="number" placeholder="Máx" min="18" max="99" style="width:56px" onchange="applyFilters()" inputmode="numeric"/>
+      <div class="upgrade-bar" id="upgrade-bar">
+        <p style="font-size:12px;margin-bottom:6px;color:var(--gray-l)">⭐ <strong style="color:#fff">Premium</strong> — filtros + tiempo ilimitado</p>
+        <button class="btn btn-primary btn-sm btn-full" onclick="showPremium()">Ver planes</button>
       </div>
-    </div>
-    <div class="upgrade-bar" id="upgrade-bar">
-      <p style="font-size:12px;margin-bottom:8px;color:var(--gray-l)">⭐ <strong style="color:#fff">Premium</strong> — filtros + tiempo ilimitado</p>
-      <button class="btn btn-primary btn-sm btn-full" onclick="showPremium()">Ver planes</button>
-    </div>
-    <div class="msgs" id="msgs"><div class="msg sys">Conecta para chatear 🔮</div></div>
-    <div class="chat-inp">
-      <input type="text" id="chat-in" placeholder="Escribe un mensaje…" maxlength="300" onkeydown="if(event.key==='Enter')sendMsg()"/>
-      <button class="send-btn" onclick="sendMsg()">➤</button>
+      <div class="msgs" id="msgs"><div class="msg sys">Conecta para chatear 🔮</div></div>
+      <div class="chat-inp">
+        <input type="text" id="chat-in" placeholder="Escribe un mensaje…" maxlength="300" onkeydown="if(event.key==='Enter')sendMsg()"/>
+        <button class="send-btn" onclick="sendMsg()">➤</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1201,7 +1211,7 @@ function toggleSidebar(){
   const sidebar = document.querySelector('.chat-sidebar');
   const btn = document.getElementById('sb-toggle-btn');
   const isCollapsed = sidebar.classList.toggle('collapsed');
-  btn.textContent = isCollapsed ? '▼ Chat' : '▲ Ocultar';
+  btn.textContent = isCollapsed ? '▲' : '▼';
 }
 
 // ── Recording ─────────────────────────────────────────────────────────────────
