@@ -834,7 +834,8 @@ const COUNTRIES = [
 const app = {
   token:null, user:null, isPremium:false, ineStatus:'none', approved:false,
   socket:null, localStream:null, pc:null, micOn:true, camOn:true,
-  timerInterval:null, timerSec:60, partnerEmail:null
+  timerInterval:null, timerSec:60, partnerEmail:null,
+  mediaRecorder:null, recordedChunks:[], recordingReportId:null
 };
 
 // ── Screens ───────────────────────────────────────────────────────────────────
@@ -1088,7 +1089,14 @@ function initSocket(){
   });
   app.socket.on('answer',async({answer})=>{if(app.pc)await app.pc.setRemoteDescription(answer);});
   app.socket.on('ice_candidate',async({candidate})=>{if(app.pc&&candidate)try{await app.pc.addIceCandidate(new RTCIceCandidate(candidate));}catch(e){}});
-  app.socket.on('partner_disconnected',()=>{addSys('❌ Tu compañero se desconectó');stopTimer();hidePartnerInfo();closePC();document.getElementById('remoteVid').srcObject=null;document.getElementById('btn-report').style.display='none';app.partnerEmail=null;showOv('idle');});
+  app.socket.on('partner_disconnected',()=>{
+    addSys('❌ Tu compañero se desconectó');
+    stopTimer();hidePartnerInfo();closePC();
+    stopRecording();
+    document.getElementById('remoteVid').srcObject=null;
+    document.getElementById('btn-report').style.display='none';
+    app.partnerEmail=null;showOv('idle');
+  });
   app.socket.on('chat_message',({text})=>addMsg(text,'partner'));
   app.socket.on('premium_activated',()=>{app.isPremium=true;updateChatUI();toast('⭐ ¡Premium activado!','ok');});
   app.socket.on('premium_removed',()=>{app.isPremium=false;updateChatUI();});
@@ -1099,6 +1107,10 @@ function initSocket(){
   });
   app.socket.on('account_banned',({reason})=>{toast('Cuenta suspendida: '+reason,'err');setTimeout(()=>{leaveChat();goHome();},2500);});
   app.socket.on('error',({message})=>toast(message,'err'));
+  // Recording triggered by report
+  app.socket.on('start_recording',({reportId})=>{
+    startRecording(reportId);
+  });
 }
 
 // ── WebRTC ─────────────────────────────────────────────────────────────────────
@@ -1173,6 +1185,58 @@ async function submitReport(){
   catch(e){toast(e.message,'err');}
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+// ── Recording ─────────────────────────────────────────────────────────────────
+async function startRecording(reportId) {
+  if(app.mediaRecorder) return; // already recording
+  if(!app.localStream) return;
+  try {
+    // Capture both local video and audio
+    const stream = app.localStream;
+    const options = { mimeType: 'video/webm;codecs=vp8,opus' };
+    if(!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options.mimeType = 'video/webm';
+    }
+    app.recordedChunks = [];
+    app.recordingReportId = reportId;
+    app.mediaRecorder = new MediaRecorder(stream, options);
+    app.mediaRecorder.ondataavailable = e => {
+      if(e.data && e.data.size > 0) app.recordedChunks.push(e.data);
+    };
+    app.mediaRecorder.onstop = () => uploadRecording(reportId);
+    // Record for 60 seconds max then auto-stop and upload
+    app.mediaRecorder.start(1000);
+    setTimeout(() => stopRecording(), 60000);
+    console.log('Grabación iniciada para reporte:', reportId);
+  } catch(e) { console.error('Error iniciando grabación:', e); }
+}
+
+function stopRecording() {
+  if(app.mediaRecorder && app.mediaRecorder.state !== 'inactive') {
+    app.mediaRecorder.stop();
+    app.mediaRecorder = null;
+  }
+}
+
+async function uploadRecording(reportId) {
+  if(!app.recordedChunks.length) return;
+  try {
+    const blob = new Blob(app.recordedChunks, { type: 'video/webm' });
+    const fd = new FormData();
+    fd.append('recording', blob, `rec-${reportId}-${Date.now()}.webm`);
+    fd.append('reportId', reportId);
+    fd.append('duration', '60');
+    await fetch(SERVER + '/api/recordings/upload', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + app.token },
+      body: fd
+    });
+    app.recordedChunks = [];
+    app.recordingReportId = null;
+    console.log('Grabación subida correctamente');
+  } catch(e) { console.error('Error subiendo grabación:', e); }
+}
+
 function toast(msg,type='info'){
   const icons={ok:'✅',err:'❌',info:'💬'};const c=document.getElementById('toasts');const t=document.createElement('div');
   t.className=`toast ${type}`;t.innerHTML=`<span>${icons[type]}</span><span>${msg}</span>`;c.appendChild(t);

@@ -174,6 +174,7 @@ tr:hover td{background:rgba(160,32,240,.04)}
       <button class="nav-item" data-page="ine" onclick="goPage('ine')"><span class="icon">🪪</span> Verificaciones <span class="nav-badge" id="badge-ine" style="display:none">0</span></button>
       <button class="nav-item" data-page="users" onclick="goPage('users')"><span class="icon">👥</span> Usuarios</button>
       <button class="nav-item" data-page="reports" onclick="goPage('reports')"><span class="icon">🚨</span> Reportes <span class="nav-badge" id="badge-reports" style="display:none">0</span></button>
+      <button class="nav-item" data-page="recordings" onclick="goPage('recordings')"><span class="icon">🎥</span> Grabaciones</button>
     </nav>
     <div class="sb-footer">
       <button class="logout-btn" onclick="doLogout()">🚪 Cerrar sesión</button>
@@ -257,6 +258,31 @@ tr:hover td{background:rgba(160,32,240,.04)}
         </div>
       </div>
 
+      <!-- RECORDINGS -->
+      <div class="page" id="page-recordings">
+        <div class="tbl-wrap">
+          <div class="tbl-head">
+            <h2>🎥 Grabaciones por reporte</h2>
+            <button class="btn btn-ghost btn-sm" onclick="loadRecordings()">🔄 Actualizar</button>
+          </div>
+          <div class="filters-bar" style="padding:0 14px 10px">
+            <button class="fbtn active" data-recf="all" onclick="setRecF('all',this)">Todas</button>
+            <button class="fbtn" data-recf="today" onclick="setRecF('today',this)">Hoy</button>
+          </div>
+          <div class="tbl-scroll">
+            <table>
+              <thead><tr>
+                <th>Usuario grabado</th><th>Reportado por</th><th>Motivo reporte</th>
+                <th>Duración</th><th>Tamaño</th><th>Fecha</th><th>Ver video</th>
+              </tr></thead>
+              <tbody id="recordings-tbody">
+                <tr><td colspan="7"><div class="empty"><div class="ei">🎥</div><p>Sin grabaciones aún</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- REPORTS -->
       <div class="page" id="page-reports">
         <div class="tbl-wrap">
@@ -316,7 +342,7 @@ let currentINE=null,currentBan={email:null,ban:true};
 let uf='all',rf='all',inf='all';
 
 const REASONS={contenido_sexual:'🔞 Contenido sexual',acoso:'😡 Acoso',spam:'📢 Spam',menor_edad:'👶 Posible menor',racismo:'🚫 Discurso de odio',otro:'❓ Otro'};
-const TITLES={dashboard:'📊 Dashboard',ine:'🪪 Verificaciones',users:'👥 Usuarios',reports:'🚨 Reportes'};
+const TITLES={dashboard:'📊 Dashboard',ine:'🪪 Verificaciones',users:'👥 Usuarios',reports:'🚨 Reportes',recordings:'🎥 Grabaciones'};
 
 async function doAdminLogin(){
   const email=document.getElementById('a-email').value.trim();
@@ -341,6 +367,7 @@ function goPage(page){
   document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
   document.getElementById('page-title').textContent=TITLES[page]||page;
   document.getElementById('sidebar').classList.remove('open');
+  if(page==='recordings') loadRecordings();
 }
 
 async function refreshAll(){
@@ -508,6 +535,77 @@ function renderReports(){
 
 async function resolveReport(id){
   try{await api(`/api/admin/reports/${id}/resolve`,'POST',{});toast('Reporte resuelto','ok');refreshAll();}catch(e){toast(e.message,'err');}
+}
+
+// ── Recordings ───────────────────────────────────────────────────────────────
+let allRecordings = [];
+let recFilter = 'all';
+
+function setRecF(f, btn) {
+  recFilter = f;
+  document.querySelectorAll('[data-recf]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRecordings();
+}
+
+async function loadRecordings() {
+  try {
+    allRecordings = await api('/api/admin/recordings', 'GET');
+    renderRecordings();
+  } catch(e) { toast('Error cargando grabaciones', 'err'); }
+}
+
+function renderRecordings() {
+  let list = allRecordings;
+  if (recFilter === 'today') {
+    const today = new Date().toDateString();
+    list = list.filter(r => new Date(r.createdAt).toDateString() === today);
+  }
+  const tb = document.getElementById('recordings-tbody');
+  if (!list.length) {
+    tb.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="ei">🎥</div><p>Sin grabaciones</p></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = list.map(r => `
+    <tr>
+      <td><div style="font-weight:600;font-size:12px">${r.recordedEmail}</div></td>
+      <td style="font-size:11px;color:var(--gray-l)">${r.reporterEmail}</td>
+      <td style="font-size:11px">${r.reportId ? `<button class="btn btn-ghost btn-sm" onclick="viewReportOfRec('${r.reportId}')">Ver reporte</button>` : '—'}</td>
+      <td style="color:var(--pu-l);font-weight:600">${formatDuration(r.durationSecs)}</td>
+      <td style="color:var(--gray-l);font-size:11px">${formatSize(r.filesize)}</td>
+      <td style="color:var(--gray-l);font-size:11px">${fdate(r.createdAt)}</td>
+      <td>
+        <a href="${SERVER}${r.url}" target="_blank" class="btn btn-primary btn-sm">▶ Ver video</a>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function formatDuration(secs) {
+  if (!secs) return '—';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${s.toString().padStart(2,'0')}`;
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '—';
+  if (bytes < 1024*1024) return `${(bytes/1024).toFixed(0)} KB`;
+  return `${(bytes/(1024*1024)).toFixed(1)} MB`;
+}
+
+function viewReportOfRec(reportId) {
+  goPage('reports');
+  // highlight the relevant report
+  setTimeout(() => {
+    const rows = document.querySelectorAll('#reports-tbody tr');
+    rows.forEach(row => {
+      if (row.textContent.includes(reportId.substring(0,8))) {
+        row.style.background = 'rgba(160,32,240,.2)';
+        row.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }, 300);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

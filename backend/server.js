@@ -77,14 +77,28 @@ async function initDB() {
       expires_at  BIGINT NOT NULL,
       data        JSONB NOT NULL
     );
-  `);
+
+    CREATE TABLE IF NOT EXISTS recordings (
+      id              TEXT PRIMARY KEY,
+      report_id       TEXT NOT NULL,
+      reporter_email  TEXT NOT NULL,
+      recorded_email  TEXT NOT NULL,
+      filename        TEXT NOT NULL,
+      filesize        BIGINT DEFAULT 0,
+      duration_secs   INT DEFAULT 0,
+      status          TEXT DEFAULT 'recording',
+      created_at      TIMESTAMPTZ DEFAULT NOW(),
+      ended_at        TIMESTAMPTZ
+    );
+  \`);
   console.log('Base de datos inicializada ✅');
 }
 
 // ── Upload dirs ────────────────────────────────────────────────────────────────
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const INE_DIR     = path.join(__dirname, 'uploads', 'ine');
-[UPLOADS_DIR, INE_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+const REC_DIR     = path.join(__dirname, 'uploads', 'recordings');
+[UPLOADS_DIR, INE_DIR, REC_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
 const makeStorage = dest => multer.diskStorage({
   destination: (req, file, cb) => cb(null, dest),
@@ -94,6 +108,8 @@ const imgFilter = (req, file, cb) =>
   cb(null, /jpeg|jpg|png|gif|webp|pdf/.test(path.extname(file.originalname).toLowerCase()));
 
 const uploadINE = multer({ storage: makeStorage(INE_DIR), limits: { fileSize: 8*1024*1024 }, fileFilter: imgFilter });
+const recFilter = (req, file, cb) => cb(null, /webm|mp4|ogg/.test(path.extname(file.originalname).toLowerCase()) || file.mimetype.startsWith('video/'));
+const uploadRec = multer({ storage: makeStorage(REC_DIR), limits: { fileSize: 200*1024*1024 }, fileFilter: recFilter });
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 const ADMIN_EMAIL    = 'admin@randoom.com';
@@ -224,6 +240,7 @@ const waitingPool   = [];
 app.use(cors());
 app.use(bodyParser.json());
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/recordings', express.static(REC_DIR));
 app.use(express.static(path.join(__dirname, '../frontend/public')));
 
 // ── JWT ────────────────────────────────────────────────────────────────────────
@@ -423,10 +440,42 @@ app.post('/api/reports/submit', authUser, async (req, res) => {
   const { reportedEmail, reason, description } = req.body;
   if (!reportedEmail||!reason) return res.status(400).json({ error: 'Faltan datos' });
   try {
+    const reportId = uuidv4();
     await pool.query('INSERT INTO reports(id,reporter_email,reported_email,reason,description) VALUES($1,$2,$3,$4,$5)',
-      [uuidv4(), req.user.email, reportedEmail, reason, description||'']);
-    res.json({ ok: true });
-  } catch(e) { res.status(500).json({ error: 'Error' }); }
+      [reportId, req.user.email, reportedEmail, reason, description||'']);
+
+    // Signal the REPORTED user's socket to start recording
+    const reportedSocket = Object.entries(activeSockets).find(([,s]) => s.email === reportedEmail);
+    const reporterSocket = Object.entries(activeSockets).find(([,s]) => s.email === req.user.email);
+
+    if (reportedSocket) {
+      // Tell reported user's browser to start recording and upload
+      io.to(reportedSocket[0]).emit('start_recording', { reportId, reason });
+    }
+    if (reporterSocket) {
+      // Also record the reporter's side
+      io.to(reporterSocket[0]).emit('start_recording', { reportId, reason, isReporter: true });
+    }
+
+    res.json({ ok: true, reportId });
+  } catch(e) { console.error(e); res.status(500).json({ error: 'Error' }); }
+});
+
+// Upload recording chunk from browser
+app.post('/api/recordings/upload', authUser, uploadRec.single('recording'), async (req, res) => {
+  const { reportId, duration } = req.body;
+  if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' });
+  try {
+    const recId = uuidv4();
+    const filename = req.file.filename;
+    await pool.query(
+      \`INSERT INTO recordings(id,report_id,reporter_email,recorded_email,filename,filesize,duration_secs,status,ended_at)
+       VALUES($1,$2,$3,$4,$5,$6,$7,'completed',NOW())\`,
+      [recId, reportId, req.user.email, req.user.email, filename, req.file.size, parseInt(duration)||0]
+    );
+    console.log(\`Grabación guardada: \${filename} (\${req.file.size} bytes)\`);
+    res.json({ ok: true, recordingId: recId });
+  } catch(e) { console.error(e); res.status(500).json({ error: 'Error guardando grabación' }); }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -532,6 +581,35 @@ app.post('/api/admin/reports/:id/resolve', authAdmin, async (req, res) => {
   try {
     await pool.query("UPDATE reports SET status='resolved', resolved_at=NOW() WHERE id=$1", [req.params.id]);
     res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+// Admin — get recordings for a report
+app.get('/api/admin/recordings', authAdmin, async (req, res) => {
+  try {
+    const r = await pool.query('SELECT * FROM recordings ORDER BY created_at DESC');
+    res.json(r.rows.map(r => ({
+      id: r.id, reportId: r.report_id,
+      reporterEmail: r.reporter_email, recordedEmail: r.recorded_email,
+      filename: r.filename, filesize: r.filesize,
+      durationSecs: r.duration_secs, status: r.status,
+      createdAt: r.created_at, endedAt: r.ended_at,
+      url: \`/recordings/\${r.filename}\`
+    })));
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.get('/api/admin/recordings/:reportId', authAdmin, async (req, res) => {
+  try {
+    const r = await pool.query('SELECT * FROM recordings WHERE report_id=$1 ORDER BY created_at DESC', [req.params.reportId]);
+    res.json(r.rows.map(r => ({
+      id: r.id, reportId: r.report_id,
+      reporterEmail: r.reporter_email, recordedEmail: r.recorded_email,
+      filename: r.filename, filesize: r.filesize,
+      durationSecs: r.duration_secs, status: r.status,
+      createdAt: r.created_at, endedAt: r.ended_at,
+      url: \`/recordings/\${r.filename}\`
+    })));
   } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
 
