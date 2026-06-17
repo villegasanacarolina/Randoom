@@ -846,10 +846,41 @@ function initSocket(){
     showOv('conn');app.partnerEmail=partner.email;
     showPartnerInfo(partner);addSys(`🔮 Conectado con ${partner.name}, ${partner.age} años`);
     document.getElementById('btn-report').style.display='flex';startTimer();
-    try{app.pc=createPC();if(app.localStream)app.localStream.getTracks().forEach(t=>app.pc.addTrack(t,app.localStream));if(initiator){const o=await app.pc.createOffer();await app.pc.setLocalDescription(o);app.socket.emit('offer',{offer:o});}}catch(e){console.error(e);}
+    try{
+      // Always ensure media is ready before WebRTC
+      if(!app.localStream) await requestMedia();
+      app.pc = createPC();
+      // Add all tracks to peer connection
+      if(app.localStream){
+        app.localStream.getTracks().forEach(track => {
+          app.pc.addTrack(track, app.localStream);
+        });
+      }
+      if(initiator){
+        const offer = await app.pc.createOffer({offerToReceiveAudio:true, offerToReceiveVideo:true});
+        await app.pc.setLocalDescription(offer);
+        app.socket.emit('offer',{offer});
+      }
+    }catch(e){console.error('WebRTC error:',e);}
   });
-  app.socket.on('offer',async({offer})=>{if(!app.pc)app.pc=createPC();if(app.localStream)app.localStream.getTracks().forEach(t=>app.pc.addTrack(t,app.localStream));await app.pc.setRemoteDescription(offer);const a=await app.pc.createAnswer();await app.pc.setLocalDescription(a);app.socket.emit('answer',{answer:a});});
-  app.socket.on('answer',async({answer})=>{if(app.pc)await app.pc.setRemoteDescription(answer);});
+  app.socket.on('offer',async({offer})=>{
+    try{
+      if(!app.localStream) await requestMedia();
+      if(!app.pc) app.pc=createPC();
+      // Add tracks if not already added
+      if(app.localStream && app.pc.getSenders().length===0){
+        app.localStream.getTracks().forEach(t=>app.pc.addTrack(t,app.localStream));
+      }
+      await app.pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer=await app.pc.createAnswer();
+      await app.pc.setLocalDescription(answer);
+      app.socket.emit('answer',{answer});
+    }catch(e){console.error('Offer error:',e);}
+  });
+  app.socket.on('answer',async({answer})=>{
+    try{if(app.pc)await app.pc.setRemoteDescription(new RTCSessionDescription(answer));}
+    catch(e){console.error('Answer error:',e);}
+  });
   app.socket.on('ice_candidate',async({candidate})=>{if(app.pc&&candidate)try{await app.pc.addIceCandidate(new RTCIceCandidate(candidate));}catch(e){}});
   app.socket.on('partner_disconnected',()=>{addSys('❌ Tu compañero se desconectó');stopTimer();hidePartnerInfo();closePC();stopRecording();document.getElementById('remoteVid').srcObject=null;document.getElementById('btn-report').style.display='none';app.partnerEmail=null;showOv('idle');});
   app.socket.on('chat_message',({text})=>addMsg(text,'partner'));
@@ -863,22 +894,75 @@ function initSocket(){
 
 // ── WebRTC ────────────────────────────────────────────────────────────────────
 function createPC(){
-  const pc=new RTCPeerConnection({iceServers:[
-    {urls:'stun:stun.relay.metered.ca:80'},
-    {urls:'turn:global.relay.metered.ca:80',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'},
-    {urls:'turn:global.relay.metered.ca:80?transport=tcp',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'},
-    {urls:'turn:global.relay.metered.ca:443',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'},
-    {urls:'turns:global.relay.metered.ca:443?transport=tcp',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'}
-  ]});
-  pc.onicecandidate=({candidate})=>{if(candidate&&app.socket)app.socket.emit('ice_candidate',{candidate});};
-  pc.ontrack=({streams})=>{const v=document.getElementById('remoteVid');if(v&&streams[0])v.srcObject=streams[0];};
+  const pc=new RTCPeerConnection({
+    iceServers:[
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'stun:stun1.l.google.com:19302'},
+      {urls:'stun:stun.relay.metered.ca:80'},
+      {urls:'turn:global.relay.metered.ca:80',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'},
+      {urls:'turn:global.relay.metered.ca:80?transport=tcp',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'},
+      {urls:'turn:global.relay.metered.ca:443',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'},
+      {urls:'turns:global.relay.metered.ca:443?transport=tcp',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'}
+    ],
+    iceCandidatePoolSize:10
+  });
+  pc.onicecandidate=({candidate})=>{
+    if(candidate&&app.socket) app.socket.emit('ice_candidate',{candidate});
+  };
+  pc.oniceconnectionstatechange=()=>{
+    console.log('ICE state:',pc.iceConnectionState);
+    if(pc.iceConnectionState==='failed') pc.restartIce();
+  };
+  pc.ontrack=({track,streams})=>{
+    const v=document.getElementById('remoteVid');
+    if(!v) return;
+    if(streams&&streams[0]){
+      v.srcObject=streams[0];
+    } else {
+      // No stream object, create one
+      if(!v.srcObject) v.srcObject=new MediaStream();
+      v.srcObject.addTrack(track);
+    }
+    v.play().catch(()=>{});
+  };
   return pc;
 }
 function closePC(){if(app.pc){app.pc.close();app.pc=null;}}
-async function requestMedia(){try{const s=await navigator.mediaDevices.getUserMedia({video:true,audio:true});app.localStream=s;document.getElementById('localVid').srcObject=s;}catch(e){toast('No se pudo acceder a cámara/micrófono','err');}}
+async function requestMedia(){
+  if(app.localStream) return app.localStream; // already have it
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+    app.localStream=s;
+    const lv=document.getElementById('localVid');
+    if(lv){lv.srcObject=s;lv.play().catch(()=>{});}
+    return s;
+  }catch(e){
+    // Try video only
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+      app.localStream=s;
+      const lv=document.getElementById('localVid');
+      if(lv){lv.srcObject=s;lv.play().catch(()=>{});}
+      toast('Micrófono no disponible, solo video','info');
+      return s;
+    }catch(e2){
+      toast('No se pudo acceder a cámara. Verifica los permisos.','err');
+      return null;
+    }
+  }
+}
 function toggleMic(){if(!app.localStream)return;app.micOn=!app.micOn;app.localStream.getAudioTracks().forEach(t=>t.enabled=app.micOn);const b=document.getElementById('btn-mic');b.textContent=app.micOn?'🎤':'🔇';b.classList.toggle('off',!app.micOn);}
 function toggleCam(){if(!app.localStream)return;app.camOn=!app.camOn;app.localStream.getVideoTracks().forEach(t=>t.enabled=app.camOn);const b=document.getElementById('btn-cam');b.textContent=app.camOn?'📷':'🚫';b.classList.toggle('off',!app.camOn);}
-function findPartner(){if(!app.socket)return;closePC();stopTimer();hidePartnerInfo();stopRecording();document.getElementById('remoteVid').srcObject=null;document.getElementById('btn-report').style.display='none';app.partnerEmail=null;showOv('search');app.socket.emit('find_partner');}
+function findPartner(){
+  if(!app.socket)return;
+  closePC();stopTimer();hidePartnerInfo();stopRecording();
+  const rv=document.getElementById('remoteVid');
+  if(rv){rv.srcObject=null;rv.load();}
+  document.getElementById('btn-report').style.display='none';
+  app.partnerEmail=null;
+  showOv('search');
+  app.socket.emit('find_partner');
+}
 function stopSearch(){if(!app.socket)return;app.socket.emit('stop_search');showOv('idle');stopTimer();}
 function leaveChat(){
   stopTimer();closePC();stopRecording();
