@@ -305,8 +305,8 @@ app.post('/api/auth/verify', async (req, res) => {
     if (pending.code !== code.trim()) return res.status(401).json({ error: 'Código incorrecto' });
     const d = pending.data;
     await pool.query(
-      `INSERT INTO users(email,password_hash,name,age,gender,country,email_verified)
-       VALUES($1,$2,$3,$4,$5,$6,true)
+      `INSERT INTO users(email,password_hash,name,age,gender,country,email_verified,approved)
+       VALUES($1,$2,$3,$4,$5,$6,true,true)
        ON CONFLICT(email) DO NOTHING`,
       [d.email, d.passwordHash || d.password_hash, d.name, d.age, d.gender, d.country]
     );

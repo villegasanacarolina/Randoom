@@ -171,7 +171,7 @@ tr:hover td{background:rgba(160,32,240,.04)}
     </div>
     <nav class="nav-items">
       <button class="nav-item active" data-page="dashboard" onclick="goPage('dashboard')"><span class="icon">📊</span> Dashboard</button>
-      <button class="nav-item" data-page="ine" onclick="goPage('ine')"><span class="icon">🪪</span> Verificaciones <span class="nav-badge" id="badge-ine" style="display:none">0</span></button>
+
       <button class="nav-item" data-page="users" onclick="goPage('users')"><span class="icon">👥</span> Usuarios</button>
       <button class="nav-item" data-page="reports" onclick="goPage('reports')"><span class="icon">🚨</span> Reportes <span class="nav-badge" id="badge-reports" style="display:none">0</span></button>
       <button class="nav-item" data-page="recordings" onclick="goPage('recordings')"><span class="icon">🎥</span> Grabaciones</button>
@@ -200,39 +200,16 @@ tr:hover td{background:rgba(160,32,240,.04)}
         <div class="stats-grid">
           <div class="stat-card purple"><div class="stat-icon">👥</div><div class="stat-val" id="s-total">—</div><div class="stat-lbl">Registrados</div></div>
           <div class="stat-card teal"><div class="stat-icon">✅</div><div class="stat-val" id="s-approved">—</div><div class="stat-lbl">Aprobados</div></div>
-          <div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-val" id="s-pending">—</div><div class="stat-lbl">Pendientes INE</div></div>
+
           <div class="stat-card green"><div class="stat-icon">🟢</div><div class="stat-val" id="s-online">—</div><div class="stat-lbl">En línea</div></div>
           <div class="stat-card purple"><div class="stat-icon">⭐</div><div class="stat-val" id="s-premium">—</div><div class="stat-lbl">Premium</div></div>
           <div class="stat-card red"><div class="stat-icon">🚫</div><div class="stat-val" id="s-banned">—</div><div class="stat-lbl">Baneados</div></div>
         </div>
         <div class="dash-grid">
-          <div class="tbl-wrap">
-            <div class="tbl-head"><h2>🪪 Verificaciones pendientes</h2><button class="btn btn-ghost btn-sm" onclick="goPage('ine')">Ver todas →</button></div>
-            <div id="dash-ine"><div class="empty"><div class="ei">🪪</div><p>Sin pendientes</p></div></div>
-          </div>
+
           <div class="tbl-wrap">
             <div class="tbl-head"><h2>🚨 Reportes recientes</h2><button class="btn btn-ghost btn-sm" onclick="goPage('reports')">Ver todos →</button></div>
             <div id="dash-reports"><div class="empty"><div class="ei">🚨</div><p>Sin reportes</p></div></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- INE VERIFICATIONS -->
-      <div class="page" id="page-ine">
-        <div class="tbl-wrap">
-          <div class="tbl-head">
-            <h2>🪪 Verificaciones de identidad</h2>
-            <div class="filters-bar" style="margin:0">
-              <button class="fbtn active" data-if="all" onclick="setIF('all',this)">Todas</button>
-              <button class="fbtn" data-if="pending" onclick="setIF('pending',this)">⏳ Pendientes</button>
-              <button class="fbtn" data-if="approved" onclick="setIF('approved',this)">✅ Aprobadas</button>
-              <button class="fbtn" data-if="rejected" onclick="setIF('rejected',this)">❌ Rechazadas</button>
-            </div>
-          </div>
-          <div class="tbl-scroll">
-            <table><thead><tr>
-              <th>Usuario</th><th>Edad</th><th>País</th><th>Fotos</th><th>Enviado</th><th>Estado</th><th>Acciones</th>
-            </tr></thead><tbody id="ine-tbody"></tbody></table>
           </div>
         </div>
       </div>
@@ -305,22 +282,6 @@ tr:hover td{background:rgba(160,32,240,.04)}
   </main>
 </div>
 
-<!-- INE modal -->
-<div class="modal-bg" id="ine-modal">
-  <div class="modal">
-    <h3>🪪 Verificación de identidad</h3>
-    <p>Revisa las 3 fotos cuidadosamente antes de aprobar o rechazar.</p>
-    <div class="dbox" id="ine-detail"></div>
-    <div class="ine-imgs" id="ine-imgs"></div>
-    <div class="fg" style="margin-bottom:14px"><label>Nota (opcional)</label><input class="fc" id="ine-note" type="text" placeholder="Motivo de aprobación o rechazo…"/></div>
-    <div class="modal-btns">
-      <button class="btn btn-success" onclick="reviewINE('approved')">✅ Aprobar — enviar correo</button>
-      <button class="btn btn-danger" onclick="reviewINE('rejected')">❌ Rechazar — enviar correo</button>
-      <button class="btn btn-ghost btn-sm" onclick="closeModal('ine-modal')">Cancelar</button>
-    </div>
-  </div>
-</div>
-
 <!-- Ban modal -->
 <div class="modal-bg" id="ban-modal">
   <div class="modal">
@@ -337,12 +298,12 @@ tr:hover td{background:rgba(160,32,240,.04)}
 <script>
 const SERVER='https://randoom-production.up.railway.app';
 let adminToken=null;
-let allUsers=[],allReports=[],allINE=[];
-let currentINE=null,currentBan={email:null,ban:true};
-let uf='all',rf='all',inf='all';
+let allUsers=[],allReports=[];
+let currentBan={email:null,ban:true};
+let uf='all',rf='all';
 
 const REASONS={contenido_sexual:'🔞 Contenido sexual',acoso:'😡 Acoso',spam:'📢 Spam',menor_edad:'👶 Posible menor',racismo:'🚫 Discurso de odio',otro:'❓ Otro'};
-const TITLES={dashboard:'📊 Dashboard',ine:'🪪 Verificaciones',users:'👥 Usuarios',reports:'🚨 Reportes',recordings:'🎥 Grabaciones'};
+const TITLES={dashboard:'📊 Dashboard',users:'👥 Usuarios',reports:'🚨 Reportes',recordings:'🎥 Grabaciones'};
 
 async function doAdminLogin(){
   const email=document.getElementById('a-email').value.trim();
@@ -372,39 +333,31 @@ function goPage(page){
 
 async function refreshAll(){
   try{
-    const [stats,users,reports,ine]=await Promise.all([
+    const [stats,users,reports]=await Promise.all([
       api('/api/admin/stats','GET'),api('/api/admin/users','GET'),
-      api('/api/admin/reports','GET'),api('/api/admin/ine','GET')
+      api('/api/admin/reports','GET')
     ]);
     updateStats(stats);
     allUsers=users;renderUsers();
     allReports=reports;renderReports();
-    allINE=ine;renderINE();
-    renderDash(ine,reports);
+    renderDash(reports);
   }catch(e){toast('Error al cargar datos','err');}
 }
 
 function updateStats(s){
   document.getElementById('s-total').textContent=s.total;
   document.getElementById('s-approved').textContent=s.approved;
-  document.getElementById('s-pending').textContent=s.pendingINE;
+
   document.getElementById('s-online').textContent=s.online;
   document.getElementById('online-count').textContent=s.online;
   document.getElementById('s-premium').textContent=s.premium;
   document.getElementById('s-banned').textContent=s.banned;
-  const bi=document.getElementById('badge-ine'),br=document.getElementById('badge-reports');
-  bi.textContent=s.pendingINE;bi.style.display=s.pendingINE>0?'inline-block':'none';
-  br.textContent=s.pendingReports;br.style.display=s.pendingReports>0?'inline-block':'none';
+  const br=document.getElementById('badge-reports');
+  if(br){br.textContent=s.pendingReports;br.style.display=s.pendingReports>0?'inline-block':'none';}
 }
 
-function renderDash(ine,reports){
-  const pi=ine.filter(r=>r.status==='pending').slice(0,6);
-  const di=document.getElementById('dash-ine');
-  if(!pi.length){di.innerHTML='<div class="empty"><div class="ei">🪪</div><p>Sin pendientes</p></div>';}
-  else di.innerHTML=`<table><thead><tr><th>Usuario</th><th>Email</th><th>Edad</th><th>Enviado</th></tr></thead><tbody>
-    ${pi.map(r=>`<tr><td style="font-weight:600">${r.userName}</td><td style="color:var(--gray-l);font-size:11px">${r.email}</td>
-    <td>${r.age}</td><td style="color:var(--gray-l);font-size:11px">${fdate(r.createdAt)}</td></tr>`).join('')}
-  </tbody></table>`;
+function renderDash(reports){
+
 
   const pr=reports.filter(r=>r.status==='pending').slice(0,5);
   const dr=document.getElementById('dash-reports');
@@ -413,128 +366,6 @@ function renderDash(ine,reports){
     ${pr.map(r=>`<tr><td style="font-weight:600">${r.reportedEmail}</td><td>${REASONS[r.reason]||r.reason}</td>
     <td style="color:var(--gray-l);font-size:11px">${fdate(r.createdAt)}</td></tr>`).join('')}
   </tbody></table>`;
-}
-
-// ── INE ───────────────────────────────────────────────────────────────────────
-function setIF(f,btn){inf=f;document.querySelectorAll('[data-if]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderINE();}
-function renderINE(){
-  let list=inf==='all'?allINE:allINE.filter(r=>r.status===inf);
-  const tb=document.getElementById('ine-tbody');
-  if(!list.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="ei">🪪</div><p>Sin solicitudes</p></div></td></tr>`;return;}
-  tb.innerHTML=list.map(r=>`<tr>
-    <td><div class="user-cell"><div class="avatar">🪪</div><div><div style="font-weight:600">${r.userName}</div></div></div></td>
-    <td>${r.age||'—'}</td>
-    <td>${r.country||'—'}</td>
-    <td>
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <a href="${SERVER}${r.frontal}" target="_blank" class="btn btn-ghost btn-sm">🪪 F</a>
-        <a href="${SERVER}${r.trasera}" target="_blank" class="btn btn-ghost btn-sm">🔄 R</a>
-        <a href="${SERVER}${r.rostro}" target="_blank" class="btn btn-ghost btn-sm">🤳 Rostro</a>
-      </div>
-    </td>
-    <td style="color:var(--gray-l);font-size:11px">${fdate(r.createdAt)}</td>
-    <td><span class="pill ${r.status}">${r.status==='pending'?'⏳ Pendiente':r.status==='approved'?'✅ Aprobada':'❌ Rechazada'}</span></td>
-    <td>${r.status==='pending'?`<button class="btn btn-info btn-sm" onclick="openINEModal('${r.id}')">🔍 Revisar</button>`:r.reviewNote?`<span style="font-size:10px;color:var(--gray-l)">${r.reviewNote.substring(0,30)}</span>`:''}</td>
-  </tr>`).join('');
-}
-
-function openINEModal(id){
-  currentINE=allINE.find(r=>r.id===id);if(!currentINE)return;
-  document.getElementById('ine-detail').innerHTML=`
-    <div class="drow"><span class="dlbl">Usuario</span><span class="dval" style="font-weight:600">${currentINE.userName}</span></div>
-    <div class="drow"><span class="dlbl">Email</span><span class="dval" style="color:var(--gray-l)">${currentINE.email}</span></div>
-    <div class="drow"><span class="dlbl">Edad</span><span class="dval">${currentINE.age||'—'}</span></div>
-    <div class="drow"><span class="dlbl">País</span><span class="dval">${currentINE.country||'—'}</span></div>
-    <div class="drow"><span class="dlbl">Género</span><span class="dval">${currentINE.gender||'—'}</span></div>
-    <div class="drow"><span class="dlbl">Enviado</span><span class="dval" style="color:var(--gray-l)">${fdate(currentINE.createdAt)}</span></div>
-  `;
-  document.getElementById('ine-imgs').innerHTML=`
-    <div class="ine-img-box"><span>Frente INE</span><img src="${SERVER}${currentINE.frontal}" onclick="window.open('${SERVER}${currentINE.frontal}')" alt="Frente"/></div>
-    <div class="ine-img-box"><span>Reverso INE</span><img src="${SERVER}${currentINE.trasera}" onclick="window.open('${SERVER}${currentINE.trasera}')" alt="Reverso"/></div>
-    <div class="ine-img-box"><span>Rostro</span><img src="${SERVER}${currentINE.rostro}" onclick="window.open('${SERVER}${currentINE.rostro}')" alt="Rostro"/></div>
-  `;
-  document.getElementById('ine-note').value='';
-  document.getElementById('ine-modal').classList.add('open');
-}
-
-async function reviewINE(status){
-  if(!currentINE)return;
-  const note=document.getElementById('ine-note').value.trim();
-  try{
-    await api(`/api/admin/ine/${currentINE.id}/review`,'POST',{status,note});
-    toast(status==='approved'?'✅ ¡Aprobado! Correo enviado al usuario':'❌ Rechazado. Correo enviado al usuario',status==='approved'?'ok':'err');
-    closeModal('ine-modal');refreshAll();
-  }catch(e){toast(e.message,'err');}
-}
-
-// ── Users ─────────────────────────────────────────────────────────────────────
-function setUF(f,btn){uf=f;document.querySelectorAll('[data-uf]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderUsers();}
-function renderUsers(){
-  const q=document.getElementById('user-search')?.value.toLowerCase()||'';
-  let list=allUsers.filter(u=>{
-    if(q&&!u.name.toLowerCase().includes(q)&&!u.email.toLowerCase().includes(q))return false;
-    if(uf==='approved'&&!u.approved)return false;
-    if(uf==='premium'&&!u.isPremium)return false;
-    if(uf==='banned'&&!u.banned)return false;
-    if(uf==='online'&&!u.isOnline)return false;
-    return true;
-  });
-  const tb=document.getElementById('users-tbody');
-  if(!list.length){tb.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="ei">👤</div><p>No hay usuarios</p></div></td></tr>`;return;}
-  tb.innerHTML=list.map(u=>`<tr>
-    <td><div class="user-cell"><div class="avatar">${u.name[0].toUpperCase()}</div><div><div style="font-weight:600">${u.name}</div></div></div></td>
-    <td style="color:var(--gray-l);font-size:11px">${u.email}</td>
-    <td>${u.age}</td>
-    <td>${u.country||'—'}</td>
-    <td>
-      ${u.isOnline?'<span class="pill online">🟢</span> ':''}
-      ${u.approved?'<span class="pill active">✅ OK</span>':'<span class="pill pending">⏳ Pendiente</span>'}
-      ${u.isPremium?' <span class="pill premium">⭐</span>':''}
-      ${u.banned?' <span class="pill banned">🚫</span>':''}
-    </td>
-    <td>${u.totalSessions||0}</td>
-    <td style="color:var(--gray-l);font-size:11px">${fdate(u.createdAt)}</td>
-    <td><div class="act-btns">
-      ${u.isPremium?`<button class="btn btn-warn btn-sm" onclick="togglePremium('${u.email}',false)">Quitar ⭐</button>`:`<button class="btn btn-success btn-sm" onclick="togglePremium('${u.email}',true)">Dar ⭐</button>`}
-      ${u.banned?`<button class="btn btn-info btn-sm" onclick="openUnban('${u.email}')">✅ Desbanear</button>`:`<button class="btn btn-danger btn-sm" onclick="openBan('${u.email}')">🚫 Banear</button>`}
-    </div></td>
-  </tr>`).join('');
-}
-
-async function togglePremium(email,active){
-  try{await api(`/api/admin/users/${encodeURIComponent(email)}/premium`,'POST',{active});toast(active?'⭐ Premium activado':'Premium removido',active?'ok':'info');refreshAll();}
-  catch(e){toast(e.message,'err');}
-}
-function openBan(email){currentBan={email,ban:true};document.getElementById('ban-title').textContent='🚫 Suspender cuenta';document.getElementById('ban-sub').textContent=`¿Suspender ${email}?`;document.getElementById('ban-confirm-btn').textContent='🚫 Suspender';document.getElementById('ban-confirm-btn').className='btn btn-danger';document.getElementById('ban-reason').value='';document.getElementById('ban-modal').classList.add('open');}
-function openUnban(email){currentBan={email,ban:false};document.getElementById('ban-title').textContent='✅ Reactivar cuenta';document.getElementById('ban-sub').textContent=`¿Reactivar ${email}?`;document.getElementById('ban-confirm-btn').textContent='✅ Reactivar';document.getElementById('ban-confirm-btn').className='btn btn-success';document.getElementById('ban-reason').value='';document.getElementById('ban-modal').classList.add('open');}
-async function confirmBan(){
-  try{await api(`/api/admin/users/${encodeURIComponent(currentBan.email)}/ban`,'POST',{ban:currentBan.ban,reason:document.getElementById('ban-reason').value.trim()});
-  toast(currentBan.ban?'🚫 Cuenta suspendida':'✅ Cuenta reactivada',currentBan.ban?'err':'ok');closeModal('ban-modal');refreshAll();}
-  catch(e){toast(e.message,'err');}
-}
-
-// ── Reports ───────────────────────────────────────────────────────────────────
-function setRF(f,btn){rf=f;document.querySelectorAll('[data-rf]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderReports();}
-function renderReports(){
-  let list=rf==='all'?allReports:allReports.filter(r=>r.status===rf);
-  const tb=document.getElementById('reports-tbody');
-  if(!list.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="ei">🚨</div><p>Sin reportes</p></div></td></tr>`;return;}
-  tb.innerHTML=list.map(r=>`<tr>
-    <td style="font-size:11px;color:var(--gray-l)">${r.reporterEmail}</td>
-    <td style="font-weight:600">${r.reportedEmail}</td>
-    <td>${REASONS[r.reason]||r.reason}</td>
-    <td style="font-size:11px;color:var(--gray-l);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.description||'—'}</td>
-    <td style="color:var(--gray-l);font-size:11px">${fdate(r.createdAt)}</td>
-    <td><span class="pill ${r.status==='resolved'?'approved':'pending'}">${r.status==='resolved'?'✅ Resuelto':'⏳ Pendiente'}</span></td>
-    <td><div class="act-btns">
-      ${r.status==='pending'?`<button class="btn btn-success btn-sm" onclick="resolveReport('${r.id}')">✅</button>`:''}
-      <button class="btn btn-danger btn-sm" onclick="openBan('${r.reportedEmail}')">🚫</button>
-    </div></td>
-  </tr>`).join('');
-}
-
-async function resolveReport(id){
-  try{await api(`/api/admin/reports/${id}/resolve`,'POST',{});toast('Reporte resuelto','ok');refreshAll();}catch(e){toast(e.message,'err');}
 }
 
 // ── Recordings ───────────────────────────────────────────────────────────────
