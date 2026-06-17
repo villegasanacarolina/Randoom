@@ -70,22 +70,41 @@ function mpRequest(method, mpPath, body) {
   });
 }
 
-// ── Resend email ──────────────────────────────────────────────────────────────
+// ── Brevo email (HTTPS API — nunca bloqueado por Railway) ────────────────────
 function sendEmail(to, subject, html) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ from: 'Randoom <onboarding@resend.dev>', to: [to], subject, html });
+    const apiKey = process.env.BREVO_API_KEY;
+    if (!apiKey) { reject(new Error('BREVO_API_KEY no configurada')); return; }
+
+    const body = JSON.stringify({
+      sender:    { name: 'Randoom', email: 'carovillegass13@gmail.com' },
+      to:        [{ email: to }],
+      subject,
+      htmlContent: html
+    });
+
     const opts = {
-      hostname: 'api.resend.com', path: '/emails', method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+      hostname: 'api.brevo.com',
+      path:     '/v3/smtp/email',
+      method:   'POST',
+      headers: {
+        'api-key':        apiKey,
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      }
     };
+
     const req = httpsLib.request(opts, res => {
       let d = '';
       res.on('data', c => d += c);
-      res.on('end', () => res.statusCode < 300 ? resolve() : reject(new Error(`Resend ${res.statusCode}: ${d}`)));
+      res.on('end', () => {
+        if (res.statusCode < 300) resolve();
+        else reject(new Error(`Brevo ${res.statusCode}: ${d}`));
+      });
     });
     req.on('error', reject);
-    req.write(body); req.end();
+    req.write(body);
+    req.end();
   });
 }
 
