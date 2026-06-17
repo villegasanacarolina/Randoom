@@ -90,7 +90,7 @@ async function initDB() {
       created_at      TIMESTAMPTZ DEFAULT NOW(),
       ended_at        TIMESTAMPTZ
     );
-  \`);
+  `);
   console.log('Base de datos inicializada ✅');
 }
 
@@ -469,11 +469,11 @@ app.post('/api/recordings/upload', authUser, uploadRec.single('recording'), asyn
     const recId = uuidv4();
     const filename = req.file.filename;
     await pool.query(
-      \`INSERT INTO recordings(id,report_id,reporter_email,recorded_email,filename,filesize,duration_secs,status,ended_at)
-       VALUES($1,$2,$3,$4,$5,$6,$7,'completed',NOW())\`,
+      `INSERT INTO recordings(id,report_id,reporter_email,recorded_email,filename,filesize,duration_secs,status,ended_at)
+       VALUES($1,$2,$3,$4,$5,$6,$7,'completed',NOW())`,
       [recId, reportId, req.user.email, req.user.email, filename, req.file.size, parseInt(duration)||0]
     );
-    console.log(\`Grabación guardada: \${filename} (\${req.file.size} bytes)\`);
+    console.log(`Grabación guardada: \${filename} (\${req.file.size} bytes)`);
     res.json({ ok: true, recordingId: recId });
   } catch(e) { console.error(e); res.status(500).json({ error: 'Error guardando grabación' }); }
 });
@@ -594,7 +594,7 @@ app.get('/api/admin/recordings', authAdmin, async (req, res) => {
       filename: r.filename, filesize: r.filesize,
       durationSecs: r.duration_secs, status: r.status,
       createdAt: r.created_at, endedAt: r.ended_at,
-      url: \`/recordings/\${r.filename}\`
+      url: `/recordings/${r.filename}`
     })));
   } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
@@ -608,7 +608,7 @@ app.get('/api/admin/recordings/:reportId', authAdmin, async (req, res) => {
       filename: r.filename, filesize: r.filesize,
       durationSecs: r.duration_secs, status: r.status,
       createdAt: r.created_at, endedAt: r.ended_at,
-      url: \`/recordings/\${r.filename}\`
+      url: `/recordings/${r.filename}`
     })));
   } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
