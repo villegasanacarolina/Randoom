@@ -22,7 +22,7 @@ body::before{content:'';position:fixed;inset:0;background:
   linear-gradient(135deg,#080010 0%,#040008 60%,#0A0015 100%);
   z-index:0;pointer-events:none}
 
-.screen{display:none;position:relative;z-index:1;min-height:100vh}
+.screen{display:none;position:relative;z-index:1;min-height:100vh;min-height:100dvh}
 .screen.active{display:flex;flex-direction:column}
 
 /* NAV */
@@ -157,15 +157,19 @@ textarea.fc{resize:vertical;min-height:80px}
 
 /* ═══ CHAT — MOBILE FIRST ═══ */
 #s-chat{
-  display:flex;flex-direction:column;
+  display:none;flex-direction:column;
   height:100dvh;height:100vh;
-  overflow:hidden;position:fixed;inset:0;
+  overflow:hidden;
 }
-#s-chat.active{display:flex}
+#s-chat.active{
+  display:flex;
+  position:fixed;inset:0;
+  z-index:50;
+}
 
 /* Desktop layout */
 @media(min-width:769px){
-  #s-chat{position:relative;flex-direction:row}
+  #s-chat.active{position:relative;flex-direction:row;height:100vh}
 }
 
 .chat-main{
@@ -489,7 +493,14 @@ textarea.fc{resize:vertical;min-height:80px}
               <div class="cdd" id="r-country-dd"></div><input type="hidden" id="r-country-v"/>
             </div>
           </div>
-          <div class="tip-box"><p>✅ Soy mayor de 18 años y acepto los <a href="#" style="color:var(--pu-l)">Términos de uso</a>. Entiendo que debo verificar mi identidad con INE para acceder.</p></div>
+          <label style="display:flex;align-items:flex-start;gap:10px;background:rgba(160,32,240,.08);border:1px solid var(--bd);border-radius:10px;padding:12px;cursor:pointer">
+            <input type="checkbox" id="terms-check" style="width:18px;height:18px;margin-top:2px;accent-color:var(--pu-l);flex-shrink:0;cursor:pointer"/>
+            <span style="font-size:12px;color:var(--gray-l);line-height:1.5">
+              Tengo 18 años o más y acepto los 
+              <a href="/terminos.html" target="_blank" style="color:var(--pu-l);font-weight:600;text-decoration:underline">Términos de Uso y Política de Privacidad</a>. 
+              Entiendo que debo verificar mi identidad con INE para acceder a la plataforma.
+            </span>
+          </label>
           <button class="btn btn-primary btn-full btn-lg" onclick="doRegister()">✨ Crear cuenta</button>
         </div>
       </div>
@@ -783,7 +794,11 @@ function backFromPremium(){ if(app.token) goToChat(); else showScreen('s-landing
 function goToChat(){
   if(!app.token){ showAuth(); return; }
   if(!app.approved){ showPendingScreen(); return; }
-  showScreen('s-chat'); updateChatUI();
+  // Remove fixed from all other screens first
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const chatEl = document.getElementById('s-chat');
+  chatEl.classList.add('active');
+  updateChatUI();
   if(!app.socket) initSocket();
   else if(!app.localStream) requestMedia();
 }
@@ -872,9 +887,11 @@ async function doRegister(){
   const age=document.getElementById('r-age').value;
   const gender=document.getElementById('r-gender').value;
   const country=document.getElementById('r-country-v').value||'MX';
+  const terms=document.getElementById('terms-check')?.checked;
   if(!name||!email||!pass||!age||!gender){toast('Completa todos los campos','err');return;}
   if(pass.length<6){toast('Contraseña mínimo 6 caracteres','err');return;}
   if(parseInt(age)<18){toast('Debes tener al menos 18 años','err');return;}
+  if(!terms){toast('Debes aceptar los Términos de Uso para continuar','err');return;}
   try{
     await api('/api/auth/register','POST',{email,password:pass,name,age,gender,country});
     pendingEmail=email;
@@ -1053,7 +1070,14 @@ function toggleMic(){if(!app.localStream)return;app.micOn=!app.micOn;app.localSt
 function toggleCam(){if(!app.localStream)return;app.camOn=!app.camOn;app.localStream.getVideoTracks().forEach(t=>t.enabled=app.camOn);const b=document.getElementById('btn-cam');b.textContent=app.camOn?'📷':'🚫';b.classList.toggle('off',!app.camOn);}
 function findPartner(){if(!app.socket)return;closePC();stopTimer();hidePartnerInfo();document.getElementById('remoteVid').srcObject=null;document.getElementById('btn-report').style.display='none';app.partnerEmail=null;showOv('search');app.socket.emit('find_partner');}
 function stopSearch(){if(!app.socket)return;app.socket.emit('stop_search');showOv('idle');stopTimer();}
-function leaveChat(){stopTimer();closePC();if(app.localStream){app.localStream.getTracks().forEach(t=>t.stop());app.localStream=null;}if(app.socket){app.socket.disconnect();app.socket=null;}showScreen('s-landing');}
+function leaveChat(){
+  stopTimer();closePC();
+  if(app.localStream){app.localStream.getTracks().forEach(t=>t.stop());app.localStream=null;}
+  if(app.socket){app.socket.disconnect();app.socket=null;}
+  // Make sure chat screen is not fixed anymore
+  document.getElementById('s-chat').classList.remove('active');
+  showScreen('s-landing');
+}
 
 // ── Timer ─────────────────────────────────────────────────────────────────────
 function startTimer(){
@@ -1102,18 +1126,23 @@ function toast(msg,type='info'){
   setTimeout(()=>{t.style.opacity='0';t.style.transform='translateY(10px)';t.style.transition='all .3s';setTimeout(()=>t.remove(),300);},3500);
 }
 
-// Auto-login
+// Auto-login — solo carga los datos, NUNCA redirige automático
 (async()=>{
   const t=localStorage.getItem('rd_token');
   if(t){
     try{
-      app.token=t;const u=await api('/api/auth/me','GET');
-      app.user=u;app.isPremium=u.isPremium;app.ineStatus=u.ineStatus;app.approved=u.approved;
-    }catch(e){localStorage.removeItem('rd_token');app.token=null;}
+      app.token=t;
+      const u=await api('/api/auth/me','GET');
+      app.user=u;app.isPremium=u.isPremium;
+      app.ineStatus=u.ineStatus;app.approved=u.approved;
+    }catch(e){
+      localStorage.removeItem('rd_token');
+      app.token=null;
+    }
   }
+  // Siempre empieza en landing, el usuario decide qué hacer
+  showScreen('s-landing');
 })();
-
-showScreen('s-landing');
 </script>
 </body>
 </html>
