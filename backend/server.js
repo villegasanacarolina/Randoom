@@ -9,6 +9,7 @@ const path       = require('path');
 const fs         = require('fs');
 const bcrypt     = require('bcryptjs');
 const jwt        = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 
 const app    = express();
 const server = http.createServer(app);
@@ -18,7 +19,7 @@ const io     = new Server(server, { cors: { origin: '*' } });
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
-// ── Multer config (images only, max 5MB) ─────────────────────────────────────
+// ── Multer config ─────────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename:    (req, file, cb) => cb(null, `${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`)
@@ -32,21 +33,84 @@ const upload = multer({
   }
 });
 
-// ── In-memory DB (replace with real DB for production) ───────────────────────
-// users[email] = { email, passwordHash, name, age, gender, country, isPremium, banned, createdAt, socketId, ... }
-const usersDB    = {};   // keyed by email
-const sessionsDB = {};   // socketId → email
-const paymentsDB = [];   // array of payment requests
-const reportsDB  = [];   // array of reports
+// ── In-memory DB ──────────────────────────────────────────────────────────────
+const usersDB      = {};  // email → user
+const pendingCodes = {};  // email → { code, data, expiresAt }
+const paymentsDB   = [];
+const reportsDB    = [];
 
-// ── Admin credentials ─────────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
 const ADMIN_EMAIL    = 'admin@randoom.com';
-const ADMIN_PASSWORD = 'Randoom2024!'; // change in production
+const ADMIN_PASSWORD = 'Randoom2024!';
 const JWT_SECRET     = 'randoom-super-secret-jwt-key-2024';
 
+// ── Nodemailer (Gmail) ────────────────────────────────────────────────────────
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS
+  }
+});
+
+async function sendVerificationEmail(email, name, code) {
+  const mailOptions = {
+    from: `"Randoom" <${process.env.GMAIL_USER}>`,
+    to: email,
+    subject: '🟠 Tu código de verificación — Randoom',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="UTF-8"/></head>
+      <body style="margin:0;padding:0;background:#0E0400;font-family:'Segoe UI',Arial,sans-serif;">
+        <div style="max-width:480px;margin:40px auto;background:#1A0800;border-radius:20px;overflow:hidden;border:1px solid rgba(255,107,0,0.3);">
+          
+          <!-- Header -->
+          <div style="background:linear-gradient(135deg,#FF6B00,#D95A00);padding:32px;text-align:center;">
+            <div style="background:rgba(255,255,255,0.15);display:inline-block;padding:12px 20px;border-radius:14px;margin-bottom:12px;">
+              <span style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px;">RD</span>
+            </div>
+            <h1 style="color:#fff;margin:0;font-size:26px;font-weight:800;letter-spacing:-0.5px;">Rand<span style="opacity:0.85">oom</span></h1>
+          </div>
+
+          <!-- Body -->
+          <div style="padding:36px 32px;text-align:center;">
+            <p style="color:#C8A882;font-size:15px;margin:0 0 8px;">Hola, <strong style="color:#fff">${name}</strong> 👋</p>
+            <p style="color:#C8A882;font-size:14px;margin:0 0 32px;line-height:1.6;">
+              Usa este código para confirmar tu correo y activar tu cuenta en Randoom.
+            </p>
+
+            <!-- Code box -->
+            <div style="background:rgba(255,107,0,0.12);border:2px solid rgba(255,107,0,0.4);border-radius:16px;padding:28px;margin-bottom:28px;">
+              <p style="color:#C8A882;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin:0 0 12px;">Tu código de verificación</p>
+              <div style="font-size:48px;font-weight:900;color:#FF6B00;letter-spacing:12px;font-family:monospace;">${code}</div>
+              <p style="color:#8A6040;font-size:12px;margin:12px 0 0;">⏱ Válido por 15 minutos</p>
+            </div>
+
+            <p style="color:#8A6040;font-size:12px;line-height:1.6;margin:0;">
+              Si no creaste una cuenta en Randoom, ignora este mensaje.<br/>
+              Nadie más puede ver este código.
+            </p>
+          </div>
+
+          <!-- Footer -->
+          <div style="padding:20px 32px;border-top:1px solid rgba(255,107,0,0.15);text-align:center;">
+            <p style="color:#8A6040;font-size:11px;margin:0;">
+              © 2024 Randoom — Conecta con el mundo 🌎
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  await transporter.sendMail(mailOptions);
+}
+
 // ── Active socket sessions ────────────────────────────────────────────────────
-const activeSockets  = {}; // socketId → { email, ...profile }
-const waitingPool    = [];
+const activeSockets = {};
+const waitingPool   = [];
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -78,33 +142,94 @@ function authUser(req, res, next) {
 // REST API — Auth
 // ════════════════════════════════════════════════════════════════════════════════
 
-// Register
+// PASO 1: Registro → guarda temporalmente y envía código
 app.post('/api/auth/register', async (req, res) => {
   const { email, password, name, age, gender, country } = req.body;
-  if (!email || !password || !name || !age || !gender) {
+  if (!email || !password || !name || !age || !gender)
     return res.status(400).json({ error: 'Todos los campos son requeridos' });
-  }
-  if (usersDB[email]) return res.status(409).json({ error: 'El correo ya está registrado' });
-  if (parseInt(age) < 18) return res.status(400).json({ error: 'Debes tener al menos 18 años' });
+  if (usersDB[email])
+    return res.status(409).json({ error: 'El correo ya está registrado' });
+  if (parseInt(age) < 18)
+    return res.status(400).json({ error: 'Debes tener al menos 18 años' });
 
+  // Genera código de 6 dígitos
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
   const passwordHash = await bcrypt.hash(password, 10);
+
+  // Guarda temporalmente por 15 minutos
+  pendingCodes[email] = {
+    code,
+    expiresAt: Date.now() + 15 * 60 * 1000,
+    data: { email, passwordHash, name, age: parseInt(age), gender, country: country || 'MX' }
+  };
+
+  // Envía email
+  try {
+    await sendVerificationEmail(email, name, code);
+    res.json({ ok: true, message: 'Código enviado a tu correo' });
+  } catch (e) {
+    console.error('Error enviando email:', e.message);
+    // Si falla el email, igual guardamos el código y lo mostramos en respuesta (modo desarrollo)
+    res.json({ ok: true, message: 'Código enviado', devCode: process.env.NODE_ENV !== 'production' ? code : undefined });
+  }
+});
+
+// PASO 2: Verificar código → crea la cuenta
+app.post('/api/auth/verify', async (req, res) => {
+  const { email, code } = req.body;
+  if (!email || !code)
+    return res.status(400).json({ error: 'Faltan datos' });
+
+  const pending = pendingCodes[email];
+  if (!pending)
+    return res.status(404).json({ error: 'No hay registro pendiente para este correo' });
+  if (Date.now() > pending.expiresAt) {
+    delete pendingCodes[email];
+    return res.status(410).json({ error: 'El código expiró. Vuelve a registrarte.' });
+  }
+  if (pending.code !== code.trim())
+    return res.status(401).json({ error: 'Código incorrecto' });
+
+  // Crea el usuario
+  const { data } = pending;
   usersDB[email] = {
-    email, passwordHash, name,
-    age: parseInt(age), gender, country: country || 'MX',
+    ...data,
     isPremium: false, banned: false,
     createdAt: new Date().toISOString(),
-    lastSeen: new Date().toISOString(),
-    totalSessions: 0, totalMinutes: 0
+    lastSeen:  new Date().toISOString(),
+    totalSessions: 0, totalMinutes: 0,
+    verified: true
   };
-  const token = jwt.sign({ email, name, isAdmin: false }, JWT_SECRET, { expiresIn: '30d' });
+  delete pendingCodes[email];
+
+  const token = jwt.sign({ email, name: data.name, isAdmin: false }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ token, user: sanitizeUser(usersDB[email]) });
+});
+
+// Reenviar código
+app.post('/api/auth/resend', async (req, res) => {
+  const { email } = req.body;
+  const pending = pendingCodes[email];
+  if (!pending)
+    return res.status(404).json({ error: 'No hay registro pendiente para este correo' });
+
+  // Renueva código y tiempo
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  pending.code      = code;
+  pending.expiresAt = Date.now() + 15 * 60 * 1000;
+
+  try {
+    await sendVerificationEmail(email, pending.data.name, code);
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: 'Error al enviar el correo' });
+  }
 });
 
 // Login
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
-  // Admin login
   if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
     const token = jwt.sign({ email, isAdmin: true }, JWT_SECRET, { expiresIn: '8h' });
     return res.json({ token, isAdmin: true });
@@ -113,6 +238,7 @@ app.post('/api/auth/login', async (req, res) => {
   const user = usersDB[email];
   if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
   if (user.banned) return res.status(403).json({ error: 'Tu cuenta ha sido suspendida' });
+  if (!user.verified) return res.status(403).json({ error: 'Verifica tu correo primero' });
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return res.status(401).json({ error: 'Contraseña incorrecta' });
@@ -132,13 +258,10 @@ app.get('/api/auth/me', authUser, (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════════
 // REST API — Payments
 // ════════════════════════════════════════════════════════════════════════════════
-
-// Submit payment request (with optional file upload)
 app.post('/api/payments/submit', authUser, upload.single('comprobante'), (req, res) => {
   const { nombre, referencia, fecha, monto } = req.body;
-  if (!nombre || !referencia || !fecha || !monto) {
+  if (!nombre || !referencia || !fecha || !monto)
     return res.status(400).json({ error: 'Completa todos los campos' });
-  }
 
   const payment = {
     id: uuidv4(),
@@ -146,7 +269,7 @@ app.post('/api/payments/submit', authUser, upload.single('comprobante'), (req, r
     userName: usersDB[req.user.email]?.name || nombre,
     nombre, referencia, fecha, monto,
     comprobante: req.file ? `/uploads/${req.file.filename}` : null,
-    status: 'pending', // pending | approved | rejected
+    status: 'pending',
     createdAt: new Date().toISOString(),
     reviewedAt: null,
     reviewNote: ''
@@ -158,16 +281,14 @@ app.post('/api/payments/submit', authUser, upload.single('comprobante'), (req, r
 // ════════════════════════════════════════════════════════════════════════════════
 // REST API — Reports
 // ════════════════════════════════════════════════════════════════════════════════
-
 app.post('/api/reports/submit', authUser, (req, res) => {
   const { reportedEmail, reason, description } = req.body;
   if (!reportedEmail || !reason) return res.status(400).json({ error: 'Faltan datos' });
-
   reportsDB.push({
     id: uuidv4(),
     reporterEmail: req.user.email,
-    reportedEmail,
-    reason, description: description || '',
+    reportedEmail, reason,
+    description: description || '',
     status: 'pending',
     createdAt: new Date().toISOString()
   });
@@ -177,19 +298,16 @@ app.post('/api/reports/submit', authUser, (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════════
 // REST API — Admin
 // ════════════════════════════════════════════════════════════════════════════════
-
-// Stats
 app.get('/api/admin/stats', authAdmin, (req, res) => {
-  const total    = Object.keys(usersDB).length;
-  const premium  = Object.values(usersDB).filter(u => u.isPremium).length;
-  const banned   = Object.values(usersDB).filter(u => u.banned).length;
-  const online   = Object.keys(activeSockets).length;
-  const pending  = paymentsDB.filter(p => p.status === 'pending').length;
-  const reports  = reportsDB.filter(r => r.status === 'pending').length;
+  const total   = Object.keys(usersDB).length;
+  const premium = Object.values(usersDB).filter(u => u.isPremium).length;
+  const banned  = Object.values(usersDB).filter(u => u.banned).length;
+  const online  = Object.keys(activeSockets).length;
+  const pending = paymentsDB.filter(p => p.status === 'pending').length;
+  const reports = reportsDB.filter(r => r.status === 'pending').length;
   res.json({ total, premium, banned, online, pendingPayments: pending, pendingReports: reports });
 });
 
-// All users
 app.get('/api/admin/users', authAdmin, (req, res) => {
   const list = Object.values(usersDB).map(u => ({
     ...sanitizeUser(u),
@@ -198,24 +316,20 @@ app.get('/api/admin/users', authAdmin, (req, res) => {
   res.json(list);
 });
 
-// Activate / deactivate premium
 app.post('/api/admin/users/:email/premium', authAdmin, (req, res) => {
   const user = usersDB[decodeURIComponent(req.params.email)];
   if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
   user.isPremium = req.body.active;
-  // Notify via socket if online
   const sock = Object.entries(activeSockets).find(([, s]) => s.email === user.email);
   if (sock) io.to(sock[0]).emit(user.isPremium ? 'premium_activated' : 'premium_removed');
   res.json({ ok: true });
 });
 
-// Ban / unban user
 app.post('/api/admin/users/:email/ban', authAdmin, (req, res) => {
   const user = usersDB[decodeURIComponent(req.params.email)];
   if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
-  user.banned = req.body.ban;
+  user.banned    = req.body.ban;
   user.banReason = req.body.reason || '';
-  // Kick from socket if online
   const sock = Object.entries(activeSockets).find(([, s]) => s.email === user.email);
   if (sock && user.banned) {
     io.to(sock[0]).emit('account_banned', { reason: user.banReason });
@@ -224,19 +338,16 @@ app.post('/api/admin/users/:email/ban', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// All payments
 app.get('/api/admin/payments', authAdmin, (req, res) => {
   res.json(paymentsDB.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
 });
 
-// Approve / reject payment
 app.post('/api/admin/payments/:id/review', authAdmin, (req, res) => {
   const payment = paymentsDB.find(p => p.id === req.params.id);
   if (!payment) return res.status(404).json({ error: 'Pago no encontrado' });
-  payment.status     = req.body.status; // approved | rejected
+  payment.status     = req.body.status;
   payment.reviewedAt = new Date().toISOString();
   payment.reviewNote = req.body.note || '';
-
   if (req.body.status === 'approved') {
     const user = usersDB[payment.email];
     if (user) {
@@ -248,21 +359,18 @@ app.post('/api/admin/payments/:id/review', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// All reports
 app.get('/api/admin/reports', authAdmin, (req, res) => {
   res.json(reportsDB.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
 });
 
-// Resolve report
 app.post('/api/admin/reports/:id/resolve', authAdmin, (req, res) => {
   const report = reportsDB.find(r => r.id === req.params.id);
   if (!report) return res.status(404).json({ error: 'Reporte no encontrado' });
-  report.status = 'resolved';
+  report.status     = 'resolved';
   report.resolvedAt = new Date().toISOString();
   res.json({ ok: true });
 });
 
-// Health
 app.get('/api/health', (req, res) => res.json({ status: 'ok', online: Object.keys(activeSockets).length }));
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -317,15 +425,12 @@ io.on('connection', (socket) => {
   });
 
   socket.on('set_filters', (filters) => {
-    if (activeSockets[socket.id]?.isPremium) {
-      activeSockets[socket.id].filters = filters;
-    }
+    if (activeSockets[socket.id]?.isPremium) activeSockets[socket.id].filters = filters;
   });
 
   socket.on('find_partner', () => {
     const user = activeSockets[socket.id];
     if (!user) return;
-
     if (user.partnerId) {
       io.to(user.partnerId).emit('partner_disconnected');
       if (activeSockets[user.partnerId]) activeSockets[user.partnerId].partnerId = null;
@@ -333,17 +438,12 @@ io.on('connection', (socket) => {
     }
     const idx = waitingPool.indexOf(socket.id);
     if (idx !== -1) waitingPool.splice(idx, 1);
-
     const matchId = findMatch(socket.id);
     if (matchId) {
       user.partnerId = matchId;
       activeSockets[matchId].partnerId = socket.id;
       user.sessionStart = Date.now();
       activeSockets[matchId].sessionStart = Date.now();
-
-      const partnerUser = usersDB[activeSockets[matchId].email];
-      const myUser      = usersDB[user.email];
-
       socket.emit('partner_found', {
         partner: { name: activeSockets[matchId].name, age: activeSockets[matchId].age, gender: activeSockets[matchId].gender, country: activeSockets[matchId].country, email: activeSockets[matchId].email },
         initiator: true
@@ -380,7 +480,6 @@ io.on('connection', (socket) => {
         io.to(user.partnerId).emit('partner_disconnected');
         if (activeSockets[user.partnerId]) activeSockets[user.partnerId].partnerId = null;
       }
-      // track minutes
       if (user.sessionStart && usersDB[user.email]) {
         usersDB[user.email].totalMinutes = (usersDB[user.email].totalMinutes || 0) +
           Math.floor((Date.now() - user.sessionStart) / 60000);
@@ -392,7 +491,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// ── Helper ────────────────────────────────────────────────────────────────────
 function sanitizeUser(u) {
   const { passwordHash, ...rest } = u;
   return rest;

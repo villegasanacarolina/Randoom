@@ -460,6 +460,32 @@ body::before{content:'';position:fixed;inset:0;background:
           <button class="btn btn-primary btn-full btn-lg" onclick="doRegister()">✨ Crear cuenta</button>
         </div>
       </div>
+
+      <!-- Verify code form -->
+      <div id="verify-form" class="card hidden">
+        <div class="auth-form">
+          <div style="text-align:center;margin-bottom:8px">
+            <div style="font-size:48px;margin-bottom:10px">📧</div>
+            <h3 style="font-family:'Poppins',sans-serif;font-weight:700;font-size:18px;margin-bottom:6px">Revisa tu correo</h3>
+            <p style="font-size:13px;color:var(--gray-l);line-height:1.6">Enviamos un código de 6 dígitos a <strong id="verify-email-display" style="color:var(--or)"></strong></p>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:center;margin:8px 0">
+            <input class="fc" id="c1" type="text" maxlength="1" style="width:46px;height:54px;text-align:center;font-size:24px;font-weight:700;padding:0;font-family:'Poppins',sans-serif" oninput="codeInput(this,'c2')" onkeydown="codeBack(event,this,'')"/>
+            <input class="fc" id="c2" type="text" maxlength="1" style="width:46px;height:54px;text-align:center;font-size:24px;font-weight:700;padding:0;font-family:'Poppins',sans-serif" oninput="codeInput(this,'c3')" onkeydown="codeBack(event,this,'c1')"/>
+            <input class="fc" id="c3" type="text" maxlength="1" style="width:46px;height:54px;text-align:center;font-size:24px;font-weight:700;padding:0;font-family:'Poppins',sans-serif" oninput="codeInput(this,'c4')" onkeydown="codeBack(event,this,'c2')"/>
+            <input class="fc" id="c4" type="text" maxlength="1" style="width:46px;height:54px;text-align:center;font-size:24px;font-weight:700;padding:0;font-family:'Poppins',sans-serif" oninput="codeInput(this,'c5')" onkeydown="codeBack(event,this,'c3')"/>
+            <input class="fc" id="c5" type="text" maxlength="1" style="width:46px;height:54px;text-align:center;font-size:24px;font-weight:700;padding:0;font-family:'Poppins',sans-serif" oninput="codeInput(this,'c6')" onkeydown="codeBack(event,this,'c4')"/>
+            <input class="fc" id="c6" type="text" maxlength="1" style="width:46px;height:54px;text-align:center;font-size:24px;font-weight:700;padding:0;font-family:'Poppins',sans-serif" oninput="codeInput(this,'')" onkeydown="codeBack(event,this,'c5')"/>
+          </div>
+          <button class="btn btn-primary btn-full btn-lg" onclick="doVerify()">✅ Confirmar código</button>
+          <div style="text-align:center">
+            <button class="btn btn-ghost btn-sm" onclick="doResend()" id="resend-btn">📩 Reenviar código</button>
+            <span id="resend-timer" style="font-size:12px;color:var(--gray-l);display:none"></span>
+          </div>
+          <button class="btn btn-ghost btn-sm btn-full" onclick="switchTab('register')" style="margin-top:-4px">← Volver</button>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -739,6 +765,7 @@ function switchTab(tab) {
   document.getElementById('tab-register').classList.toggle('active', tab==='register');
   document.getElementById('login-form').classList.toggle('hidden', tab!=='login');
   document.getElementById('register-form').classList.toggle('hidden', tab!=='register');
+  document.getElementById('verify-form').classList.add('hidden');
 }
 
 // ── Country search ────────────────────────────────────────────────────────────
@@ -782,6 +809,9 @@ async function doLogin() {
   } catch(e) { toast(e.message,'err'); }
 }
 
+// email being verified
+let pendingEmail = null;
+
 async function doRegister() {
   const name    = document.getElementById('r-name').value.trim();
   const email   = document.getElementById('r-email').value.trim();
@@ -793,11 +823,76 @@ async function doRegister() {
   if (pass.length < 6) { toast('La contraseña debe tener al menos 6 caracteres','err'); return; }
   if (parseInt(age)<18) { toast('Debes tener al menos 18 años','err'); return; }
   try {
-    const r = await api('/api/auth/register','POST',{email,password:pass,name,age,gender,country});
+    await api('/api/auth/register','POST',{email,password:pass,name,age,gender,country});
+    pendingEmail = email;
+    document.getElementById('verify-email-display').textContent = email;
+    // show verify form
+    document.getElementById('register-form').classList.add('hidden');
+    document.getElementById('verify-form').classList.remove('hidden');
+    document.getElementById('c1').focus();
+    toast('📧 Código enviado a tu correo','ok');
+    startResendTimer();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// Code input helpers
+function codeInput(el, nextId) {
+  el.value = el.value.replace(/[^0-9]/g,'');
+  if (el.value && nextId) document.getElementById(nextId)?.focus();
+  // auto-submit when all 6 filled
+  const code = ['c1','c2','c3','c4','c5','c6'].map(id=>document.getElementById(id).value).join('');
+  if (code.length === 6) doVerify();
+}
+
+function codeBack(e, el, prevId) {
+  if (e.key === 'Backspace' && !el.value && prevId) document.getElementById(prevId)?.focus();
+}
+
+async function doVerify() {
+  const code = ['c1','c2','c3','c4','c5','c6'].map(id=>document.getElementById(id).value).join('');
+  if (code.length < 6) { toast('Ingresa el código completo','err'); return; }
+  if (!pendingEmail) { toast('Error: vuelve a registrarte','err'); return; }
+  try {
+    const r = await api('/api/auth/verify','POST',{ email: pendingEmail, code });
     app.token=r.token; app.user=r.user; app.isPremium=false;
     localStorage.setItem('rd_token',r.token);
-    toast(`¡Cuenta creada! Bienvenido, ${r.user.name} 🎉`,'ok');
+    toast(`🎉 ¡Cuenta verificada! Bienvenido, ${r.user.name}`,'ok');
     goToChat();
+  } catch(e) {
+    toast(e.message,'err');
+    // clear inputs on wrong code
+    ['c1','c2','c3','c4','c5','c6'].forEach(id=>{ document.getElementById(id).value=''; });
+    document.getElementById('c1').focus();
+  }
+}
+
+let resendInterval = null;
+function startResendTimer() {
+  const btn   = document.getElementById('resend-btn');
+  const timer = document.getElementById('resend-timer');
+  btn.style.display = 'none';
+  timer.style.display = 'inline';
+  let secs = 60;
+  timer.textContent = `Reenviar en ${secs}s`;
+  resendInterval = setInterval(() => {
+    secs--;
+    timer.textContent = `Reenviar en ${secs}s`;
+    if (secs <= 0) {
+      clearInterval(resendInterval);
+      timer.style.display = 'none';
+      btn.style.display = 'inline-flex';
+    }
+  }, 1000);
+}
+
+async function doResend() {
+  if (!pendingEmail) return;
+  try {
+    await api('/api/auth/resend','POST',{ email: pendingEmail });
+    toast('📧 Nuevo código enviado','ok');
+    ['c1','c2','c3','c4','c5','c6'].forEach(id=>{ document.getElementById(id).value=''; });
+    document.getElementById('c1').focus();
+    startResendTimer();
   } catch(e) { toast(e.message,'err'); }
 }
 
