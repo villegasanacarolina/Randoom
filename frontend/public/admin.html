@@ -332,16 +332,21 @@ function goPage(page){
 }
 
 async function refreshAll(){
+  // Load each independently so one error doesn't block everything
   try{
-    const [stats,users,reports]=await Promise.all([
-      api('/api/admin/stats','GET'),api('/api/admin/users','GET'),
-      api('/api/admin/reports','GET')
-    ]);
+    const stats = await api('/api/admin/stats','GET');
     updateStats(stats);
+  }catch(e){console.error('Stats error:',e.message);}
+
+  try{
+    const users = await api('/api/admin/users','GET');
     allUsers=users;renderUsers();
-    allReports=reports;renderReports();
-    renderDash(reports);
-  }catch(e){toast('Error al cargar datos','err');}
+  }catch(e){console.error('Users error:',e.message);}
+
+  try{
+    const reports = await api('/api/admin/reports','GET');
+    allReports=reports;renderReports();renderDash(reports);
+  }catch(e){console.error('Reports error:',e.message);}
 }
 
 function updateStats(s){

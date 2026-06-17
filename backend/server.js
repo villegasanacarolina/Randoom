@@ -356,42 +356,6 @@ app.get('/api/auth/me', authUser, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// INE
-// ══════════════════════════════════════════════════════════════════════════════
-app.post('/api/ine/submit', authUser,
-  uploadINE.fields([{ name:'frontal',maxCount:1 },{ name:'trasera',maxCount:1 },{ name:'rostro',maxCount:1 }]),
-  async (req, res) => {
-    if (!req.files?.frontal||!req.files?.trasera||!req.files?.rostro)
-      return res.status(400).json({ error: 'Debes subir frente, reverso y foto de rostro' });
-    try {
-      const u = (await pool.query('SELECT * FROM users WHERE email=$1', [req.user.email])).rows[0];
-      if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
-      if (u.ine_status === 'approved') return res.status(400).json({ error: 'Ya verificado' });
-      const id = uuidv4();
-      await pool.query('DELETE FROM ine_requests WHERE email=$1 AND status=$2', [req.user.email, 'pending']);
-      await pool.query(
-        `INSERT INTO ine_requests(id,email,user_name,age,gender,country,frontal,trasera,rostro)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [id, req.user.email, u.name, u.age, u.gender, u.country,
-         `/uploads/ine/${req.files.frontal[0].filename}`,
-         `/uploads/ine/${req.files.trasera[0].filename}`,
-         `/uploads/ine/${req.files.rostro[0].filename}`]
-      );
-      await pool.query('UPDATE users SET ine_status=$1 WHERE email=$2', ['pending', req.user.email]);
-      res.json({ ok: true, requestId: id });
-    } catch(e) { console.error(e); res.status(500).json({ error: 'Error del servidor' }); }
-  }
-);
-
-app.get('/api/ine/status', authUser, async (req, res) => {
-  try {
-    const r = await pool.query('SELECT ine_status,ine_verified,approved FROM users WHERE email=$1', [req.user.email]);
-    if (!r.rows.length) return res.status(404).json({ error: 'No encontrado' });
-    res.json({ ineStatus: r.rows[0].ine_status, ineVerified: r.rows[0].ine_verified, approved: r.rows[0].approved });
-  } catch(e) { res.status(500).json({ error: 'Error' }); }
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
 // MERCADOPAGO
 // ══════════════════════════════════════════════════════════════════════════════
 app.post('/api/payments/create-preference', authUser, async (req, res) => {
@@ -533,35 +497,6 @@ app.post('/api/admin/users/:email/ban', authAdmin, async (req, res) => {
     if (s && req.body.ban) { io.to(s[0]).emit('account_banned', { reason: req.body.reason }); io.sockets.sockets.get(s[0])?.disconnect(true); }
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: 'Error' }); }
-});
-
-app.get('/api/admin/ine', authAdmin, async (req, res) => {
-  try {
-    const r = await pool.query('SELECT * FROM ine_requests ORDER BY created_at DESC');
-    res.json(r.rows.map(r => ({
-      id: r.id, email: r.email, userName: r.user_name, age: r.age,
-      gender: r.gender, country: r.country, frontal: r.frontal,
-      trasera: r.trasera, rostro: r.rostro, status: r.status,
-      reviewNote: r.review_note, createdAt: r.created_at, reviewedAt: r.reviewed_at
-    })));
-  } catch(e) { res.status(500).json({ error: 'Error' }); }
-});
-
-app.post('/api/admin/ine/:id/review', authAdmin, async (req, res) => {
-  const { status, note } = req.body;
-  try {
-    const r = await pool.query('SELECT * FROM ine_requests WHERE id=$1', [req.params.id]);
-    if (!r.rows.length) return res.status(404).json({ error: 'No encontrado' });
-    const request = r.rows[0];
-    await pool.query('UPDATE ine_requests SET status=$1, review_note=$2, reviewed_at=NOW() WHERE id=$3', [status, note||'', req.params.id]);
-    await pool.query('UPDATE users SET ine_status=$1, ine_verified=$2, approved=$3 WHERE email=$4',
-      [status, status==='approved', status==='approved', request.email]);
-    const s = Object.entries(activeSockets).find(([,s]) => s.email === request.email);
-    if (s) io.to(s[0]).emit('ine_reviewed', { status, note });
-    if (status === 'approved') sendApprovalEmail(request.email, request.user_name).catch(() => {});
-    else sendRejectionEmail(request.email, request.user_name, note).catch(() => {});
-    res.json({ ok: true });
-  } catch(e) { console.error(e); res.status(500).json({ error: 'Error' }); }
 });
 
 app.get('/api/admin/reports', authAdmin, async (req, res) => {
