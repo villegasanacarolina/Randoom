@@ -483,12 +483,11 @@ app.post('/api/recordings/upload', authUser, uploadRec.single('recording'), asyn
 // ══════════════════════════════════════════════════════════════════════════════
 app.get('/api/admin/stats', authAdmin, async (req, res) => {
   try {
-    const [total, approved, premium, banned, pendingINE, pendingReports] = await Promise.all([
+    const [total, approved, premium, banned, pendingReports] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM users'),
       pool.query('SELECT COUNT(*) FROM users WHERE approved=true'),
       pool.query('SELECT COUNT(*) FROM users WHERE is_premium=true'),
       pool.query('SELECT COUNT(*) FROM users WHERE banned=true'),
-      pool.query("SELECT COUNT(*) FROM ine_requests WHERE status='pending'"),
       pool.query("SELECT COUNT(*) FROM reports WHERE status='pending'")
     ]);
     res.json({
@@ -497,10 +496,9 @@ app.get('/api/admin/stats', authAdmin, async (req, res) => {
       premium:        parseInt(premium.rows[0].count),
       banned:         parseInt(banned.rows[0].count),
       online:         Object.keys(activeSockets).length,
-      pendingINE:     parseInt(pendingINE.rows[0].count),
       pendingReports: parseInt(pendingReports.rows[0].count)
     });
-  } catch(e) { res.status(500).json({ error: 'Error' }); }
+  } catch(e) { console.error('Stats error:',e.message); res.status(500).json({ error: 'Error' }); }
 });
 
 app.get('/api/admin/users', authAdmin, async (req, res) => {
