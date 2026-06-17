@@ -9,7 +9,7 @@ const path       = require('path');
 const fs         = require('fs');
 const bcrypt     = require('bcryptjs');
 const jwt        = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+const https = require('https');
 
 const app    = express();
 const server = http.createServer(app);
@@ -45,30 +45,42 @@ const ADMIN_PASSWORD = 'Randoom2024!';
 const JWT_SECRET     = 'randoom-super-secret-jwt-key-2024';
 
 // ── Nodemailer (Gmail) ────────────────────────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  requireTLS: true,
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false,
-    minVersion: 'TLSv1.2'
-  },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 15000
-});
+// ── Resend email sender (uses HTTPS, never blocked) ──────────────────────────
+function sendWithResend(to, subject, html) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      from: 'Randoom <onboarding@resend.dev>',
+      to: [to],
+      subject,
+      html
+    });
+    const options = {
+      hostname: 'api.resend.com',
+      path: '/emails',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) resolve(JSON.parse(data));
+        else reject(new Error(`Resend error ${res.statusCode}: ${data}`));
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
 
 async function sendVerificationEmail(email, name, code) {
-  const mailOptions = {
-    from: `"Randoom" <${process.env.GMAIL_USER}>`,
-    to: email,
-    subject: '🟠 Tu código de verificación — Randoom',
-    html: `
+  const subject = '🟠 Tu código de verificación — Randoom';
+  const html = `
       <!DOCTYPE html>
       <html>
       <head><meta charset="UTF-8"/></head>
@@ -112,10 +124,9 @@ async function sendVerificationEmail(email, name, code) {
         </div>
       </body>
       </html>
-    `
-  };
+    `;
 
-  await transporter.sendMail(mailOptions);
+  await sendWithResend(email, subject, html);
 }
 
 // ── Active socket sessions ────────────────────────────────────────────────────
