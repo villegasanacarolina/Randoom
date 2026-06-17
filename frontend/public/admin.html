@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Randoom — Panel Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --or:#FF6B00;--or-d:#D95A00;--or-l:#FF8C33;--or-g:rgba(255,107,0,.15);
+  --dk:#0E0400;--dk2:#170600;--dk3:#1F0900;
+  --wh:#fff;--gray:#8A6040;--gray-l:#B89070;
+  --bd:rgba(255,107,0,.2);--card:rgba(255,255,255,.04);
+  --ok:#22C55E;--err:#EF4444;--warn:#F59E0B;--info:#3B82F6;
+  --sidebar:220px;--r:12px
+}
+html,body{height:100%;font-family:'Inter',sans-serif;background:var(--dk);color:var(--wh);overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:
+  radial-gradient(ellipse 60% 40% at 10% 10%,rgba(255,107,0,.08) 0%,transparent 60%),
+  linear-gradient(160deg,#0E0400,#060100);z-index:0;pointer-events:none}
+
+/* ── Login ── */
+#login-screen{position:fixed;inset:0;background:var(--dk);z-index:500;
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:rgba(255,255,255,.04);border:1px solid var(--bd);border-radius:20px;
+  padding:40px 36px;width:100%;max-width:400px;text-align:center}
+.login-box .logo-icon{width:56px;height:56px;background:var(--or);border-radius:14px;
+  display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;
+  font-weight:900;font-size:22px;color:#fff;margin:0 auto 16px;
+  box-shadow:0 6px 20px rgba(255,107,0,.5)}
+.login-box h2{font-family:'Poppins',sans-serif;font-weight:800;font-size:24px;margin-bottom:6px}
+.login-box p{color:var(--gray-l);font-size:13px;margin-bottom:28px}
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;text-align:left}
+.fg label{font-size:11px;font-weight:600;color:var(--gray-l);text-transform:uppercase;letter-spacing:.5px}
+.fc{background:rgba(255,255,255,.06);border:1.5px solid var(--bd);border-radius:10px;
+  color:#fff;font-family:'Inter',sans-serif;font-size:14px;padding:10px 13px;
+  outline:none;width:100%;transition:all .2s}
+.fc:focus{border-color:var(--or);background:rgba(255,107,0,.06)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:10px 20px;border-radius:10px;font-family:'Poppins',sans-serif;font-weight:600;
+  font-size:13px;border:none;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:linear-gradient(135deg,var(--or-l),var(--or-d));color:#fff;
+  box-shadow:0 4px 16px rgba(255,107,0,.35)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(255,107,0,.5)}
+.btn-sm{padding:6px 12px;font-size:11px;border-radius:8px}
+.btn-ghost{background:rgba(255,255,255,.07);color:#fff;border:1px solid var(--bd)}
+.btn-ghost:hover{background:rgba(255,255,255,.12)}
+.btn-danger{background:rgba(239,68,68,.15);color:#EF4444;border:1px solid rgba(239,68,68,.3)}
+.btn-danger:hover{background:rgba(239,68,68,.25)}
+.btn-success{background:rgba(34,197,94,.15);color:#22C55E;border:1px solid rgba(34,197,94,.3)}
+.btn-success:hover{background:rgba(34,197,94,.25)}
+.btn-warn{background:rgba(245,158,11,.15);color:#F59E0B;border:1px solid rgba(245,158,11,.3)}
+.btn-warn:hover{background:rgba(245,158,11,.25)}
+.btn-info{background:rgba(59,130,246,.15);color:#3B82F6;border:1px solid rgba(59,130,246,.3)}
+.btn-full{width:100%}
+
+/* ── Layout ── */
+#app{position:relative;z-index:1;display:flex;min-height:100vh}
+
+/* Sidebar */
+.sidebar{width:var(--sidebar);background:rgba(14,4,0,.9);border-right:1px solid var(--bd);
+  display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;
+  overflow-y:auto;z-index:10;backdrop-filter:blur(20px)}
+.sidebar-logo{padding:20px 18px;border-bottom:1px solid var(--bd)}
+.sidebar-logo .li{display:flex;align-items:center;gap:9px}
+.logo-icon-sm{width:36px;height:36px;background:var(--or);border-radius:9px;
+  display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;
+  font-weight:900;font-size:15px;color:#fff;flex-shrink:0}
+.logo-txt-sm{font-family:'Poppins',sans-serif;font-weight:800;font-size:18px}
+.logo-txt-sm span{color:var(--or)}
+.admin-badge{font-size:10px;background:var(--or-g);border:1px solid rgba(255,107,0,.3);
+  color:var(--or);border-radius:20px;padding:2px 8px;margin-top:4px;display:inline-block}
+
+.nav-items{flex:1;padding:12px 10px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;
+  font-size:13px;font-weight:500;color:var(--gray-l);cursor:pointer;transition:all .2s;
+  margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--or-g);color:var(--wh)}
+.nav-item.active{background:var(--or-g);color:var(--or);border:1px solid rgba(255,107,0,.2)}
+.nav-item .icon{font-size:16px;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--err);color:#fff;font-size:10px;font-weight:700;
+  padding:2px 7px;border-radius:20px;min-width:20px;text-align:center}
+
+.sidebar-footer{padding:14px 18px;border-top:1px solid var(--bd)}
+.logout-btn{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;
+  background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#EF4444;
+  cursor:pointer;font-size:13px;font-weight:600;width:100%;transition:all .2s}
+.logout-btn:hover{background:rgba(239,68,68,.2)}
+
+/* Main content */
+.main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{padding:16px 28px;background:rgba(14,4,0,.8);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(10px);
+  position:sticky;top:0;z-index:5}
+.topbar h1{font-family:'Poppins',sans-serif;font-weight:700;font-size:20px}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.online-pill{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gray-l);
+  background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:20px;padding:4px 10px}
+.online-dot{width:6px;height:6px;background:var(--ok);border-radius:50%;
+  box-shadow:0 0 5px var(--ok);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.content{padding:24px 28px;flex:1}
+.page{display:none}
+.page.active{display:block}
+
+/* Stats grid */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:20px;
+  position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:-20px;right:-20px;width:80px;height:80px;
+  border-radius:50%;opacity:.4}
+.stat-card.orange::before{background:var(--or)}
+.stat-card.green::before{background:var(--ok)}
+.stat-card.red::before{background:var(--err)}
+.stat-card.blue::before{background:var(--info)}
+.stat-card.yellow::before{background:var(--warn)}
+.stat-icon{font-size:22px;margin-bottom:10px}
+.stat-val{font-family:'Poppins',sans-serif;font-weight:800;font-size:32px;line-height:1;margin-bottom:4px}
+.stat-lbl{font-size:12px;color:var(--gray-l)}
+
+/* Table */
+.tbl-wrap{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:20px}
+.tbl-head{padding:16px 20px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tbl-head h2{font-family:'Poppins',sans-serif;font-weight:700;font-size:16px}
+.tbl-search{background:rgba(255,255,255,.06);border:1px solid var(--bd);border-radius:9px;
+  color:#fff;font-size:13px;padding:7px 12px;outline:none;min-width:200px}
+.tbl-search::placeholder{color:var(--gray)}
+.tbl-search:focus{border-color:var(--or)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{padding:11px 16px;text-align:left;color:var(--gray-l);font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bd);background:rgba(255,255,255,.02)}
+td{padding:12px 16px;border-bottom:1px solid rgba(255,107,0,.07);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.status-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.status-pill.pending{background:rgba(245,158,11,.15);color:#F59E0B;border:1px solid rgba(245,158,11,.3)}
+.status-pill.approved{background:rgba(34,197,94,.15);color:#22C55E;border:1px solid rgba(34,197,94,.3)}
+.status-pill.rejected{background:rgba(239,68,68,.15);color:#EF4444;border:1px solid rgba(239,68,68,.3)}
+.status-pill.active{background:rgba(34,197,94,.15);color:#22C55E;border:1px solid rgba(34,197,94,.3)}
+.status-pill.banned{background:rgba(239,68,68,.15);color:#EF4444;border:1px solid rgba(239,68,68,.3)}
+.status-pill.online{background:rgba(59,130,246,.15);color:#3B82F6;border:1px solid rgba(59,130,246,.3)}
+.status-pill.premium{background:var(--or-g);color:var(--or);border:1px solid rgba(255,107,0,.3)}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--or-g);
+  display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.user-cell{display:flex;align-items:center;gap:10px}
+
+/* Action buttons in table */
+.act-btns{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);
+  z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg.open{display:flex}
+.modal{background:linear-gradient(135deg,rgba(20,6,0,.98),rgba(35,12,0,.98));
+  border:1.5px solid var(--or);border-radius:18px;padding:32px 28px;
+  max-width:480px;width:100%;animation:mIn .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes mIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+.modal h3{font-family:'Poppins',sans-serif;font-weight:800;font-size:20px;margin-bottom:8px}
+.modal p{color:var(--gray-l);font-size:13px;line-height:1.6;margin-bottom:20px}
+.modal-fgs{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+.modal-btns{display:flex;gap:10px;flex-wrap:wrap}
+
+/* Detail box */
+.detail-box{background:rgba(255,255,255,.03);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:14px}
+.detail-row{display:flex;gap:10px;margin-bottom:8px;font-size:13px}
+.detail-row:last-child{margin-bottom:0}
+.detail-lbl{color:var(--gray-l);width:110px;flex-shrink:0;font-size:11px;font-weight:600;text-transform:uppercase;padding-top:1px}
+.detail-val{color:#fff;word-break:break-all}
+
+/* Proof image */
+.proof-img{max-width:100%;border-radius:10px;border:1px solid var(--bd);cursor:pointer;transition:opacity .2s}
+.proof-img:hover{opacity:.85}
+
+/* Toasts */
+#toasts{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:7px}
+.toast{background:rgba(14,4,0,.97);border:1px solid var(--bd);border-radius:10px;
+  padding:12px 15px;font-size:13px;display:flex;align-items:center;gap:8px;
+  box-shadow:0 8px 28px rgba(0,0,0,.5);animation:tIn .3s ease;max-width:300px}
+@keyframes tIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast.ok{border-color:var(--ok)}.toast.err{border-color:var(--err)}.toast.info{border-color:var(--or)}
+
+/* Filters bar */
+.filters-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.filter-btn{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .2s;border:1px solid var(--bd);background:transparent;color:var(--gray-l)}
+.filter-btn.active{background:var(--or-g);border-color:var(--or);color:var(--or)}
+
+/* Empty state */
+.empty{text-align:center;padding:48px 20px;color:var(--gray-l)}
+.empty .ei{font-size:44px;margin-bottom:12px}
+.empty p{font-size:14px}
+
+/* Responsive */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);transition:transform .3s}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+}
+</style>
+</head>
+<body>
+
+<div id="toasts"></div>
+
+<!-- ══════════════════ LOGIN ══════════════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="logo-icon">RD</div>
+    <h2>Panel Administrador</h2>
+    <p>Acceso exclusivo para administradores de Randoom</p>
+    <div class="fg"><label>Correo</label><input class="fc" id="a-email" type="email" placeholder="admin@randoom.com" value="admin@randoom.com"/></div>
+    <div class="fg"><label>Contraseña</label><input class="fc" id="a-pass" type="password" placeholder="Contraseña admin" onkeydown="if(event.key==='Enter')doAdminLogin()"/></div>
+    <button class="btn btn-primary btn-full" style="margin-top:8px" onclick="doAdminLogin()">🔐 Ingresar al panel</button>
+  </div>
+</div>
+
+<!-- ══════════════════ MAIN APP ══════════════════ -->
+<div id="app" style="display:none">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="li">
+        <div class="logo-icon-sm">RD</div>
+        <span class="logo-txt-sm">Rand<span>oom</span></span>
+      </div>
+      <span class="admin-badge">🔐 Admin Panel</span>
+    </div>
+    <nav class="nav-items">
+      <button class="nav-item active" data-page="dashboard" onclick="goPage('dashboard')"><span class="icon">📊</span> Dashboard</button>
+      <button class="nav-item" data-page="users" onclick="goPage('users')"><span class="icon">👥</span> Usuarios <span class="nav-badge" id="badge-users" style="display:none">0</span></button>
+      <button class="nav-item" data-page="payments" onclick="goPage('payments')"><span class="icon">💳</span> Pagos <span class="nav-badge" id="badge-payments">0</span></button>
+      <button class="nav-item" data-page="reports" onclick="goPage('reports')"><span class="icon">🚨</span> Reportes <span class="nav-badge" id="badge-reports">0</span></button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()">🚪 Cerrar sesión</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <h1 id="page-title">📊 Dashboard</h1>
+      <div class="topbar-right">
+        <div class="online-pill"><div class="online-dot"></div><span id="online-count">0</span> en línea</div>
+        <button class="btn btn-ghost btn-sm" onclick="refreshAll()">🔄 Actualizar</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── DASHBOARD ── -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card orange"><div class="stat-icon">👥</div><div class="stat-val" id="s-total">—</div><div class="stat-lbl">Usuarios totales</div></div>
+          <div class="stat-card green"><div class="stat-icon">🟢</div><div class="stat-val" id="s-online">—</div><div class="stat-lbl">En línea ahora</div></div>
+          <div class="stat-card yellow"><div class="stat-icon">⭐</div><div class="stat-val" id="s-premium">—</div><div class="stat-lbl">Usuarios Premium</div></div>
+          <div class="stat-card red"><div class="stat-icon">🚫</div><div class="stat-val" id="s-banned">—</div><div class="stat-lbl">Cuentas baneadas</div></div>
+          <div class="stat-card blue"><div class="stat-icon">💳</div><div class="stat-val" id="s-ppending">—</div><div class="stat-lbl">Pagos pendientes</div></div>
+          <div class="stat-card red"><div class="stat-icon">🚨</div><div class="stat-val" id="s-rpending">—</div><div class="stat-lbl">Reportes pendientes</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div class="tbl-wrap">
+            <div class="tbl-head"><h2>💳 Últimos pagos pendientes</h2><button class="btn btn-ghost btn-sm" onclick="goPage('payments')">Ver todos →</button></div>
+            <div id="dash-payments"><div class="empty"><div class="ei">💳</div><p>Sin pagos pendientes</p></div></div>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-head"><h2>🚨 Últimos reportes</h2><button class="btn btn-ghost btn-sm" onclick="goPage('reports')">Ver todos →</button></div>
+            <div id="dash-reports"><div class="empty"><div class="ei">🚨</div><p>Sin reportes pendientes</p></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── USERS ── -->
+      <div class="page" id="page-users">
+        <div class="tbl-wrap">
+          <div class="tbl-head">
+            <h2>👥 Todos los usuarios</h2>
+            <input class="tbl-search" id="user-search" placeholder="🔍 Buscar por nombre o email…" oninput="filterUsers()"/>
+          </div>
+          <div class="filters-bar" style="padding:0 16px 12px">
+            <button class="filter-btn active" data-uf="all" onclick="setUserFilter('all',this)">Todos</button>
+            <button class="filter-btn" data-uf="premium" onclick="setUserFilter('premium',this)">⭐ Premium</button>
+            <button class="filter-btn" data-uf="banned" onclick="setUserFilter('banned',this)">🚫 Baneados</button>
+            <button class="filter-btn" data-uf="online" onclick="setUserFilter('online',this)">🟢 En línea</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead><tr>
+                <th>Usuario</th><th>Email</th><th>Edad</th><th>País</th>
+                <th>Estado</th><th>Sesiones</th><th>Registro</th><th>Acciones</th>
+              </tr></thead>
+              <tbody id="users-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PAYMENTS ── -->
+      <div class="page" id="page-payments">
+        <div class="tbl-wrap">
+          <div class="tbl-head">
+            <h2>💳 Comprobantes de pago</h2>
+            <div class="filters-bar" style="margin:0">
+              <button class="filter-btn active" data-pf="all" onclick="setPayFilter('all',this)">Todos</button>
+              <button class="filter-btn" data-pf="pending" onclick="setPayFilter('pending',this)">⏳ Pendientes</button>
+              <button class="filter-btn" data-pf="approved" onclick="setPayFilter('approved',this)">✅ Aprobados</button>
+              <button class="filter-btn" data-pf="rejected" onclick="setPayFilter('rejected',this)">❌ Rechazados</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead><tr>
+                <th>Usuario</th><th>Referencia</th><th>Monto</th>
+                <th>Fecha depósito</th><th>Enviado</th><th>Comprobante</th>
+                <th>Estado</th><th>Acciones</th>
+              </tr></thead>
+              <tbody id="payments-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── REPORTS ── -->
+      <div class="page" id="page-reports">
+        <div class="tbl-wrap">
+          <div class="tbl-head">
+            <h2>🚨 Reportes de usuarios</h2>
+            <div class="filters-bar" style="margin:0">
+              <button class="filter-btn active" data-rf="all" onclick="setRepFilter('all',this)">Todos</button>
+              <button class="filter-btn" data-rf="pending" onclick="setRepFilter('pending',this)">⏳ Pendientes</button>
+              <button class="filter-btn" data-rf="resolved" onclick="setRepFilter('resolved',this)">✅ Resueltos</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead><tr>
+                <th>Reportado por</th><th>Usuario reportado</th><th>Motivo</th>
+                <th>Descripción</th><th>Fecha</th><th>Estado</th><th>Acciones</th>
+              </tr></thead>
+              <tbody id="reports-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </main>
+</div><!-- /app -->
+
+<!-- Payment detail modal -->
+<div class="modal-bg" id="pay-modal">
+  <div class="modal">
+    <h3>💳 Detalle del pago</h3>
+    <p>Revisa la información y el comprobante antes de aprobar o rechazar.</p>
+    <div class="detail-box" id="pay-detail"></div>
+    <div id="pay-proof" style="margin-bottom:14px"></div>
+    <div class="modal-fgs">
+      <div class="fg" style="margin:0"><label>Nota (opcional)</label><input class="fc" id="pay-note" type="text" placeholder="Razón de aprobación o rechazo…"/></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-success" onclick="reviewPayment('approved')">✅ Aprobar Premium</button>
+      <button class="btn btn-danger" onclick="reviewPayment('rejected')">❌ Rechazar</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('pay-modal')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ban modal -->
+<div class="modal-bg" id="ban-modal">
+  <div class="modal">
+    <h3 id="ban-title">🚫 Suspender cuenta</h3>
+    <p id="ban-subtitle">Esta acción desconectará al usuario y le impedirá acceder.</p>
+    <div class="modal-fgs">
+      <div class="fg" style="margin:0"><label>Motivo del baneo</label><input class="fc" id="ban-reason" type="text" placeholder="Ej: Contenido inapropiado, acoso…"/></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-danger" id="ban-confirm-btn" onclick="confirmBan()">🚫 Confirmar suspensión</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('ban-modal')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SERVER = window.location.protocol + '//' + window.location.hostname + ':3001';
+let adminToken = null;
+let allUsers   = [];
+let allPayments= [];
+let allReports = [];
+let currentPay = null;
+let currentBan = { email: null, ban: true };
+let userFilter = 'all';
+let payFilter  = 'all';
+let repFilter  = 'all';
+
+const REASONS = {
+  contenido_sexual:'🔞 Contenido sexual no permitido',
+  acoso:'😡 Acoso o comportamiento agresivo',
+  spam:'📢 Spam o publicidad',
+  menor_edad:'👶 Posible menor de edad',
+  racismo:'🚫 Discurso de odio o racismo',
+  otro:'❓ Otro motivo'
+};
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+async function doAdminLogin() {
+  const email = document.getElementById('a-email').value.trim();
+  const pass  = document.getElementById('a-pass').value;
+  if (!email || !pass) { toast('Completa los campos','err'); return; }
+  try {
+    const r = await api('/api/auth/login','POST',{ email, password: pass });
+    if (!r.isAdmin) { toast('Acceso denegado','err'); return; }
+    adminToken = r.token;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    refreshAll();
+    setInterval(refreshAll, 10000);
+  } catch(e) { toast(e.message,'err'); }
+}
+
+function doLogout() {
+  adminToken = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+const pageTitles = { dashboard:'📊 Dashboard', users:'👥 Usuarios', payments:'💳 Pagos Premium', reports:'🚨 Reportes' };
+
+function goPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+page)?.classList.add('active');
+  document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[page] || page;
+}
+
+// ── Refresh all data ──────────────────────────────────────────────────────────
+async function refreshAll() {
+  try {
+    const [stats, users, payments, reports] = await Promise.all([
+      api('/api/admin/stats','GET'),
+      api('/api/admin/users','GET'),
+      api('/api/admin/payments','GET'),
+      api('/api/admin/reports','GET')
+    ]);
+    updateStats(stats);
+    allUsers = users; renderUsers();
+    allPayments = payments; renderPayments();
+    allReports = reports; renderReports();
+    renderDashboard(payments, reports);
+  } catch(e) { toast('Error al cargar datos','err'); }
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function updateStats(s) {
+  document.getElementById('s-total').textContent   = s.total;
+  document.getElementById('s-online').textContent  = s.online;
+  document.getElementById('online-count').textContent = s.online;
+  document.getElementById('s-premium').textContent = s.premium;
+  document.getElementById('s-banned').textContent  = s.banned;
+  document.getElementById('s-ppending').textContent= s.pendingPayments;
+  document.getElementById('s-rpending').textContent= s.pendingReports;
+
+  const pp = s.pendingPayments;
+  const pr = s.pendingReports;
+  const bP = document.getElementById('badge-payments');
+  const bR = document.getElementById('badge-reports');
+  bP.textContent = pp; bP.style.display = pp > 0 ? 'inline-block' : 'none';
+  bR.textContent = pr; bR.style.display = pr > 0 ? 'inline-block' : 'none';
+}
+
+// ── Dashboard quick views ─────────────────────────────────────────────────────
+function renderDashboard(payments, reports) {
+  const pend = payments.filter(p => p.status === 'pending').slice(0,5);
+  const rep  = reports.filter(r => r.status === 'pending').slice(0,5);
+
+  const dp = document.getElementById('dash-payments');
+  if (!pend.length) { dp.innerHTML = '<div class="empty"><div class="ei">💳</div><p>Sin pagos pendientes</p></div>'; }
+  else dp.innerHTML = `<table><thead><tr><th>Usuario</th><th>Monto</th><th>Fecha</th></tr></thead><tbody>
+    ${pend.map(p=>`<tr><td>${p.userName}</td><td style="color:var(--or);font-weight:700">${p.monto}</td>
+    <td style="color:var(--gray-l)">${fdate(p.createdAt)}</td></tr>`).join('')}
+  </tbody></table>`;
+
+  const dr = document.getElementById('dash-reports');
+  if (!rep.length) { dr.innerHTML = '<div class="empty"><div class="ei">🚨</div><p>Sin reportes pendientes</p></div>'; }
+  else dr.innerHTML = `<table><thead><tr><th>Reportado</th><th>Motivo</th><th>Fecha</th></tr></thead><tbody>
+    ${rep.map(r=>`<tr><td>${r.reportedEmail}</td><td>${REASONS[r.reason]||r.reason}</td>
+    <td style="color:var(--gray-l)">${fdate(r.createdAt)}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+function setUserFilter(f, btn) {
+  userFilter = f;
+  document.querySelectorAll('[data-uf]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderUsers();
+}
+
+function filterUsers() { renderUsers(); }
+
+function renderUsers() {
+  const q = document.getElementById('user-search')?.value.toLowerCase() || '';
+  let list = allUsers.filter(u => {
+    if (q && !u.name.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
+    if (userFilter === 'premium' && !u.isPremium) return false;
+    if (userFilter === 'banned'  && !u.banned)    return false;
+    if (userFilter === 'online'  && !u.isOnline)  return false;
+    return true;
+  });
+
+  const tb = document.getElementById('users-tbody');
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="ei">👤</div><p>No hay usuarios</p></div></td></tr>`; return; }
+
+  tb.innerHTML = list.map(u => `
+    <tr>
+      <td><div class="user-cell"><div class="avatar">${u.name[0].toUpperCase()}</div><div><div style="font-weight:600;font-size:13px">${u.name}</div></div></div></td>
+      <td style="color:var(--gray-l);font-size:12px">${u.email}</td>
+      <td>${u.age}</td>
+      <td>${u.country||'—'}</td>
+      <td>
+        ${u.isOnline ? '<span class="status-pill online">🟢 En línea</span>' : ''}
+        ${u.isPremium ? '<span class="status-pill premium">⭐ Premium</span>' : ''}
+        ${u.banned ? '<span class="status-pill banned">🚫 Baneado</span>' : ''}
+        ${!u.isOnline && !u.isPremium && !u.banned ? '<span class="status-pill" style="background:rgba(255,255,255,.06);color:var(--gray-l);border:1px solid var(--bd)">Activo</span>' : ''}
+      </td>
+      <td>${u.totalSessions||0}</td>
+      <td style="color:var(--gray-l);font-size:12px">${fdate(u.createdAt)}</td>
+      <td>
+        <div class="act-btns">
+          ${u.isPremium
+            ? `<button class="btn btn-warn btn-sm" onclick="togglePremium('${u.email}',false)">⭐ Quitar</button>`
+            : `<button class="btn btn-success btn-sm" onclick="togglePremium('${u.email}',true)">⭐ Dar</button>`}
+          ${u.banned
+            ? `<button class="btn btn-info btn-sm" onclick="openUnban('${u.email}')">✅ Desbanear</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="openBan('${u.email}')">🚫 Banear</button>`}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function togglePremium(email, active) {
+  try {
+    await api(`/api/admin/users/${encodeURIComponent(email)}/premium`,'POST',{ active });
+    toast(active ? '⭐ Premium activado' : 'Premium removido', active ? 'ok' : 'info');
+    refreshAll();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+function openBan(email) {
+  currentBan = { email, ban: true };
+  document.getElementById('ban-title').textContent = '🚫 Suspender cuenta';
+  document.getElementById('ban-subtitle').textContent = `¿Suspender la cuenta de ${email}?`;
+  document.getElementById('ban-confirm-btn').textContent = '🚫 Confirmar suspensión';
+  document.getElementById('ban-confirm-btn').className = 'btn btn-danger';
+  document.getElementById('ban-reason').value = '';
+  document.getElementById('ban-modal').classList.add('open');
+}
+
+function openUnban(email) {
+  currentBan = { email, ban: false };
+  document.getElementById('ban-title').textContent = '✅ Reactivar cuenta';
+  document.getElementById('ban-subtitle').textContent = `¿Reactivar la cuenta de ${email}?`;
+  document.getElementById('ban-confirm-btn').textContent = '✅ Confirmar reactivación';
+  document.getElementById('ban-confirm-btn').className = 'btn btn-success';
+  document.getElementById('ban-reason').value = '';
+  document.getElementById('ban-modal').classList.add('open');
+}
+
+async function confirmBan() {
+  const reason = document.getElementById('ban-reason').value.trim();
+  try {
+    await api(`/api/admin/users/${encodeURIComponent(currentBan.email)}/ban`,'POST',{ ban: currentBan.ban, reason });
+    toast(currentBan.ban ? '🚫 Cuenta suspendida' : '✅ Cuenta reactivada', currentBan.ban ? 'err' : 'ok');
+    closeModal('ban-modal');
+    refreshAll();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// ── Payments ──────────────────────────────────────────────────────────────────
+function setPayFilter(f, btn) {
+  payFilter = f;
+  document.querySelectorAll('[data-pf]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPayments();
+}
+
+function renderPayments() {
+  let list = payFilter === 'all' ? allPayments : allPayments.filter(p => p.status === payFilter);
+  const tb = document.getElementById('payments-tbody');
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="ei">💳</div><p>Sin resultados</p></div></td></tr>`; return; }
+
+  tb.innerHTML = list.map(p => `
+    <tr>
+      <td><div class="user-cell"><div class="avatar">💳</div><div>
+        <div style="font-weight:600;font-size:13px">${p.userName}</div>
+        <div style="font-size:11px;color:var(--gray-l)">${p.email}</div>
+      </div></div></td>
+      <td style="font-family:monospace;font-size:12px;color:var(--or)">${p.referencia}</td>
+      <td style="font-weight:700;color:var(--ok)">${p.monto}</td>
+      <td style="color:var(--gray-l);font-size:12px">${p.fecha}</td>
+      <td style="color:var(--gray-l);font-size:12px">${fdate(p.createdAt)}</td>
+      <td>${p.comprobante ? `<a href="${SERVER}${p.comprobante}" target="_blank" class="btn btn-ghost btn-sm">📎 Ver</a>` : '<span style="color:var(--gray-l);font-size:12px">Sin archivo</span>'}</td>
+      <td><span class="status-pill ${p.status}">${p.status==='pending'?'⏳ Pendiente':p.status==='approved'?'✅ Aprobado':'❌ Rechazado'}</span></td>
+      <td>
+        ${p.status==='pending' ? `<button class="btn btn-info btn-sm" onclick="openPayModal('${p.id}')">🔍 Revisar</button>` : ''}
+        ${p.status!=='pending' && p.reviewNote ? `<span style="font-size:11px;color:var(--gray-l)">${p.reviewNote}</span>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openPayModal(id) {
+  currentPay = allPayments.find(p => p.id === id);
+  if (!currentPay) return;
+  document.getElementById('pay-detail').innerHTML = `
+    <div class="detail-row"><span class="detail-lbl">Usuario</span><span class="detail-val">${currentPay.userName} (${currentPay.email})</span></div>
+    <div class="detail-row"><span class="detail-lbl">Nombre depósito</span><span class="detail-val">${currentPay.nombre}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Referencia</span><span class="detail-val" style="color:var(--or);font-weight:600">${currentPay.referencia}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Monto</span><span class="detail-val" style="color:var(--ok);font-weight:700">${currentPay.monto}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Fecha depósito</span><span class="detail-val">${currentPay.fecha}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Enviado</span><span class="detail-val" style="color:var(--gray-l)">${fdate(currentPay.createdAt)}</span></div>
+  `;
+  const pp = document.getElementById('pay-proof');
+  if (currentPay.comprobante) {
+    const ext = currentPay.comprobante.split('.').pop().toLowerCase();
+    if (ext === 'pdf') {
+      pp.innerHTML = `<a href="${SERVER}${currentPay.comprobante}" target="_blank" class="btn btn-ghost btn-sm">📄 Ver PDF comprobante</a>`;
+    } else {
+      pp.innerHTML = `<img src="${SERVER}${currentPay.comprobante}" class="proof-img" alt="Comprobante" onclick="window.open('${SERVER}${currentPay.comprobante}')"/>`;
+    }
+  } else { pp.innerHTML = '<p style="color:var(--gray-l);font-size:12px">Sin archivo de comprobante</p>'; }
+  document.getElementById('pay-note').value = '';
+  document.getElementById('pay-modal').classList.add('open');
+}
+
+async function reviewPayment(status) {
+  if (!currentPay) return;
+  const note = document.getElementById('pay-note').value.trim();
+  try {
+    await api(`/api/admin/payments/${currentPay.id}/review`,'POST',{ status, note });
+    toast(status==='approved' ? '✅ Premium activado al usuario' : '❌ Pago rechazado', status==='approved'?'ok':'err');
+    closeModal('pay-modal');
+    refreshAll();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+function setRepFilter(f, btn) {
+  repFilter = f;
+  document.querySelectorAll('[data-rf]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderReports();
+}
+
+function renderReports() {
+  let list = repFilter === 'all' ? allReports : allReports.filter(r => r.status === repFilter);
+  const tb = document.getElementById('reports-tbody');
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="ei">🚨</div><p>Sin reportes</p></div></td></tr>`; return; }
+
+  tb.innerHTML = list.map(r => `
+    <tr>
+      <td style="font-size:12px;color:var(--gray-l)">${r.reporterEmail}</td>
+      <td style="font-weight:600">${r.reportedEmail}</td>
+      <td>${REASONS[r.reason]||r.reason}</td>
+      <td style="font-size:12px;color:var(--gray-l);max-width:180px;overflow:hidden;text-overflow:ellipsis">${r.description||'—'}</td>
+      <td style="color:var(--gray-l);font-size:12px">${fdate(r.createdAt)}</td>
+      <td><span class="status-pill ${r.status==='resolved'?'approved':'pending'}">${r.status==='resolved'?'✅ Resuelto':'⏳ Pendiente'}</span></td>
+      <td>
+        <div class="act-btns">
+          ${r.status==='pending' ? `<button class="btn btn-success btn-sm" onclick="resolveReport('${r.id}')">✅ Resolver</button>` : ''}
+          <button class="btn btn-danger btn-sm" onclick="openBan('${r.reportedEmail}')">🚫 Banear</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function resolveReport(id) {
+  try {
+    await api(`/api/admin/reports/${id}/resolve`,'POST',{});
+    toast('Reporte marcado como resuelto','ok');
+    refreshAll();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fdate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function api(path, method, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+  const r = await fetch(SERVER+path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'Error');
+  return d;
+}
+
+function toast(msg, type='info') {
+  const icons = { ok:'✅', err:'❌', info:'💬' };
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transform='translateX(100%)'; t.style.transition='all .3s'; setTimeout(()=>t.remove(),300); }, 4000);
+}
+</script>
+</body>
+</html>
