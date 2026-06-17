@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Términos y Privacidad — Randoom</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --pu:#A020F0;--pu-d:#6B00CC;--pu-l:#C060FF;--pu-g:rgba(160,32,240,.15);
+  --dk:#080010;--dk2:#0D0018;--wh:#fff;--gray-l:#C8A8E0;--bd:rgba(160,32,240,.22)
+}
+html,body{min-height:100%;font-family:'Inter',sans-serif;background:var(--dk);color:var(--wh);line-height:1.7}
+body::before{content:'';position:fixed;inset:0;background:
+  radial-gradient(ellipse 60% 40% at 10% 10%,rgba(160,32,240,.1) 0%,transparent 60%),
+  linear-gradient(135deg,#080010,#040008);z-index:0;pointer-events:none}
+
+nav{position:sticky;top:0;z-index:100;background:rgba(8,0,16,.95);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--bd);padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;cursor:pointer}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--pu-l),var(--pu-d));
+  border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-family:'Poppins',sans-serif;font-weight:900;font-size:14px;color:#fff;
+  box-shadow:0 3px 14px rgba(160,32,240,.5)}
+.logo-txt{font-family:'Poppins',sans-serif;font-weight:800;font-size:18px;color:#fff}
+.logo-txt span{color:var(--pu-l)}
+.back-btn{background:rgba(160,32,240,.1);border:1px solid var(--bd);color:#fff;
+  padding:7px 14px;border-radius:9px;font-size:12px;font-weight:600;
+  cursor:pointer;text-decoration:none;font-family:'Poppins',sans-serif}
+
+.container{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:40px 20px 80px}
+
+.hero-section{text-align:center;margin-bottom:48px;padding:36px 24px;
+  background:rgba(160,32,240,.06);border:1px solid var(--bd);border-radius:20px}
+.hero-section .icon{font-size:48px;margin-bottom:14px}
+.hero-section h1{font-family:'Poppins',sans-serif;font-weight:900;font-size:clamp(24px,5vw,36px);
+  margin-bottom:10px;line-height:1.1}
+.hero-section h1 span{color:var(--pu-l)}
+.hero-section p{color:var(--gray-l);font-size:14px;max-width:500px;margin:0 auto}
+.last-update{display:inline-block;margin-top:14px;background:var(--pu-g);
+  border:1px solid rgba(160,32,240,.3);border-radius:20px;
+  padding:4px 14px;font-size:12px;color:var(--pu-l);font-weight:600}
+
+.toc{background:rgba(160,32,240,.06);border:1px solid var(--bd);border-radius:14px;
+  padding:20px 24px;margin-bottom:40px}
+.toc h3{font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;
+  color:var(--pu-l);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
+.toc ol{padding-left:18px}
+.toc li{margin-bottom:6px}
+.toc a{color:var(--gray-l);text-decoration:none;font-size:13px;transition:color .2s}
+.toc a:hover{color:var(--pu-l)}
+
+section{margin-bottom:40px;scroll-margin-top:80px}
+.section-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;
+  padding-bottom:12px;border-bottom:1px solid var(--bd)}
+.section-num{width:36px;height:36px;background:linear-gradient(135deg,var(--pu-l),var(--pu-d));
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-family:'Poppins',sans-serif;font-weight:800;font-size:14px;color:#fff;flex-shrink:0}
+.section-header h2{font-family:'Poppins',sans-serif;font-weight:700;font-size:18px}
+
+p{color:var(--gray-l);font-size:14px;margin-bottom:12px}
+p:last-child{margin-bottom:0}
+
+.highlight-box{background:rgba(160,32,240,.08);border:1px solid rgba(160,32,240,.3);
+  border-radius:12px;padding:16px 18px;margin:14px 0}
+.highlight-box p{margin:0;color:var(--gray-l)}
+.highlight-box strong{color:#fff}
+
+.warning-box{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);
+  border-radius:12px;padding:16px 18px;margin:14px 0}
+.warning-box p{margin:0;color:#FCA5A5}
+
+.ok-box{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);
+  border-radius:12px;padding:16px 18px;margin:14px 0}
+.ok-box p{margin:0;color:#86EFAC}
+
+ul.list{padding-left:0;list-style:none;margin:12px 0}
+ul.list li{color:var(--gray-l);font-size:14px;padding:6px 0 6px 20px;
+  position:relative;border-bottom:1px solid rgba(160,32,240,.08)}
+ul.list li:last-child{border-bottom:none}
+ul.list li::before{content:'›';position:absolute;left:0;color:var(--pu-l);font-weight:700}
+
+.contact-box{background:linear-gradient(135deg,rgba(160,32,240,.12),rgba(107,0,204,.08));
+  border:1px solid var(--bd);border-radius:16px;padding:24px;text-align:center;margin-top:40px}
+.contact-box h3{font-family:'Poppins',sans-serif;font-weight:700;font-size:18px;margin-bottom:8px}
+.contact-box p{color:var(--gray-l);font-size:13px;margin-bottom:14px}
+.contact-box a{color:var(--pu-l);text-decoration:none;font-weight:600}
+
+.back-top{display:flex;justify-content:center;margin-top:32px}
+.back-top a{background:var(--pu-g);border:1px solid var(--bd);color:var(--gray-l);
+  padding:10px 22px;border-radius:20px;text-decoration:none;font-size:13px;transition:all .2s}
+.back-top a:hover{color:#fff;border-color:var(--pu)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="logo" href="/">
+    <div class="logo-icon">RD</div>
+    <span class="logo-txt">Rand<span>oom</span></span>
+  </a>
+  <a class="back-btn" href="/">← Volver a la app</a>
+</nav>
+
+<div class="container">
+
+  <div class="hero-section">
+    <div class="icon">📋</div>
+    <h1>Términos de Uso y <span>Política de Privacidad</span></h1>
+    <p>Lee con atención antes de usar Randoom. Al registrarte aceptas todos los términos aquí descritos.</p>
+    <span class="last-update">Última actualización: Junio 2024</span>
+  </div>
+
+  <!-- Índice -->
+  <div class="toc">
+    <h3>📌 Contenido</h3>
+    <ol>
+      <li><a href="#s1">Descripción del servicio</a></li>
+      <li><a href="#s2">Requisitos para usar Randoom</a></li>
+      <li><a href="#s3">Verificación de identidad (INE)</a></li>
+      <li><a href="#s4">Conducta y normas de uso</a></li>
+      <li><a href="#s5">Contenido prohibido</a></li>
+      <li><a href="#s6">Privacidad y datos personales</a></li>
+      <li><a href="#s7">Pagos y suscripción Premium</a></li>
+      <li><a href="#s8">Suspensión y cancelación de cuentas</a></li>
+      <li><a href="#s9">Limitación de responsabilidad</a></li>
+      <li><a href="#s10">Cambios a estos términos</a></li>
+      <li><a href="#s11">Contacto</a></li>
+    </ol>
+  </div>
+
+  <!-- 1 -->
+  <section id="s1">
+    <div class="section-header">
+      <div class="section-num">1</div>
+      <h2>Descripción del servicio</h2>
+    </div>
+    <p>Randoom es una plataforma de videochat aleatorio que conecta a usuarios de forma aleatoria para conversaciones por video y texto en tiempo real. El servicio está disponible a través de nuestra aplicación web en <strong style="color:#fff">randoom-zeta.vercel.app</strong>.</p>
+    <p>Randoom opera como intermediario tecnológico entre usuarios. No somos responsables del contenido de las conversaciones entre usuarios, aunque tomamos medidas activas para garantizar la seguridad de la comunidad.</p>
+    <div class="highlight-box">
+      <p>🌎 <strong>Randoom es una plataforma de acceso libre para adultos verificados.</strong> Nos reservamos el derecho de modificar, suspender o discontinuar el servicio en cualquier momento.</p>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section id="s2">
+    <div class="section-header">
+      <div class="section-num">2</div>
+      <h2>Requisitos para usar Randoom</h2>
+    </div>
+    <p>Para crear una cuenta y usar Randoom debes cumplir con todos los siguientes requisitos:</p>
+    <ul class="list">
+      <li>Tener <strong style="color:#fff">18 años o más</strong> al momento del registro</li>
+      <li>Ser residente de un país donde el servicio esté disponible</li>
+      <li>Contar con un documento de identidad oficial válido (INE, pasaporte u equivalente)</li>
+      <li>Proporcionar información verídica y actualizada durante el registro</li>
+      <li>Tener capacidad legal para aceptar contratos vinculantes</li>
+      <li>No haber sido previamente suspendido o baneado de Randoom</li>
+    </ul>
+    <div class="warning-box">
+      <p>⚠️ <strong>El acceso de menores de edad está estrictamente prohibido.</strong> Cualquier usuario que sea menor de 18 años será suspendido permanentemente y su información reportada a las autoridades competentes si así se requiere.</p>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section id="s3">
+    <div class="section-header">
+      <div class="section-num">3</div>
+      <h2>Verificación de identidad (INE)</h2>
+    </div>
+    <p>Randoom requiere que todos los usuarios verifiquen su identidad antes de acceder al servicio de videochat. Este proceso es obligatorio y no puede omitirse.</p>
+    <p><strong style="color:#fff">¿Qué documentos se solicitan?</strong></p>
+    <ul class="list">
+      <li>Fotografía del <strong style="color:#fff">frente de tu INE</strong> (lado con fotografía y datos)</li>
+      <li>Fotografía del <strong style="color:#fff">reverso de tu INE</strong> (lado con código de barras)</li>
+      <li>Una <strong style="color:#fff">selfie de tu rostro</strong> tomada en tiempo real</li>
+    </ul>
+    <div class="highlight-box">
+      <p>🔒 <strong>Privacidad de tus documentos:</strong> Las fotografías de tu INE son revisadas únicamente por el equipo de verificación de Randoom. No se comparten con otros usuarios, terceros ni anunciantes. Las imágenes son almacenadas de forma segura y son eliminadas una vez completada la verificación.</p>
+    </div>
+    <p>El proceso de verificación toma menos de <strong style="color:#fff">24 horas hábiles</strong>. Recibirás un correo electrónico con el resultado. Si tu verificación es rechazada, podrás volver a intentarlo con fotografías más claras.</p>
+    <div class="ok-box">
+      <p>✅ <strong>Propósito de la verificación:</strong> Garantizar que todos los miembros de la comunidad son personas reales y mayores de edad, creando un espacio seguro y confiable para todos.</p>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section id="s4">
+    <div class="section-header">
+      <div class="section-num">4</div>
+      <h2>Conducta y normas de uso</h2>
+    </div>
+    <p>Al usar Randoom te comprometes a mantener una conducta respetuosa y dentro de los límites legales y éticos. Todas las interacciones deben cumplir con las siguientes normas:</p>
+    <ul class="list">
+      <li>Tratar a todos los usuarios con respeto y dignidad</li>
+      <li>No acosar, intimidar, amenazar ni discriminar a otros usuarios</li>
+      <li>No utilizar la plataforma para actividades ilegales de ningún tipo</li>
+      <li>No suplantar la identidad de otras personas o entidades</li>
+      <li>No compartir información personal de terceros sin su consentimiento</li>
+      <li>No realizar grabaciones de las videollamadas sin el consentimiento explícito del otro usuario</li>
+      <li>Usar el sistema de reportes responsablemente y de buena fe</li>
+    </ul>
+    <p>Randoom emplea sistemas de moderación y revisión de reportes. Los usuarios que infrinjan estas normas serán suspendidos temporal o permanentemente según la gravedad de la infracción.</p>
+  </section>
+
+  <!-- 5 -->
+  <section id="s5">
+    <div class="section-header">
+      <div class="section-num">5</div>
+      <h2>Contenido prohibido</h2>
+    </div>
+    <p>Está estrictamente prohibido mostrar, compartir o solicitar cualquiera de los siguientes tipos de contenido en Randoom:</p>
+    <ul class="list">
+      <li>Contenido sexual explícito o nudez no consensuada</li>
+      <li>Material de abuso sexual infantil (CSAM) — reportado inmediatamente a las autoridades</li>
+      <li>Discurso de odio basado en raza, género, religión, orientación sexual u origen</li>
+      <li>Violencia gráfica, gore o contenido que glorifique la violencia</li>
+      <li>Spam, publicidad no solicitada o comportamiento de bot</li>
+      <li>Contenido que promueva actividades ilegales</li>
+      <li>Información personal de terceros sin su consentimiento (doxing)</li>
+    </ul>
+    <div class="warning-box">
+      <p>🚨 <strong>Tolerancia cero con menores:</strong> Cualquier actividad sexual que involucre menores de edad será reportada inmediatamente a las autoridades competentes incluyendo la Fiscalía General de la República y organismos internacionales de protección infantil.</p>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section id="s6">
+    <div class="section-header">
+      <div class="section-num">6</div>
+      <h2>Privacidad y datos personales</h2>
+    </div>
+    <p>Randoom recopila y trata los siguientes datos personales con la única finalidad de operar el servicio:</p>
+    <ul class="list">
+      <li><strong style="color:#fff">Datos de registro:</strong> nombre, correo electrónico, edad, género y país</li>
+      <li><strong style="color:#fff">Documentos de verificación:</strong> fotografías de INE y selfie (uso exclusivo de verificación)</li>
+      <li><strong style="color:#fff">Datos de uso:</strong> número de sesiones, tiempo de uso, reportes emitidos o recibidos</li>
+      <li><strong style="color:#fff">Datos técnicos:</strong> dirección IP, tipo de dispositivo y navegador</li>
+    </ul>
+    <div class="highlight-box">
+      <p>🔐 <strong>Tus datos están protegidos.</strong> Randoom no vende, renta ni comparte tu información personal con terceros con fines comerciales. Los documentos de identidad son almacenados en servidores seguros y eliminados tras la verificación.</p>
+    </div>
+    <p><strong style="color:#fff">Tus derechos sobre tus datos:</strong> Tienes derecho de acceso, rectificación, cancelación y oposición (derechos ARCO) sobre tu información personal. Para ejercerlos contacta a <strong style="color:var(--pu-l)">privacidad@randoom.com</strong>.</p>
+    <p>Las videollamadas en Randoom son conexiones peer-to-peer (de usuario a usuario) y <strong style="color:#fff">no son grabadas ni almacenadas</strong> por nuestros servidores.</p>
+    <p>Randoom cumple con la <strong style="color:#fff">Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)</strong> de México.</p>
+  </section>
+
+  <!-- 7 -->
+  <section id="s7">
+    <div class="section-header">
+      <div class="section-num">7</div>
+      <h2>Pagos y suscripción Premium</h2>
+    </div>
+    <p>Randoom ofrece una versión gratuita y una versión Premium. La versión Premium desbloquea funciones adicionales como videollamadas sin límite de tiempo y filtros avanzados de búsqueda.</p>
+    <ul class="list">
+      <li>El costo de Randoom Premium es de <strong style="color:#fff">$399 MXN por mes</strong></li>
+      <li>El pago se procesa a través de <strong style="color:#fff">MercadoPago</strong>, plataforma segura certificada</li>
+      <li>La activación del plan Premium puede tardar hasta <strong style="color:#fff">24 horas hábiles</strong></li>
+      <li>Recibirás un correo de confirmación cuando tu Premium esté activo</li>
+    </ul>
+    <div class="highlight-box">
+      <p>💳 <strong>Política de reembolsos:</strong> Los pagos realizados no son reembolsables una vez que el servicio Premium ha sido activado. En caso de error en el cobro o fallo técnico de nuestra parte, nos comprometemos a resolver el problema o emitir el reembolso correspondiente en un plazo de 5 días hábiles.</p>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section id="s8">
+    <div class="section-header">
+      <div class="section-num">8</div>
+      <h2>Suspensión y cancelación de cuentas</h2>
+    </div>
+    <p>Randoom se reserva el derecho de suspender o eliminar cuentas de usuario en los siguientes casos:</p>
+    <ul class="list">
+      <li>Violación de cualquier punto de estos términos de uso</li>
+      <li>Comportamiento abusivo reportado y verificado por otros usuarios</li>
+      <li>Uso de documentos de identidad falsos o alterados</li>
+      <li>Intento de acceso por parte de menores de edad</li>
+      <li>Actividades ilegales realizadas a través de la plataforma</li>
+      <li>Múltiples reportes fundados por parte de la comunidad</li>
+    </ul>
+    <p>Las suspensiones pueden ser temporales o permanentes dependiendo de la gravedad de la infracción. Las suspensiones permanentes no son apelables en casos de violaciones graves.</p>
+    <p>Si consideras que tu cuenta fue suspendida por error, puedes contactarnos a <strong style="color:var(--pu-l)">soporte@randoom.com</strong> dentro de los 7 días posteriores a la suspensión.</p>
+  </section>
+
+  <!-- 9 -->
+  <section id="s9">
+    <div class="section-header">
+      <div class="section-num">9</div>
+      <h2>Limitación de responsabilidad</h2>
+    </div>
+    <p>Randoom actúa como plataforma tecnológica intermediaria. En consecuencia:</p>
+    <ul class="list">
+      <li>No somos responsables del contenido generado por los usuarios durante las videollamadas</li>
+      <li>No garantizamos la disponibilidad continua e ininterrumpida del servicio</li>
+      <li>No somos responsables de daños derivados del uso indebido de la plataforma por terceros</li>
+      <li>La calidad de las videollamadas depende de la conexión a internet de cada usuario</li>
+    </ul>
+    <div class="warning-box">
+      <p>⚠️ <strong>Uso bajo tu propio riesgo:</strong> Randoom se proporciona "tal como está". Aunque tomamos medidas de seguridad activas, no podemos garantizar que todos los usuarios actúen de buena fe. Usa tu criterio y reporta cualquier conducta inapropiada.</p>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section id="s10">
+    <div class="section-header">
+      <div class="section-num">10</div>
+      <h2>Cambios a estos términos</h2>
+    </div>
+    <p>Randoom puede modificar estos términos en cualquier momento. Los cambios serán notificados a través de:</p>
+    <ul class="list">
+      <li>Un correo electrónico a tu dirección registrada</li>
+      <li>Un aviso visible dentro de la aplicación</li>
+      <li>La actualización de la fecha en la parte superior de este documento</li>
+    </ul>
+    <p>El uso continuado de Randoom después de la publicación de los cambios constituye tu aceptación de los nuevos términos. Si no estás de acuerdo con los cambios, debes dejar de usar el servicio.</p>
+  </section>
+
+  <!-- 11 -->
+  <section id="s11">
+    <div class="section-header">
+      <div class="section-num">11</div>
+      <h2>Contacto</h2>
+    </div>
+    <p>Para cualquier duda, reporte o solicitud relacionada con estos términos o con el servicio en general, puedes contactarnos a través de los siguientes medios:</p>
+  </section>
+
+  <div class="contact-box">
+    <h3>📬 ¿Tienes alguna pregunta?</h3>
+    <p>Nuestro equipo está disponible para ayudarte en cualquier momento.</p>
+    <p>📧 Soporte general: <a href="mailto:soporte@randoom.com">soporte@randoom.com</a></p>
+    <p>🔐 Privacidad y datos: <a href="mailto:privacidad@randoom.com">privacidad@randoom.com</a></p>
+    <p>🚨 Reportes urgentes: <a href="mailto:reportes@randoom.com">reportes@randoom.com</a></p>
+  </div>
+
+  <div class="back-top">
+    <a href="#">↑ Volver al inicio de la página</a>
+  </div>
+
+</div>
+</body>
+</html>
