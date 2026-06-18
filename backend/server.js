@@ -147,6 +147,15 @@ async function initDB() {
       status       TEXT DEFAULT 'pending',
       created_at   TIMESTAMPTZ DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS page_visits (
+      id           SERIAL PRIMARY KEY,
+      visited_at   TIMESTAMPTZ DEFAULT NOW(),
+      ip           TEXT,
+      country      TEXT DEFAULT 'unknown',
+      device       TEXT DEFAULT 'unknown',
+      page         TEXT DEFAULT '/'
+    );
   `);
 
   // ── Migrate existing DB: add columns that may not exist yet ──────────────────
@@ -311,9 +320,6 @@ const sendPremiumEmail = (email, name) => sendEmail(email, '⭐ ¡Premium activa
 const activeSockets = {};
 const waitingPool   = [];
 
-// ── Lives (in-memory) ─────────────────────────────────────────────────────────
-// Map: liveId → { id, hostEmail, hostName, title, viewers: Set<socketId>, startedAt }
-const activeLives = new Map();
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -900,44 +906,67 @@ app.get('/api/friends/online', authUser, async (req, res) => {
   } catch(e) { console.error('friends/online error:', e.message); res.status(500).json({ error: 'Error' }); }
 });
 
-// ── LIVES ────────────────────────────────────────────────────────────────────
-app.get('/api/lives', async (req, res) => {
-  const lives = Array.from(activeLives.values()).map(l => ({
-    id: l.id, hostEmail: l.hostEmail, hostName: l.hostName,
-    title: l.title, viewerCount: l.viewers.size,
-    startedAt: l.startedAt
-  }));
-  res.json(lives);
-});
-
 // ── LiveKit token ─────────────────────────────────────────────────────────────
-app.post('/api/lives/token', authUser, async (req, res) => {
-  const { liveId, isHost } = req.body;
-  if (!LK_ENABLED) return res.status(503).json({ error: 'LiveKit no configurado' });
-  if (!liveId) return res.status(400).json({ error: 'Falta liveId' });
+// Endpoint para que el host cree la sala y obtenga su token
+// ── Visit tracking ───────────────────────────────────────────────────────────
+app.post('/api/track/visit', async (req, res) => {
   try {
-    const identity = req.user.email;
-    const token = await lkToken(identity, liveId, !!isHost);
-    res.json({ token, url: LK_URL, liveId });
-  } catch(e) { console.error('LiveKit token error:', e); res.status(500).json({ error: 'Error generando token' }); }
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+    const ua = req.headers['user-agent'] || '';
+    const device = /mobile|android|iphone|ipad/i.test(ua) ? 'mobile' : 'desktop';
+    const page = req.body?.page || '/';
+    await pool.query(
+      'INSERT INTO page_visits(ip, device, page) VALUES($1,$2,$3)',
+      [ip, device, page]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.json({ ok: false }); }
 });
 
-// Endpoint para que el host cree la sala y obtenga su token
-app.post('/api/lives/start', authUser, async (req, res) => {
-  const { title } = req.body;
-  if (!LK_ENABLED) return res.status(503).json({ error: 'LiveKit no configurado' });
+// ── Analytics for admin ───────────────────────────────────────────────────────
+app.get('/api/admin/analytics', authAdmin, async (req, res) => {
   try {
-    const liveId = uuidv4();
-    const token = await lkToken(req.user.email, liveId, true);
-    // Store in activeLives
-    activeLives.set(liveId, {
-      id: liveId, hostEmail: req.user.email, hostName: req.user.name||req.user.email,
-      title: title || `${req.user.name} en vivo`,
-      viewers: new Set(), startedAt: new Date().toISOString(),
-      hostSocketId: null // will be set via socket
+    const [
+      totalVisits,
+      todayVisits,
+      weekVisits,
+      monthVisits,
+      byDevice,
+      byDay,
+      uniqueIPs,
+      uniqueToday
+    ] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM page_visits'),
+      pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '1 day'"),
+      pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '7 days'"),
+      pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '30 days'"),
+      pool.query("SELECT device, COUNT(*) as count FROM page_visits GROUP BY device ORDER BY count DESC"),
+      pool.query(`SELECT DATE(visited_at) as day, COUNT(*) as visits 
+                  FROM page_visits 
+                  WHERE visited_at >= NOW() - INTERVAL '30 days'
+                  GROUP BY DATE(visited_at) 
+                  ORDER BY day ASC`),
+      pool.query('SELECT COUNT(DISTINCT ip) FROM page_visits'),
+      pool.query(`SELECT DATE(visited_at) as day, COUNT(*) as visits, COUNT(DISTINCT ip) as unique_visits
+                  FROM page_visits WHERE visited_at >= NOW() - INTERVAL '30 days'
+                  GROUP BY DATE(visited_at) ORDER BY day ASC`),
+      pool.query(`SELECT EXTRACT(HOUR FROM visited_at) as hour, COUNT(*) as visits
+                  FROM page_visits WHERE visited_at >= NOW() - INTERVAL '7 days'
+                  GROUP BY hour ORDER BY hour ASC`),
+      pool.query("SELECT COUNT(DISTINCT ip) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '1 day'"),
+    ]);
+
+    res.json({
+      total:        parseInt(totalVisits.rows[0].count),
+      today:        parseInt(todayVisits.rows[0].count),
+      week:         parseInt(weekVisits.rows[0].count),
+      month:        parseInt(monthVisits.rows[0].count),
+      uniqueTotal:  parseInt(uniqueIPs.rows[0].count),
+      uniqueToday:  parseInt(uniqueToday.rows[0].count),
+      byDevice:     byDevice.rows,
+      byDay:        byDay.rows,
     });
-    res.json({ token, url: LK_URL, liveId });
-  } catch(e) { console.error('LiveKit start error:', e); res.status(500).json({ error: 'Error iniciando live' }); }
+  } catch(e) { console.error('Analytics error:', e.message); res.status(500).json({ error: 'Error' }); }
 });
 
 app.get('/api/health', (req, res) =>
@@ -1036,114 +1065,9 @@ io.on('connection', socket => {
     const target = Object.entries(activeSockets).find(([,s]) => s.email === d.toEmail);
     if (target) io.to(target[0]).emit('call_accepted_direct', { from: activeSockets[socket.id]?.email });
   });
-  // set_mode handled above
-
-  // ── Live socket events ──────────────────────────────────────────────────────
-  socket.on('live_start', ({ title, liveId: existingLiveId }) => {
-    const u = activeSockets[socket.id]; if (!u) return;
-    // End any existing live by this host
-    for (const [id, live] of activeLives) {
-      if (live.hostEmail === u.email) {
-        live.viewers.forEach(vid => io.to(vid).emit('live_ended', { liveId: id }));
-        activeLives.delete(id);
-      }
-    }
-    // Use liveId from /api/lives/start if provided, otherwise create new
-    const liveId = existingLiveId || uuidv4();
-    if (!activeLives.has(liveId)) {
-      activeLives.set(liveId, {
-        id: liveId, hostEmail: u.email, hostName: u.name,
-        title: title || `${u.name} en vivo`,
-        viewers: new Set(), startedAt: new Date().toISOString(),
-        hostSocketId: socket.id
-      });
-    } else {
-      // Update hostSocketId for existing room (created via REST)
-      activeLives.get(liveId).hostSocketId = socket.id;
-    }
-    socket.join(`live:${liveId}`);
-    socket.emit('live_started', { liveId });
-    const partnerSock = activeSockets[socket.id]?.partnerId;
-    if (partnerSock) io.to(partnerSock).emit('partner_live_started', { liveId, hostName: u.name });
-    io.emit('lives_updated');
-  });
-
-  socket.on('live_end', () => {
-    const u = activeSockets[socket.id]; if (!u) return;
-    for (const [id, live] of activeLives) {
-      if (live.hostEmail === u.email) {
-        live.viewers.forEach(vid => io.to(vid).emit('live_ended', { liveId: id }));
-        activeLives.delete(id);
-        socket.leave(`live:${id}`);
-        io.emit('lives_updated');
-        // Notify videocall partner that live ended
-        if (u.partnerId) io.to(u.partnerId).emit('partner_live_ended');
-      }
-    }
-  });
-
-  socket.on('live_join', ({ liveId }) => {
-    const live = activeLives.get(liveId); if (!live) return;
-    live.viewers.add(socket.id);
-    socket.join(`live:${liveId}`);
-    socket.data = { ...socket.data, watchingLive: liveId };
-    socket.emit('live_joined', { liveId, viewerCount: live.viewers.size, hostName: live.hostName, title: live.title });
-    // Tell host + viewers about new count
-    io.to(`live:${liveId}`).emit('live_viewer_count', { liveId, count: live.viewers.size });
-  });
-
-  socket.on('live_leave', ({ liveId }) => {
-    const live = activeLives.get(liveId); if (!live) return;
-    live.viewers.delete(socket.id);
-    socket.leave(`live:${liveId}`);
-    io.to(`live:${liveId}`).emit('live_viewer_count', { liveId, count: live.viewers.size });
-  });
-
-  socket.on('live_comment', ({ liveId, text }) => {
-    if (!text || !text.trim()) return;
-    const live = activeLives.get(liveId); if (!live) return;
-    const u = activeSockets[socket.id];
-    const payload = { from: (u?.name) || 'Viewer', text: text.slice(0, 200), ts: Date.now() };
-    io.to(`live:${liveId}`).emit('live_comment', payload);
-    // Also relay to videocall partner of host (so both see comments in chat)
-    const hostSock = Object.entries(activeSockets).find(([,s]) => s.email === live.hostEmail);
-    if (hostSock) {
-      const partnerId = activeSockets[hostSock[0]]?.partnerId;
-      if (partnerId) io.to(partnerId).emit('live_comment', payload);
-    }
-  });
-
-  // Live WebRTC: viewer requests offer from host
-  socket.on('live_request_offer', ({ liveId }) => {
-    const live = activeLives.get(liveId); if (!live) return;
-    io.to(live.hostSocketId).emit('live_viewer_requesting', { viewerSocketId: socket.id });
-  });
-  socket.on('live_offer',     ({ viewerSocketId, offer })     => io.to(viewerSocketId).emit('live_offer', { offer }));
-  socket.on('live_answer', ({ answer, liveId: aLiveId }) => {
-    // Find the live's host socket and send answer
-    for (const [, live] of activeLives) {
-      if (live.viewers.has(socket.id) || aLiveId === live.id) {
-        if (live.hostSocketId) io.to(live.hostSocketId).emit('live_answer', { answer });
-        break;
-      }
-    }
-  });
-  socket.on('live_ice',       ({ targetId, candidate })       => io.to(targetId).emit('live_ice', { candidate }));
-
   socket.on('disconnect', async () => {
     const u = activeSockets[socket.id];
     if (u) {
-      // Clean up live if this socket was hosting
-      for (const [id, live] of activeLives) {
-        if (live.hostSocketId === socket.id) {
-          live.viewers.forEach(vid => io.to(vid).emit('live_ended', { liveId: id }));
-          activeLives.delete(id);
-          io.emit('lives_updated');
-        } else {
-          live.viewers.delete(socket.id);
-          io.to(`live:${id}`).emit('live_viewer_count', { liveId: id, count: live.viewers.size });
-        }
-      }
       if (u.partnerId) { io.to(u.partnerId).emit('partner_disconnected'); if(activeSockets[u.partnerId]) activeSockets[u.partnerId].partnerId=null; }
       // Notify friends this user went offline
       try {

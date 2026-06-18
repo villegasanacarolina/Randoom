@@ -234,6 +234,74 @@ tr:hover td{background:rgba(160,32,240,.04)}
         </div>
       </div>
 
+      <!-- ANALYTICS -->
+      <div class="page" id="page-analytics">
+        <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h2>📈 Visitantes de Randoom</h2>
+          <button class="btn btn-ghost btn-sm" onclick="loadAnalytics()">🔄 Actualizar</button>
+        </div>
+
+        <!-- Summary cards -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px">
+          <div class="stat-card purple">
+            <div class="stat-icon">🌐</div>
+            <div class="stat-val" id="an-total">—</div>
+            <div class="stat-lbl">Total histórico</div>
+          </div>
+          <div class="stat-card teal">
+            <div class="stat-icon">📅</div>
+            <div class="stat-val" id="an-today">—</div>
+            <div class="stat-lbl">Hoy</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">📆</div>
+            <div class="stat-val" id="an-week">—</div>
+            <div class="stat-lbl">Esta semana</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon">🗓️</div>
+            <div class="stat-val" id="an-month">—</div>
+            <div class="stat-lbl">Este mes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">👤</div>
+            <div class="stat-val" id="an-unique">—</div>
+            <div class="stat-lbl">IPs únicas</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-val" id="an-avg">—</div>
+            <div class="stat-lbl">Prom. diario</div>
+          </div>
+        </div>
+
+        <!-- Device + hourly -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div class="card">
+            <div style="font-weight:700;font-size:13px;margin-bottom:12px;color:var(--pu-l)">📱 Dispositivos</div>
+            <div id="an-devices"><div style="color:var(--gray-l);font-size:13px">Cargando...</div></div>
+          </div>
+          <div class="card">
+            <div style="font-weight:700;font-size:13px;margin-bottom:12px;color:var(--pu-l)">🕐 Hora pico (últimos 7 días)</div>
+            <div id="an-hourly-wrap" style="overflow-x:auto">
+              <div style="display:flex;align-items:flex-end;gap:2px;height:70px;min-width:240px" id="an-hourly-bars"></div>
+              <div style="display:flex;gap:2px;min-width:240px;margin-top:3px" id="an-hourly-labels"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Daily chart — 30 days -->
+        <div class="card">
+          <div style="font-weight:700;font-size:13px;margin-bottom:14px;color:var(--pu-l)">📅 Visitas diarias — últimos 30 días</div>
+          <div id="an-chart" style="width:100%;overflow-x:auto">
+            <div id="an-chart-inner">
+              <div style="display:flex;align-items:flex-end;gap:3px;height:130px;min-width:580px" id="an-bars"></div>
+              <div style="display:flex;gap:3px;min-width:580px;margin-top:5px" id="an-labels"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- RECORDINGS (hidden) -->
       <div class="page" id="page-recordings" style="display:none">
         <div class="tbl-wrap">
@@ -513,6 +581,81 @@ async function resolveReport(id) {
     toast('✅ Reporte resuelto', 'ok');
     refreshAll();
   } catch(e) { toast(e.message,'err'); }
+}
+
+async function loadAnalytics() {
+  try {
+    const d = await api('/api/admin/analytics','GET');
+
+    // Summary cards
+    document.getElementById('an-total').textContent  = (d.total||0).toLocaleString();
+    document.getElementById('an-today').textContent  = (d.today||0).toLocaleString();
+    document.getElementById('an-week').textContent   = (d.week||0).toLocaleString();
+    document.getElementById('an-month').textContent  = (d.month||0).toLocaleString();
+    document.getElementById('an-unique').textContent = (d.uniqueIPs||d.uniqueTotal||0).toLocaleString();
+    const avgVal = Math.round((d.month||0) / 30);
+    document.getElementById('an-avg').textContent    = avgVal.toLocaleString();
+
+    // Device breakdown
+    const devEl = document.getElementById('an-devices');
+    const devTotal = (d.byDevice||[]).reduce((a,b)=>a+parseInt(b.count),0)||1;
+    devEl.innerHTML = (d.byDevice||[]).length ? (d.byDevice||[]).map(dv=>{
+      const pct = Math.round(parseInt(dv.count)/devTotal*100);
+      const icon = dv.device==='mobile'?'📱':dv.device==='tablet'?'📱':'💻';
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span>${icon} ${dv.device}</span>
+          <span style="font-weight:700">${parseInt(dv.count).toLocaleString()} (${pct}%)</span>
+        </div>
+        <div style="background:var(--bd);border-radius:20px;height:7px">
+          <div style="background:linear-gradient(90deg,var(--pu-l),var(--pu-d));width:${pct}%;height:7px;border-radius:20px"></div>
+        </div>
+      </div>`;
+    }).join('') : '<div style="color:var(--gray-l);font-size:13px">Sin datos aún</div>';
+
+    // Hourly chart
+    const hourlyBars = document.getElementById('an-hourly-bars');
+    const hourlyLabels = document.getElementById('an-hourly-labels');
+    const hourly = d.hourlyChart||[];
+    if(hourly.length){
+      const maxH = Math.max(...hourly.map(r=>parseInt(r.visits)||0))||1;
+      hourlyBars.innerHTML = Array.from({length:24},(_,h)=>{
+        const row = hourly.find(r=>parseInt(r.hour)===h);
+        const v = row?parseInt(row.visits):0;
+        const ht = Math.max(2,Math.round(v/maxH*65));
+        return `<div title="${h}:00 — ${v} visitas" style="flex:1;background:rgba(160,32,240,${0.3+v/maxH*0.7});height:${ht}px;border-radius:3px 3px 0 0;cursor:default"></div>`;
+      }).join('');
+      hourlyLabels.innerHTML = Array.from({length:24},(_,h)=>`<div style="flex:1;font-size:8px;color:var(--gray-l);text-align:center">${h%6===0?h+':00':''}</div>`).join('');
+    } else {
+      hourlyBars.innerHTML='<div style="color:var(--gray-l);font-size:12px;padding:8px">Sin datos</div>';
+    }
+
+    // Daily bar chart — 30 days
+    const barsEl = document.getElementById('an-bars');
+    const labelsEl = document.getElementById('an-labels');
+    const daily = d.dailyChart||d.byDay||[];
+    if(!daily.length){
+      barsEl.innerHTML='<div style="color:var(--gray-l);font-size:13px;padding:30px 0">Sin datos aún — las visitas aparecerán aquí en cuanto lleguen visitantes</div>';
+      return;
+    }
+    const maxV = Math.max(...daily.map(r=>parseInt(r.visits||r.visits)||0))||1;
+    barsEl.innerHTML = daily.map(r=>{
+      const v = parseInt(r.visits)||0;
+      const uv = parseInt(r.unique_visits||0);
+      const h = Math.max(4,Math.round(v/maxV*120));
+      const date = new Date(r.day); const label=`${date.getDate()}/${date.getMonth()+1}`;
+      return `<div title="${label}: ${v} visitas (${uv} únicas)" style="flex:1;min-width:12px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;cursor:pointer" onmouseover="this.querySelector('span').style.display='block'" onmouseout="this.querySelector('span').style.display='none'">
+        <span style="display:none;position:absolute;background:rgba(8,0,16,.9);color:#fff;font-size:10px;padding:3px 7px;border-radius:6px;white-space:nowrap;margin-bottom:2px">${label}: ${v}</span>
+        <div style="width:100%;background:linear-gradient(180deg,var(--pu-l),var(--pu-d));height:${h}px;border-radius:4px 4px 0 0"></div>
+      </div>`;
+    }).join('');
+    labelsEl.innerHTML = daily.map((r,i)=>{
+      const show=i%5===0||i===daily.length-1;
+      const date=new Date(r.day);
+      return `<div style="flex:1;min-width:12px;font-size:9px;color:var(--gray-l);text-align:center">${show?`${date.getDate()}/${date.getMonth()+1}`:''}</div>`;
+    }).join('');
+
+  } catch(e) { console.error('Analytics error:', e); }
 }
 
 function renderDash(reports){

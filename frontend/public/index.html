@@ -299,33 +299,6 @@ textarea.fc{resize:vertical;min-height:70px}
 .filter-pill.active{background:rgba(160,32,240,.2);border-color:var(--pu-l);color:var(--pu-l)}
 .filter-pill:hover{border-color:var(--pu-l);color:#fff}
 
-/* LIVES LIST */
-#s-lives{align-items:flex-start;padding:0;overflow-y:auto;display:flex;flex-direction:column}
-.lives-header{padding:16px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd);flex-shrink:0}
-.lives-header h2{font-family:'Poppins',sans-serif;font-weight:800;font-size:20px}
-.lives-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;width:100%;box-sizing:border-box}
-.live-card{background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .2s;position:relative}
-.live-card:hover{border-color:var(--pu);transform:scale(1.02)}
-.live-thumb{width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,rgba(160,32,240,.3),rgba(8,0,16,.8));display:flex;align-items:center;justify-content:center;font-size:32px;position:relative}
-.live-badge{position:absolute;top:6px;left:6px;background:#EF4444;color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:6px}
-.live-viewers{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.7);color:#fff;font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px}
-.live-info{padding:8px 10px}
-.live-host{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.live-title{font-size:11px;color:var(--gray-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-/* LIVE VIEWER SCREEN */
-#s-liveview{display:none;position:fixed;inset:0;z-index:60;flex-direction:column;background:var(--dk)}
-#s-liveview.active{display:flex}
-.liveview-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(8,0,16,.9);border-bottom:1px solid var(--bd);flex-shrink:0}
-.liveview-vid{flex:1;position:relative;background:#000;min-height:0}
-#live-remote-vid{width:100%;height:100%;object-fit:cover}
-.live-stats{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.7);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:6px}
-.live-dot{width:8px;height:8px;background:#EF4444;border-radius:50%;animation:pulse 1s infinite}
-.liveview-chat{height:200px;display:flex;flex-direction:column;border-top:1px solid var(--bd);flex-shrink:0}
-.live-comments{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:4px}
-.live-comment{font-size:12px;color:var(--gray-l)}.live-comment strong{color:var(--pu-l)}
-.live-comment-inp{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--bd);flex-shrink:0}
-
 /* CONFIRM */
 #s-confirm{align-items:center;padding:16px 14px;overflow-y:auto;text-align:center}
 .confirm-wrap{max-width:420px;margin:0 auto;padding:20px 0}
@@ -342,8 +315,6 @@ textarea.fc{resize:vertical;min-height:70px}
 .hidden{display:none!important}
 .pu{color:var(--pu-l)}
 </style>
-  <!-- LiveKit Client SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
 </head>
 <body>
 <div id="toasts"></div>
@@ -556,11 +527,6 @@ textarea.fc{resize:vertical;min-height:70px}
       <video id="remoteVid" autoplay playsinline></video>
       <video id="localVid" autoplay playsinline muted></video>
       <button onclick="swapCameras()" style="position:absolute;top:8px;left:8px;z-index:15;background:rgba(8,0,16,.7);border:1px solid var(--bd);color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px)">⇄ Cámara</button>
-      <div id="live-cam-badge" style="position:absolute;top:8px;right:8px;z-index:15;background:rgba(239,68,68,.92);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;display:none;align-items:center;gap:5px"><span style="width:7px;height:7px;background:#fff;border-radius:50%;display:inline-block;animation:pulse 1s infinite"></span> LIVE</div>
-      <!-- Viewer count badge — visible on vid-area during live -->
-      <div id="live-viewer-badge" style="position:absolute;bottom:12px;left:12px;z-index:15;background:rgba(0,0,0,.65);color:#fff;font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;display:none;align-items:center;gap:5px;backdrop-filter:blur(4px)">
-        👁 <span id="live-viewer-count">0</span>
-      </div>
       <div class="vid-overlay" id="ov-idle">
         <div style="font-size:44px">🔮</div>
         <h3>¡Listo para conectar!</h3>
@@ -590,7 +556,6 @@ textarea.fc{resize:vertical;min-height:70px}
       <button class="ctrl-btn" onclick="openGame('target')" id="btn-target" style="display:none;background:rgba(59,130,246,.15);border:1px solid #3B82F6" title="Tiro al blanco">🎯</button>
       <button class="ctrl-btn" onclick="openGame('basket')" id="btn-basket" style="display:none;background:rgba(245,158,11,.15);border:1px solid #F59E0B" title="Baloncesto">🏀</button>
       <button class="ctrl-btn" onclick="sendFriendReq()" id="btn-addfriend" style="display:none;background:rgba(160,32,240,.15);border:1px solid var(--pu)" title="Agregar amigo">👤+</button>
-      <button class="ctrl-btn" onclick="toggleLive()" id="btn-live" style="background:rgba(239,68,68,.15);border:1px solid #EF4444;color:#EF4444;font-weight:700;font-size:10px;flex-shrink:0;width:auto;padding:0 10px;border-radius:12px" title="Iniciar Live">📡 LIVE</button>
     </div>
   </div>
 
@@ -785,12 +750,7 @@ textarea.fc{resize:vertical;min-height:70px}
   </nav>
   <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:20px 16px">
     <div class="mode-choice">
-      <h2>¿Qué quieres hacer?</h2>
-      <div class="mode-card" onclick="showLives()">
-        <div class="mc-icon">📡</div>
-        <h3>Ver Lives</h3>
-        <p>Únete a transmisiones en vivo de otros usuarios</p>
-      </div>
+      <h2>¿Cómo quieres conectar?</h2>
       <div class="mode-card" onclick="goToChat()">
         <div class="mc-icon">🎲</div>
         <h3>Videollamada aleatoria</h3>
@@ -884,54 +844,6 @@ textarea.fc{resize:vertical;min-height:70px}
       </button>
       <button onclick="_enterChat(app._mood)" class="mood-skip-btn">Continuar sin filtros →</button>
       <button onclick="showMoodStep(1)" style="background:transparent;border:none;color:var(--gray-l);font-size:12px;cursor:pointer;padding:4px">← Cambiar mood</button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ LIVES LIST ═══ -->
-<div id="s-lives" class="screen">
-  <nav class="nav">
-    <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
-    <button class="btn btn-ghost btn-sm" onclick="showScreen('s-mode')">← Volver</button>
-  </nav>
-  <div class="lives-header">
-    <h2>📡 Lives en vivo</h2>
-    <button class="btn btn-ghost btn-sm" onclick="loadLives()">🔄</button>
-  </div>
-  <div id="lives-grid" class="lives-grid">
-    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--gray-l)">
-      <div style="font-size:48px;margin-bottom:12px">📡</div>
-      <p>No hay lives en este momento</p>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ LIVE VIEWER ═══ -->
-<div id="s-liveview">
-  <div class="liveview-header">
-    <div>
-      <div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:15px" id="lv-title">Live</div>
-      <div class="live-stats" style="position:static;display:inline-flex;background:transparent;padding:0;margin-top:2px">
-        <div class="live-dot"></div>
-        👁 <span id="lv-viewers">0</span>
-      </div>
-    </div>
-    <button class="btn btn-danger btn-sm" onclick="leaveLive()">✕ Salir</button>
-  </div>
-  <div class="liveview-vid">
-    <video id="live-remote-vid" autoplay playsinline></video>
-    <div style="position:absolute;top:8px;left:8px;background:rgba(239,68,68,.9);color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:6px;display:flex;align-items:center;gap:5px">
-      <div class="live-dot"></div> EN VIVO
-    </div>
-    <div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:12px">
-      👁 <span id="lv-viewers2">0</span>
-    </div>
-  </div>
-  <div class="liveview-chat">
-    <div class="live-comments" id="live-comments"></div>
-    <div class="live-comment-inp">
-      <input class="fc" id="live-comment-in" placeholder="Escribe un comentario..." maxlength="200" style="font-size:13px" onkeydown="if(event.key==='Enter')sendLiveComment()"/>
-      <button class="send-btn" onclick="sendLiveComment()">➤</button>
     </div>
   </div>
 </div>
@@ -1304,117 +1216,6 @@ function initSocket(){
     if (dot) dot.style.background = online ? 'var(--ok)' : 'var(--gray)';
   });
 
-  // ── Live socket events ────────────────────────────────────────────────────
-  app.socket.on('live_started', ({ liveId }) => {
-    app_liveId = liveId;
-    const btn = document.getElementById('btn-live');
-    if (btn) { btn.style.background='rgba(239,68,68,.7)'; btn.style.color='#fff'; btn.innerHTML='⏹ DETENER'; }
-    _showLiveBadge();
-    addSys('📡 ¡Live iniciado! Los viewers pueden verte ahora.');
-    toast('📡 ¡Live iniciado! Ya pueden verte.','ok');
-  });
-
-  app.socket.on('lives_updated', () => {
-    // If lives screen is open, refresh
-    if (document.getElementById('s-lives')?.classList.contains('active')) loadLives();
-  });
-
-  app.socket.on('live_ended', ({ liveId }) => {
-    if (app_watchLiveId === liveId) {
-      leaveLive();
-      toast('El live terminó','info');
-    }
-    // Always hide badge + notify
-    _hideLiveBadge();
-    if (app.partnerEmail) addSys('📡 El live ha finalizado.');
-  });
-  // Partner explicitly stopped the live (from videocall)
-  app.socket.on('partner_live_ended', () => {
-    _hideLiveBadge();
-    addSys('📡 Tu amigo terminó el live.');
-  });
-  app.socket.on('partner_live_started', ({ liveId, hostName }) => {
-    // Partner started live — show badge on video area
-    _showLiveBadge();
-    addSys(`📡 ${hostName} inició un live. ¡Están en vivo!`);
-    toast(`📡 ${hostName} está en vivo`,'info');
-  });
-
-  app.socket.on('live_viewer_count', ({ count }) => {
-    // Update live viewer screen counters
-    ['lv-viewers','lv-viewers2'].forEach(id => {
-      const el = document.getElementById(id); if(el) el.textContent = count;
-    });
-    // Update badge on video area (host sees this)
-    const vc = document.getElementById('live-viewer-count');
-    if (vc) vc.textContent = count;
-    // Notify in chat
-    if (app_liveId) addSys(`👁 ${count} ${count===1?'persona viendo':'personas viendo'} el live`);
-  });
-
-  app.socket.on('live_joined', ({ viewerCount, hostName, title }) => {
-    ['lv-viewers','lv-viewers2'].forEach(id => {
-      const el = document.getElementById(id); if(el) el.textContent = viewerCount;
-    });
-    const vc = document.getElementById('live-viewer-count');
-    if (vc) vc.textContent = viewerCount;
-  });
-
-  app.socket.on('live_comment', ({ from, text }) => {
-    addLiveComment(from, text);
-    _snd('hit'); // subtle sound
-  });
-
-  // Live WebRTC (host side)
-  app.socket.on('live_viewer_requesting', async ({ viewerSocketId }) => {
-    if (!app_liveId || !app.localStream) return;
-    const pc = new RTCPeerConnection({ iceServers: [
-      {urls:'stun:stun.l.google.com:19302'},
-      {urls:'turn:global.relay.metered.ca:80',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'},
-      {urls:'turns:global.relay.metered.ca:443?transport=tcp',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'}
-    ]});
-    app.localStream.getTracks().forEach(t => pc.addTrack(t, app.localStream));
-    pc.onicecandidate = ({candidate}) => { if(candidate) app.socket.emit('live_ice',{targetId:viewerSocketId,candidate}); };
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    app.socket.emit('live_offer', { viewerSocketId, offer });
-    app_liveViewers.set(viewerSocketId, pc);
-  });
-
-  // Live WebRTC (viewer side)
-  app.socket.on('live_offer', async ({ offer }) => {
-    if (!app_watchLiveId) return;
-    app_watchPC = new RTCPeerConnection({ iceServers: [
-      {urls:'stun:stun.l.google.com:19302'},
-      {urls:'turn:global.relay.metered.ca:80',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'},
-      {urls:'turns:global.relay.metered.ca:443?transport=tcp',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'}
-    ]});
-    app_watchPC.ontrack = ({ streams }) => {
-      const vid = document.getElementById('live-remote-vid');
-      if (vid && streams[0]) { vid.srcObject = streams[0]; vid.play().catch(()=>{}); }
-    };
-    app_watchPC.onicecandidate = ({candidate}) => {
-      if(candidate) app.socket.emit('live_ice',{targetId:'host',candidate});
-    };
-    await app_watchPC.setRemoteDescription(offer);
-    const answer = await app_watchPC.createAnswer();
-    await app_watchPC.setLocalDescription(answer);
-    app.socket.emit('live_answer', { answer });
-  });
-
-  app.socket.on('live_answer', async ({ answer }) => {
-    // For each viewer's PC, set answer
-    for (const [,pc] of app_liveViewers) {
-      if (pc.signalingState === 'have-local-offer') {
-        await pc.setRemoteDescription(answer).catch(()=>{});
-        break;
-      }
-    }
-  });
-
-  app.socket.on('live_ice', async ({ candidate }) => {
-    if (app_watchPC) await app_watchPC.addIceCandidate(candidate).catch(()=>{});
-  });
 }
 
 // ── WebRTC ────────────────────────────────────────────────────────────────────
@@ -1662,13 +1463,11 @@ function sendMsg(){
   const i=document.getElementById('chat-in');const t=i.value.trim();if(!t||!app.socket)return;
   app.socket.emit('chat_message',{text:t});
   // If hosting a live, also send to live viewers
-  if(app_liveId) app.socket.emit('live_comment',{liveId:app_liveId,text:t});
   addMsg(t,'me');i.value='';
 }
 function sendMsgDesk(){
   const i=document.getElementById('chat-in-d');const t=i.value.trim();if(!t||!app.socket)return;
   app.socket.emit('chat_message',{text:t});
-  if(app_liveId) app.socket.emit('live_comment',{liveId:app_liveId,text:t});
   addMsg(t,'me');i.value='';
 }
 
@@ -2686,13 +2485,6 @@ function _enterChat(mood) {
   }
 }
 
-function showLives() {
-  showScreen('s-lives');
-  loadLives();
-  // Subscribe to live updates
-  if (app.socket) app.socket.emit('subscribe_lives');
-}
-
 async function loadLives() {
   try {
     const lives = await api('/api/lives','GET');
@@ -2717,204 +2509,6 @@ async function loadLives() {
   } catch(e) { console.error(e); }
 }
 
-// ── Live hosting ──────────────────────────────────────────────────────────────
-let app_liveId = null;
-let app_liveViewers = new Map(); // viewerSocketId → RTCPeerConnection
-
-function toggleLive() {
-  if (app_liveId) stopLive();
-  else startLive();
-}
-
-let app_lkRoom = null; // LiveKit room instance (host)
-let app_lkViewRoom = null; // LiveKit room instance (viewer)
-
-async function startLive() {
-  if (!app.partnerEmail) {
-    toast('Debes estar en una videollamada para iniciar un live','err');
-    return;
-  }
-  const title = prompt('Título de tu live (opcional):', '') ?? '';
-  try {
-    // 1. Get token from backend
-    const r = await api('/api/lives/start','POST',{ title: title || `${app.user?.name} en vivo` });
-    const { token, url, liveId } = r;
-
-    // 2. Connect to LiveKit room as publisher
-    app_lkRoom = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
-
-    app_lkRoom.on(LivekitClient.RoomEvent.ParticipantConnected, () => {
-      const cnt = app_lkRoom.remoteParticipants.size;
-      // Update viewer count badge
-      const vc = document.getElementById('live-viewer-count');
-      if (vc) vc.textContent = cnt;
-      const vb = document.getElementById('live-viewer-badge');
-      if (vb) vb.style.display = 'flex';
-      if (app.socket) io_updateViewerCount(liveId, cnt);
-    });
-    app_lkRoom.on(LivekitClient.RoomEvent.ParticipantDisconnected, () => {
-      const cnt = app_lkRoom.remoteParticipants.size;
-      const vc = document.getElementById('live-viewer-count');
-      if (vc) vc.textContent = cnt;
-    });
-
-    await app_lkRoom.connect(url, token);
-
-    // 3. Publish local camera + mic
-    if (app.localStream) {
-      const tracks = app.localStream.getTracks();
-      for (const track of tracks) {
-        await app_lkRoom.localParticipant.publishTrack(track);
-      }
-    } else {
-      await LivekitClient.createLocalTracks({ audio: true, video: true }).then(async tracks => {
-        for (const t of tracks) await app_lkRoom.localParticipant.publishTrack(t);
-      });
-    }
-
-    // 4. Tell server (for list + partner badge)
-    if (app.socket) app.socket.emit('live_start', { title, liveId });
-
-    toast('📡 ¡Live iniciado con LiveKit!','ok');
-  } catch(e) {
-    console.error('LiveKit start error:', e);
-    // Fallback to old WebRTC if LiveKit not configured
-    if (app.socket) app.socket.emit('live_start', { title });
-  }
-}
-
-function io_updateViewerCount(liveId, count) {
-  // Emit via socket so others see count update
-  if (app.socket) app.socket.emit('live_viewer_update', { liveId, count });
-}
-
-function _showLiveBadge() {
-  const badge = document.getElementById('live-cam-badge');
-  if (badge) badge.style.display='flex';
-  const vbadge = document.getElementById('live-viewer-badge');
-  if (vbadge) vbadge.style.display='flex';
-}
-function _hideLiveBadge() {
-  const badge = document.getElementById('live-cam-badge');
-  if (badge) badge.style.display='none';
-  const vbadge = document.getElementById('live-viewer-badge');
-  if (vbadge) vbadge.style.display='none';
-}
-
-async function stopLive() {
-  // Disconnect LiveKit room if connected
-  if (app_lkRoom) {
-    await app_lkRoom.disconnect();
-    app_lkRoom = null;
-  }
-  // Fallback: close old WebRTC connections
-  app_liveViewers.forEach(pc => pc.close());
-  app_liveViewers.clear();
-
-  if (app.socket) app.socket.emit('live_end');
-  app_liveId = null;
-  const btn = document.getElementById('btn-live');
-  if (btn) { btn.style.background='rgba(239,68,68,.15)'; btn.style.color='#EF4444'; btn.innerHTML='📡 LIVE'; }
-  _hideLiveBadge();
-  addSys('📡 Live terminado.');
-}
-
-// ── Live watching ─────────────────────────────────────────────────────────────
-let app_watchLiveId = null;
-let app_watchPC = null;
-
-async function joinLive(liveId, hostName, title) {
-  if (!app.token) { showAuth(); return; }
-  app_watchLiveId = liveId;
-  document.getElementById('lv-title').textContent = title || hostName + ' en vivo';
-  document.getElementById('live-comments').innerHTML = '';
-  document.getElementById('s-liveview').classList.add('active');
-
-  // Notify server for viewer count
-  if (app.socket) app.socket.emit('live_join', { liveId });
-
-  try {
-    // Get viewer token from backend
-    const r = await api('/api/lives/token','POST',{ liveId, isHost: false });
-    const { token, url } = r;
-
-    // Connect as subscriber (no publish)
-    app_lkViewRoom = new LivekitClient.Room({ adaptiveStream: true });
-
-    app_lkViewRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track, pub, participant) => {
-      const vid = document.getElementById('live-remote-vid');
-      if (!vid) return;
-      if (track.kind === 'video') {
-        track.attach(vid);
-        vid.play().catch(()=>{});
-      }
-    });
-
-    app_lkViewRoom.on(LivekitClient.RoomEvent.Disconnected, () => {
-      toast('Live desconectado','info');
-      leaveLive();
-    });
-
-    await app_lkViewRoom.connect(url, token);
-  } catch(e) {
-    console.error('LiveKit join error:', e);
-    // Fallback to old WebRTC
-    if (app.socket) app.socket.emit('live_request_offer', { liveId });
-  }
-}
-
-async function leaveLive() {
-  if (app_watchLiveId && app.socket) app.socket.emit('live_leave', { liveId: app_watchLiveId });
-  // Disconnect LiveKit viewer room
-  if (app_lkViewRoom) {
-    await app_lkViewRoom.disconnect();
-    app_lkViewRoom = null;
-  }
-  // Fallback cleanup
-  if (app_watchPC) { app_watchPC.close(); app_watchPC = null; }
-  document.getElementById('s-liveview').classList.remove('active');
-  const vid = document.getElementById('live-remote-vid');
-  if (vid) { vid.srcObject = null; vid.src = ''; }
-  app_watchLiveId = null;
-}
-
-function sendLiveComment() {
-  const inp = document.getElementById('live-comment-in');
-  const text = inp.value.trim();
-  if (!text || !app.socket) return;
-  const liveId = app_watchLiveId || app_liveId;
-  if (!liveId) return;
-  app.socket.emit('live_comment', { liveId, text });
-  // Show immediately in local live-comments
-  const el = document.getElementById('live-comments');
-  if (el) {
-    const d = document.createElement('div');
-    d.className = 'live-comment';
-    d.innerHTML = `<strong>Tú:</strong> ${text}`;
-    el.appendChild(d); el.scrollTop = el.scrollHeight;
-  }
-  // Also show in main chat (if host is in video call)
-  addSys(`📡 Tú: ${text}`);
-  inp.value = '';
-}
-
-function addLiveComment(from, text) {
-  // Add to MAIN chat (visible to host + partner in videocall)
-  addSys(`📡 ${from}: ${text}`);
-  // Also add to live-comments panel if viewer is watching from live screen
-  const el = document.getElementById('live-comments');
-  if (el) {
-    const d = document.createElement('div');
-    d.className = 'live-comment';
-    d.innerHTML = `<strong>${from}:</strong> ${text}`;
-    el.appendChild(d);
-    el.scrollTop = el.scrollHeight;
-    while (el.children.length > 100) el.removeChild(el.firstChild);
-  }
-}
-
-// ── Camera swap ───────────────────────────────────────────────────────────────
-let _showingLocal = false; // false = remote is big (default)
 function swapCameras() {
   _showingLocal = !_showingLocal;
   const remoteVid = document.getElementById('remoteVid');
@@ -2929,6 +2523,17 @@ function swapCameras() {
     localVid.style.cssText  = 'position:absolute;bottom:10px;right:10px;width:88px;height:66px;object-fit:cover;border-radius:8px;border:2px solid var(--pu);z-index:10';
   }
 }
+
+// ── Visit tracking ───────────────────────────────────────────────────────────
+(function trackVisit() {
+  try {
+    fetch(SERVER + '/api/track/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page: window.location.pathname })
+    }).catch(() => {});
+  } catch(e) {}
+})();
 
 // ── Auto-login ────────────────────────────────────────────────────────────────
 (async()=>{
