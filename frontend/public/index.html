@@ -795,28 +795,32 @@ textarea.fc{resize:vertical;min-height:70px}
     <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
     <button class="btn btn-ghost btn-sm" onclick="showScreen('s-mode')">← Volver</button>
   </nav>
-  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:20px 16px">
-    <div class="mode-choice">
-      <div style="text-align:center;margin-bottom:4px">
-        <span style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px">⭐ PREMIUM</span>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px">
+    <div style="width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px">
+      <div style="text-align:center;margin-bottom:6px">
+        <span style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:11px;font-weight:700;padding:3px 14px;border-radius:20px">⭐ PREMIUM</span>
       </div>
-      <h2>¿Cómo quieres conectar?</h2>
-      <p style="text-align:center;color:var(--gray-l);font-size:13px;margin-top:-8px;margin-bottom:8px">Solo te conectarás con usuarios premium en el mismo mood</p>
-      <div class="mode-card" onclick="_enterChat('pareja')">
-        <div class="mc-icon">💕</div>
-        <h3>Buscar pareja</h3>
-        <p>Conecta con alguien especial</p>
-      </div>
-      <div class="mode-card" onclick="_enterChat('amigos')">
-        <div class="mc-icon">👋</div>
-        <h3>Hacer amigos</h3>
-        <p>Conoce gente nueva para chatear</p>
-      </div>
-      <div class="mode-card" onclick="_enterChat('negocios')">
-        <div class="mc-icon">💼</div>
-        <h3>Negocios</h3>
-        <p>Networking profesional</p>
-      </div>
+      <h2 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:24px;text-align:center;margin:0 0 4px">¿Cuál es tu mood hoy?</h2>
+      <p style="text-align:center;color:var(--gray-l);font-size:13px;margin:0 0 8px">Solo conectarás con usuarios en el mismo mood</p>
+
+      <button onclick="_enterChat('pareja')" style="width:100%;background:rgba(236,72,153,.12);border:1.5px solid rgba(236,72,153,.4);border-radius:16px;padding:20px 24px;cursor:pointer;display:flex;align-items:center;gap:16px;transition:all .2s;text-align:left" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <span style="font-size:40px">💕</span>
+        <div><div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:17px;color:#fff">Buscar match</div><div style="font-size:12px;color:var(--gray-l);margin-top:2px">Conecta con alguien especial</div></div>
+      </button>
+
+      <button onclick="_enterChat('amigos')" style="width:100%;background:rgba(34,197,94,.10);border:1.5px solid rgba(34,197,94,.35);border-radius:16px;padding:20px 24px;cursor:pointer;display:flex;align-items:center;gap:16px;transition:all .2s;text-align:left" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <span style="font-size:40px">👋</span>
+        <div><div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:17px;color:#fff">Buscar amigos</div><div style="font-size:12px;color:var(--gray-l);margin-top:2px">Conoce gente nueva</div></div>
+      </button>
+
+      <button onclick="_enterChat('negocios')" style="width:100%;background:rgba(59,130,246,.10);border:1.5px solid rgba(59,130,246,.35);border-radius:16px;padding:20px 24px;cursor:pointer;display:flex;align-items:center;gap:16px;transition:all .2s;text-align:left" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <span style="font-size:40px">💼</span>
+        <div><div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:17px;color:#fff">Hacer negocios</div><div style="font-size:12px;color:var(--gray-l);margin-top:2px">Networking profesional</div></div>
+      </button>
+
+      <button onclick="app._mood=null;_enterChat(null)" style="width:100%;background:transparent;border:1px solid var(--bd);border-radius:12px;padding:12px 24px;cursor:pointer;color:var(--gray-l);font-size:13px;font-family:'Inter',sans-serif;transition:all .2s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--gray-l)'">
+        Continuar sin mood →
+      </button>
     </div>
   </div>
 </div>
@@ -2125,16 +2129,15 @@ function _startSpectatorLoop() {
     const c=_gc(), x=_gx(); if(!c||!x) return;
     x.clearRect(0,0,c.width,c.height);
     // Dark overlay so fruits/targets are visible
-    x.fillStyle='rgba(5,0,12,.12)'; x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,14,.82)'; x.fillRect(0,0,c.width,c.height);
 
     if (GS.type==='fruit') {
       PT.items.forEach(f=>{
         x.save(); x.translate(f.x,f.y);
         x.font=f.sz+'px serif'; x.textAlign='center'; x.textBaseline='middle';
-        x.shadowColor='rgba(255,255,255,0.95)';
-        x.shadowBlur=18; x.fillText(f.e,0,0);
-        x.shadowColor='rgba(255,230,0,1)';
-        x.shadowBlur=14; x.fillText(f.e,0,0);
+        x.shadowColor='rgba(255,255,100,1)';
+        x.shadowBlur=24; x.fillText(f.e,0,0);
+        x.shadowBlur=12; x.fillText(f.e,0,0);
         x.shadowBlur=0;  x.fillText(f.e,0,0);
         x.restore();
       });
@@ -2214,7 +2217,7 @@ function _fruit() {
     if(!GS.alive||GS.phase!=='my_turn') return;
     const dt=Math.min((now-ts)/16,2.5); ts=now;
     x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,12,.08)'; x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,14,.82)'; x.fillRect(0,0,c.width,c.height);
 
     // Trail
     const t0=Date.now();
@@ -2243,13 +2246,9 @@ function _fruit() {
       if(f.y>c.height+80){MY.items.splice(i,1);if(!f.bomb){MY.lives--;if(MY.lives<0)MY.lives=0;}continue;}
       x.save();x.translate(f.x,f.y);x.rotate(f.rot*Math.PI/180);
       x.font=f.sz+'px serif';x.textAlign='center';x.textBaseline='middle';
-      // White halo pass — makes emoji pop on any background
-      x.shadowColor='rgba(255,255,255,0.95)';
-      x.shadowBlur=18; x.fillText(f.e,0,0);
-      // Colored glow pass
-      x.shadowColor=f.bomb?'rgba(255,100,0,1)':'rgba(255,230,0,1)';
-      x.shadowBlur=14; x.fillText(f.e,0,0);
-      // Crisp final pass
+      x.shadowColor=f.bomb?'rgba(255,120,0,1)':'rgba(255,255,100,1)';
+      x.shadowBlur=24; x.fillText(f.e,0,0);
+      x.shadowBlur=12; x.fillText(f.e,0,0);
       x.shadowBlur=0;  x.fillText(f.e,0,0);
       x.restore();
     }
@@ -2333,7 +2332,7 @@ function _target() {
     if(!GS.alive||GS.phase!=='my_turn') return;
     const dt=Math.min((now-ts)/16,2.5); ts=now;
     x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,12,.08)';x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,14,.82)';x.fillRect(0,0,c.width,c.height);
 
     MY.spT+=dt; if(MY.spT>30&&MY.tgts.length<8){spawn();MY.spT=0;}
     if(!MY.tgts.length) spawn();
@@ -2414,7 +2413,7 @@ function _basket() {
     if(!GS.alive||GS.phase!=='my_turn') return;
     const dt=Math.min((now-ts)/16,2.5); ts=now;
     x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,12,.08)';x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,14,.82)';x.fillRect(0,0,c.width,c.height);
 
     const b=MY.ball;
     if(b.free&&!drag){
@@ -2462,6 +2461,7 @@ function _basket() {
 // ── Mode Select & Lives ───────────────────────────────────────────────────────
 function handleStart() {
   if (!app.token) { showAuth(); return; }
+  app._mood = null; // reset mood on fresh start
   showScreen('s-mode');
 }
 function showMoodSelect() { showScreen('s-mood'); }

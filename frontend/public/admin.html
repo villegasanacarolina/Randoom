@@ -395,15 +395,17 @@ function renderUsers() {
     <tr>
       <td>
         <div style="font-weight:600;font-size:13px">${u.name}</div>
-        <div style="font-size:10px;color:var(--gray-l)">${u.email}</div>
+        <div style="font-size:10px;color:var(--gray-l)">@${u.username||'—'}</div>
       </td>
+      <td style="font-size:11px;color:var(--gray-l);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.email}</td>
       <td style="font-size:12px">${u.age||'—'} · ${u.gender||'—'}</td>
       <td style="font-size:11px;color:var(--gray-l)">${u.country||'—'}</td>
       <td>
         ${u.isPremium ? '<span style="background:rgba(160,32,240,.2);color:var(--pu-l);font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700">⭐ Premium</span>' : '<span style="color:var(--gray-l);font-size:11px">Gratis</span>'}
-        ${u.isOnline ? '<span style="background:rgba(34,197,94,.15);color:#22C55E;font-size:10px;padding:2px 7px;border-radius:10px;margin-left:4px">🟢</span>' : ''}
+        ${u.isOnline ? ' <span style="color:#22C55E;font-size:11px">🟢</span>' : ''}
       </td>
-      <td style="font-size:11px;color:var(--gray-l)">${fdate(u.createdAt)}</td>
+      <td style="font-size:11px;color:var(--gray-l)">${u.total_sessions||0}</td>
+      <td style="font-size:11px;color:var(--gray-l)">${fdate(u.createdAt||u.created_at)}</td>
       <td>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
           ${u.isPremium
