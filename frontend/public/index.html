@@ -547,8 +547,8 @@ textarea.fc{resize:vertical;min-height:70px}
       <button onclick="swapCameras()" style="position:absolute;top:8px;left:8px;z-index:15;background:rgba(8,0,16,.7);border:1px solid var(--bd);color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px)">⇄ Cámara</button>
       <div id="live-cam-badge" style="position:absolute;top:8px;right:8px;z-index:15;background:rgba(239,68,68,.92);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;display:none;align-items:center;gap:5px"><span style="width:7px;height:7px;background:#fff;border-radius:50%;display:inline-block;animation:pulse 1s infinite"></span> LIVE</div>
       <!-- Viewer count badge — visible on vid-area during live -->
-      <div id="live-viewer-badge" style="position:absolute;bottom:12px;left:12px;z-index:15;background:rgba(0,0,0,.75);color:#fff;font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;display:none;align-items:center;gap:6px;backdrop-filter:blur(4px)">
-        👁 <span id="live-viewer-count">0</span> viendo
+      <div id="live-viewer-badge" style="position:absolute;bottom:12px;left:12px;z-index:15;background:rgba(0,0,0,.65);color:#fff;font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;display:none;align-items:center;gap:5px;backdrop-filter:blur(4px)">
+        👁 <span id="live-viewer-count">0</span>
       </div>
       <div class="vid-overlay" id="ov-idle">
         <div style="font-size:44px">🔮</div>
@@ -846,7 +846,7 @@ textarea.fc{resize:vertical;min-height:70px}
       <div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:15px" id="lv-title">Live</div>
       <div class="live-stats" style="position:static;display:inline-flex;background:transparent;padding:0;margin-top:2px">
         <div class="live-dot"></div>
-        <span id="lv-viewers">0</span> viendo
+        👁 <span id="lv-viewers">0</span>
       </div>
     </div>
     <button class="btn btn-danger btn-sm" onclick="leaveLive()">✕ Salir</button>
@@ -1102,7 +1102,12 @@ async function doResend(){
 function initSocket(){
   app.socket=io(SERVER);
   app.socket.on('connect',()=>{app.socket.emit('join',{token:app.token});pollStats();requestMedia();});
-  app.socket.on('joined',({isPremium,ineStatus,approved})=>{app.isPremium=isPremium;app.ineStatus=ineStatus;app.approved=approved;updateChatUI();});
+  app.socket.on('joined',({isPremium,ineStatus,approved})=>{
+    app.isPremium=isPremium;app.ineStatus=ineStatus;app.approved=approved;updateChatUI();
+    // If we have a pending mood, set it and search
+    if(app._mood) app.socket.emit('set_mode',{mode:app._mood});
+    app.socket.emit('find_partner');
+  });
   app.socket.on('searching',()=>{showOv('search');document.getElementById('search-sub').textContent=app.isPremium?'Aplicando filtros…':'Buscando a alguien…';});
   app.socket.on('partner_found',async({partner,initiator})=>{
     showOv('conn');app.partnerEmail=partner.email;
@@ -1164,6 +1169,22 @@ function initSocket(){
   app.socket.on('game_score', (d) => {
     onGameScore(d.score);
   });
+  // Partner computed the final result — show it to me too
+  app.socket.on('game_result', (d) => {
+    if (GS.phase === 'result') return; // already showing
+    _kill();
+    GS.phase = 'result';
+    // d.myScore = partner's score, d.partnerScore = my score (swapped perspective)
+    const my = d.partnerScore, th = d.myScore;
+    GS.myScore = my; GS.partnerScore = th;
+    const won=my>th, tied=my===th;
+    document.getElementById('result-emoji').textContent  = tied?'🤝':won?'🏆':'😅';
+    document.getElementById('result-winner').textContent = tied?'¡Empate!':won?'🎉 ¡GANASTE!':'¡Ganó tu compañero!';
+    document.getElementById('result-winner').style.color = tied?'#F59E0B':won?'#A020F0':'#EF4444';
+    document.getElementById('result-score').textContent  = `Tú: ${my} pts   Compañero: ${th} pts`;
+    document.getElementById('game-result').classList.add('show');
+    setTimeout(()=>_snd(tied?'hit':won?'win':'lose'), 100);
+  });
   app.socket.on('game_state', (d) => {
     onGameState(d);
   });
@@ -1215,7 +1236,7 @@ function initSocket(){
       leaveLive();
       toast('El live terminó','info');
     }
-    // If my partner ended their live, hide the badge from MY camera area
+    // Always hide badge when any live we know about ends
     _hideLiveBadge();
     addSys('📡 El live ha finalizado.');
   });
@@ -1834,11 +1855,16 @@ function _snd(type) {
       // Gentle click for countdown
       note(1047, 0.05, 0.09);
     } else if (type === 'win') {
-      // Cheerful ascending fanfare
-      [523, 659, 784, 1047].forEach((f, i) => note(f, 0.22, 0.16, i * 0.11));
+      // Ta-da fanfare: quick triplet then long high note
+      note(523, 0.1, 0.18, 0);
+      note(659, 0.1, 0.18, 0.1);
+      note(784, 0.1, 0.18, 0.2);
+      note(1047, 0.45, 0.22, 0.3);
     } else if (type === 'lose') {
-      // Short descending tone
-      [494, 392, 330].forEach((f, i) => note(f, 0.2, 0.13, i * 0.13));
+      // Sad trombone descend
+      note(494, 0.18, 0.14, 0);
+      note(440, 0.18, 0.14, 0.15);
+      note(392, 0.3,  0.14, 0.3);
     }
   } catch(e) {}
 }
@@ -2004,7 +2030,10 @@ function _showResult() {
   document.getElementById('result-winner').style.color = tied?'#F59E0B':won?'#A020F0':'#EF4444';
   document.getElementById('result-score').textContent  = `Tú: ${my} pts   Compañero: ${th} pts`;
   document.getElementById('game-result').classList.add('show');
-  setTimeout(()=>_snd(tied?'hit':won?'win':'lose'),100);
+  // Victory/defeat sound
+  setTimeout(()=>_snd(tied?'hit':won?'win':'lose'), 100);
+  // Tell partner to also show result (with swapped perspective)
+  if (app.socket) app.socket.emit('game_result', { myScore: my, partnerScore: th });
 }
 
 // ─── Draw HUD (works for both MY and PT) ─────────────────────────────────────
@@ -2101,12 +2130,11 @@ function _startSpectatorLoop() {
     if (GS.type==='fruit') {
       PT.items.forEach(f=>{
         x.save(); x.translate(f.x,f.y);
-        x.beginPath();x.arc(0,0,f.sz*0.55,0,Math.PI*2);
-        x.fillStyle='rgba(0,0,0,0.45)';x.fill();
         x.font=f.sz+'px serif'; x.textAlign='center'; x.textBaseline='middle';
-        x.shadowColor='rgba(255,240,80,1)';
-        x.shadowBlur=22; x.fillText(f.e,0,0);
-        x.shadowBlur=10; x.fillText(f.e,0,0);
+        x.shadowColor='rgba(255,255,255,0.95)';
+        x.shadowBlur=18; x.fillText(f.e,0,0);
+        x.shadowColor='rgba(255,230,0,1)';
+        x.shadowBlur=14; x.fillText(f.e,0,0);
         x.shadowBlur=0;  x.fillText(f.e,0,0);
         x.restore();
       });
@@ -2214,13 +2242,14 @@ function _fruit() {
       f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=.45*dt;f.rot+=f.rv*dt;
       if(f.y>c.height+80){MY.items.splice(i,1);if(!f.bomb){MY.lives--;if(MY.lives<0)MY.lives=0;}continue;}
       x.save();x.translate(f.x,f.y);x.rotate(f.rot*Math.PI/180);
-      // Dark circle backdrop so shadow is always visible
-      x.beginPath();x.arc(0,0,f.sz*0.55,0,Math.PI*2);
-      x.fillStyle='rgba(0,0,0,0.45)';x.fill();
       x.font=f.sz+'px serif';x.textAlign='center';x.textBaseline='middle';
-      x.shadowColor=f.bomb?'rgba(255,120,0,1)':'rgba(255,240,80,1)';
-      x.shadowBlur=22; x.fillText(f.e,0,0);
-      x.shadowBlur=10; x.fillText(f.e,0,0);
+      // White halo pass — makes emoji pop on any background
+      x.shadowColor='rgba(255,255,255,0.95)';
+      x.shadowBlur=18; x.fillText(f.e,0,0);
+      // Colored glow pass
+      x.shadowColor=f.bomb?'rgba(255,100,0,1)':'rgba(255,230,0,1)';
+      x.shadowBlur=14; x.fillText(f.e,0,0);
+      // Crisp final pass
       x.shadowBlur=0;  x.fillText(f.e,0,0);
       x.restore();
     }
@@ -2236,11 +2265,11 @@ function _fruit() {
       PT.items.forEach(f=>{
         const px=offX+f.x*scl, py=offY+f.y*scl;
         if(px<offX||py<0||px>c.width||py>c.height*0.3) return;
-        x.beginPath();x.arc(px,py,Math.round(f.sz*scl)*0.55,0,Math.PI*2);
-        x.fillStyle='rgba(0,0,0,0.4)';x.fill();
-        x.shadowColor='rgba(255,240,80,1)'; x.shadowBlur=12;
+        x.shadowColor='rgba(255,255,255,0.9)'; x.shadowBlur=12;
         x.font=Math.round(f.sz*scl)+'px serif';x.textAlign='center';x.textBaseline='middle';
-        x.fillText(f.e,px,py); x.shadowBlur=6; x.fillText(f.e,px,py); x.shadowBlur=0;
+        x.fillText(f.e,px,py);
+        x.shadowColor='rgba(255,230,0,1)'; x.shadowBlur=8;
+        x.fillText(f.e,px,py); x.shadowBlur=0;
       });
       x.restore();
       // Partner label
@@ -2436,6 +2465,21 @@ function handleStart() {
   showScreen('s-mode');
 }
 function showMoodSelect() { showScreen('s-mood'); }
+
+function _enterChat(mood) {
+  app._mood = mood || null;
+  // Go to chat screen
+  document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active'));
+  document.getElementById('s-chat').classList.add('active');
+  updateChatUI();
+  if (!app.socket) {
+    initSocket();
+    // initSocket calls find_partner after joined — pass mood via global
+  } else {
+    if (app._mood) app.socket.emit('set_mode', { mode: app._mood });
+    app.socket.emit('find_partner');
+  }
+}
 
 function showLives() {
   showScreen('s-lives');

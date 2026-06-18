@@ -843,13 +843,13 @@ function matchesFilters(a, b) {
   const s = activeSockets[a], c = activeSockets[b];
   if (!s||!c) return false;
 
-  // Premium mood: both must be premium AND same mood
-  if (s.isPremium && c.isPremium) {
-    if (s.mode && c.mode && s.mode !== c.mode) return false;
+  // Mood matching: if either user has a mood set, both must have same mood
+  const sm = s.mode || null;
+  const cm = c.mode || null;
+  if (sm || cm) {
+    // Both need to have a mood, and it must match
+    if (!sm || !cm || sm !== cm) return false;
   }
-  // If one is premium and has a mood, only match with same-mood premium
-  if (s.isPremium && s.mode && !c.isPremium) return false;
-  if (c.isPremium && c.mode && !s.isPremium) return false;
 
   const check = (f, t) => {
     if (!f) return true;
@@ -924,6 +924,7 @@ io.on('connection', socket => {
   socket.on('game_score',  d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_score',  d); });
   socket.on('game_end',    d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_end',    d); });
   socket.on('game_state',  d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_state',  d); });
+  socket.on('game_result', d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_result', d); });
   socket.on('call_accept', d => {
     const target = Object.entries(activeSockets).find(([,s]) => s.email === d.toEmail);
     if (target) io.to(target[0]).emit('call_accepted_direct', { from: activeSockets[socket.id]?.email });
