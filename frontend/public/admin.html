@@ -245,37 +245,53 @@ tr:hover td{background:rgba(160,32,240,.04)}
           <button class="btn btn-ghost btn-sm" onclick="loadAnalytics()">🔄 Actualizar</button>
         </div>
 
-        <!-- Summary cards -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px">
-          <div class="stat-card purple">
-            <div class="stat-icon">🌐</div>
-            <div class="stat-val" id="an-total">—</div>
-            <div class="stat-lbl">Total histórico</div>
+        <!-- Summary: Visitas vs Personas -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+
+          <!-- VISITAS (una persona puede contar varias) -->
+          <div style="background:var(--card);border:1.5px solid rgba(160,32,240,.3);border-radius:16px;padding:18px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--pu-l);margin-bottom:14px">🌐 Visitas al sitio</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <div style="font-size:28px;font-weight:900;color:#fff;line-height:1" id="an-total">—</div>
+                <div style="font-size:11px;color:var(--gray-l);margin-top:3px">Total histórico</div>
+              </div>
+              <div>
+                <div style="font-size:28px;font-weight:900;color:#fff;line-height:1" id="an-today">—</div>
+                <div style="font-size:11px;color:var(--gray-l);margin-top:3px">Hoy</div>
+              </div>
+              <div>
+                <div style="font-size:22px;font-weight:800;color:#C8A8E0;line-height:1" id="an-week">—</div>
+                <div style="font-size:11px;color:var(--gray-l);margin-top:3px">Esta semana</div>
+              </div>
+              <div>
+                <div style="font-size:22px;font-weight:800;color:#C8A8E0;line-height:1" id="an-month">—</div>
+                <div style="font-size:11px;color:var(--gray-l);margin-top:3px">Este mes</div>
+              </div>
+            </div>
           </div>
-          <div class="stat-card teal">
-            <div class="stat-icon">📅</div>
-            <div class="stat-val" id="an-today">—</div>
-            <div class="stat-lbl">Hoy</div>
-          </div>
-          <div class="stat-card green">
-            <div class="stat-icon">📆</div>
-            <div class="stat-val" id="an-week">—</div>
-            <div class="stat-lbl">Esta semana</div>
-          </div>
-          <div class="stat-card purple">
-            <div class="stat-icon">🗓️</div>
-            <div class="stat-val" id="an-month">—</div>
-            <div class="stat-lbl">Este mes</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">👤</div>
-            <div class="stat-val" id="an-unique">—</div>
-            <div class="stat-lbl">IPs únicas</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">📊</div>
-            <div class="stat-val" id="an-avg">—</div>
-            <div class="stat-lbl">Prom. diario</div>
+
+          <!-- PERSONAS ÚNICAS (IPs distintas) -->
+          <div style="background:var(--card);border:1.5px solid rgba(34,197,94,.25);border-radius:16px;padding:18px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#22C55E;margin-bottom:14px">👤 Personas únicas</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <div style="font-size:28px;font-weight:900;color:#fff;line-height:1" id="an-unique">—</div>
+                <div style="font-size:11px;color:var(--gray-l);margin-top:3px">Total histórico</div>
+              </div>
+              <div>
+                <div style="font-size:28px;font-weight:900;color:#fff;line-height:1" id="an-unique-today">—</div>
+                <div style="font-size:11px;color:var(--gray-l);margin-top:3px">Hoy</div>
+              </div>
+              <div>
+                <div style="font-size:22px;font-weight:800;color:#86efac;line-height:1" id="an-avg">—</div>
+                <div style="font-size:11px;color:var(--gray-l);margin-top:3px">Prom. visitas/día</div>
+              </div>
+              <div>
+                <div style="font-size:22px;font-weight:800;color:#86efac;line-height:1" id="an-ratio">—</div>
+                <div style="font-size:11px;color:var(--gray-l);margin-top:3px">Visitas/persona</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -592,13 +608,20 @@ async function loadAnalytics() {
     const d = await api('/api/admin/analytics','GET');
 
     // Summary cards
-    document.getElementById('an-total').textContent  = (d.total||0).toLocaleString();
-    document.getElementById('an-today').textContent  = (d.today||0).toLocaleString();
-    document.getElementById('an-week').textContent   = (d.week||0).toLocaleString();
-    document.getElementById('an-month').textContent  = (d.month||0).toLocaleString();
-    document.getElementById('an-unique').textContent = (d.uniqueIPs||0).toLocaleString();
+    const total   = d.total||0;
+    const unique  = d.uniqueIPs||0;
+    const todayV  = d.today||0;
+    const uniqueT = d.uniqueToday||0;
+    document.getElementById('an-total').textContent       = total.toLocaleString();
+    document.getElementById('an-today').textContent       = todayV.toLocaleString();
+    document.getElementById('an-week').textContent        = (d.week||0).toLocaleString();
+    document.getElementById('an-month').textContent       = (d.month||0).toLocaleString();
+    document.getElementById('an-unique').textContent      = unique.toLocaleString();
+    document.getElementById('an-unique-today').textContent= uniqueT.toLocaleString();
     const avgVal = Math.round((d.month||0) / 30);
-    document.getElementById('an-avg').textContent    = avgVal.toLocaleString();
+    document.getElementById('an-avg').textContent         = avgVal.toLocaleString();
+    const ratio = unique > 0 ? (total/unique).toFixed(1) : '—';
+    document.getElementById('an-ratio').textContent       = ratio+'x';
 
     // Device breakdown
     const devEl = document.getElementById('an-devices');
