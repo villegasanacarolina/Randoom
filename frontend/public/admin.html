@@ -407,8 +407,8 @@ function renderUsers() {
       <td>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
           ${u.isPremium
-            ? `<button class="btn btn-ghost btn-sm" onclick="setPremium('${u.email}',false)">⭐ Quitar</button>`
-            : `<button class="btn btn-ghost btn-sm" onclick="setPremium('${u.email}',true)">⭐ Dar</button>`}
+            ? `<button class="btn btn-ghost btn-sm" onclick="setPremium('${u.email}',false)">✕ Quitar</button>`
+            : `<button class="btn btn-ghost btn-sm" onclick="setPremium('${u.email}',true)">⭐ Premium</button>`}
           ${u.banned
             ? `<button class="btn btn-success btn-sm" onclick="banUser('${u.email}',false)">✅ Desbanear</button>`
             : `<button class="btn btn-danger btn-sm" onclick="banUser('${u.email}',true)">🚫 Banear</button>`}
@@ -453,10 +453,10 @@ function renderReports() {
   `).join('');
 }
 
-async function setPremium(email, give) {
+async function setPremium(email, active) {
   try {
-    await api(`/api/admin/users/${encodeURIComponent(email)}/premium`, 'POST', { give });
-    toast(give ? '⭐ Premium dado' : '⭐ Premium quitado', 'ok');
+    await api(`/api/admin/users/${encodeURIComponent(email)}/premium`, 'POST', { active });
+    toast(active ? '⭐ Premium dado' : '⭐ Premium quitado', 'ok');
     refreshAll();
   } catch(e) { toast(e.message,'err'); }
 }

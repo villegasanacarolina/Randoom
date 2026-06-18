@@ -1287,366 +1287,419 @@ async function sendFriendReq() {
   } catch(e) {toast(e.message,'err');}
 }
 
-// ══════════════════════════════════════════════════════════════════════
-// ═══════════════════ GAMES ═══════════════════
-// State — declared once here, used everywhere
-const G = {
-  type: null,       // 'fruit' | 'target' | 'basket'
-  phase: 'idle',   // 'idle' | 'my_turn' | 'waiting' | 'result'
-  myScore: 0,
-  partnerScore: 0,
-  timeLeft: 30,
-  frameId: null,
-  timerInt: null,
-  canvas: null,
-  ctx: null
+// ═══════════════════════════════════════════════════════
+// GAMES  – turn-based, 30s each, no canvas-clone bugs
+// ═══════════════════════════════════════════════════════
+
+const GTYPE  = { fruit:'🍉 Fruit Ninja', target:'🎯 Tiro al Blanco', basket:'🏀 Baloncesto' };
+const FRUITS = ['🍉','🍊','🍋','🍇','🍓','🥝','🍑','🍒'];
+const TCOLS  = ['#EF4444','#3B82F6','#22C55E','#F59E0B','#A020F0','#EC4899'];
+
+// ── Single mutable state ──────────────────────────────
+let GS = {
+  type: null, phase: 'idle',
+  myScore: 0, partnerScore: 0,
+  timeLeft: 30, timerID: null, rafID: null,
+  alive: false   // set true when a game loop is running
 };
 
-const GAME_SEC   = 30;
-const FRUIT_LIST = ['🍉','🍊','🍋','🍇','🍓','🥝','🍑','🍒'];
-const TGT_COLORS = ['#EF4444','#3B82F6','#22C55E','#F59E0B','#A020F0','#EC4899'];
-
-// ── I opened the game ──────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────
+// PUBLIC: called by HTML buttons
+// ─────────────────────────────────────────────────────
 function openGame(type) {
   if (!app.partnerEmail) { toast('Debes estar en una llamada','err'); return; }
-  G.myScore = 0; G.partnerScore = 0; G.type = type;
-  if (app.socket) app.socket.emit('game_invite', { type, from: app.user?.name || '' });
-  _boot(type);
-  _startMyTurn();
-}
-
-// ── Partner opened the game ────────────────────────────────────────────────
-function onGameInvite(type, fromName) {
-  G.type = type; G.myScore = 0; G.partnerScore = 0; G.phase = 'idle';
-  _boot(type);
-  _drawMsg('⌛ ' + (fromName||'Tu compañero') + ' está jugando...');
-  document.getElementById('game-status').textContent = 'Turno de tu compañero...';
-}
-
-// ── Partner finished their turn ────────────────────────────────────────────
-function onGameScore(score) {
-  G.partnerScore = score;
-  if (G.phase === 'waiting') {
-    _showResult(); // I already played → show result
-  } else {
-    // Partner finished first → now my turn
-    _boot(G.type);
-    _drawMsg('🎮 ¡TU TURNO!\n¡Prepárate!', '#A020F0');
-    document.getElementById('game-status').textContent = '¡Tu turno en 2s!';
-    setTimeout(_startMyTurn, 1800);
-  }
-}
-
-function onGameEnd() {
-  _stop();
-  G.type = null; G.phase = 'idle';
-  document.getElementById('game-overlay').classList.remove('active');
-  toast('Tu compañero cerró el juego','info');
-}
-
-// ── Shared UI helpers ──────────────────────────────────────────────────────
-function _boot(type) {
-  const titles = {fruit:'🍉 Fruit Ninja', target:'🎯 Tiro al Blanco', basket:'🏀 Baloncesto'};
-  document.getElementById('game-title').textContent = titles[type]||'🎮';
-  document.getElementById('game-result').classList.remove('show');
-  document.getElementById('game-overlay').classList.add('active');
-  _resize();
-}
-
-function _resize() {
-  G.canvas = document.getElementById('game-canvas');
-  const w = G.canvas.parentElement;
-  G.canvas.width  = w.offsetWidth  || window.innerWidth;
-  G.canvas.height = w.offsetHeight || window.innerHeight - 56;
-  G.ctx = G.canvas.getContext('2d');
-}
-
-function _stop() {
-  if (G.frameId)  { cancelAnimationFrame(G.frameId); G.frameId = null; }
-  if (G.timerInt) { clearInterval(G.timerInt); G.timerInt = null; }
-  // Fresh canvas removes all stale event listeners
-  const old = document.getElementById('game-canvas');
-  if (old && old.parentNode) {
-    const neo = old.cloneNode(false);
-    old.parentNode.replaceChild(neo, old);
-    G.canvas = neo;
-    neo.width  = old.width;
-    neo.height = old.height;
-    G.ctx = neo.getContext('2d');
-  }
-}
-
-function _drawMsg(text, color) {
-  const c = G.canvas, x = G.ctx;
-  if (!c || !x) return;
-  x.clearRect(0,0,c.width,c.height);
-  x.fillStyle = 'rgba(8,0,16,.78)'; x.fillRect(0,0,c.width,c.height);
-  const lines = text.split('\n');
-  x.textAlign = 'center';
-  lines.forEach((line, i) => {
-    const big = i === 0;
-    x.font = `bold ${big ? Math.min(46,c.width/7) : 18}px Poppins,sans-serif`;
-    x.fillStyle = big ? (color||'#fff') : '#C8A8E0';
-    if (big && color) { x.shadowColor = color; x.shadowBlur = 22; }
-    x.fillText(line, c.width/2, c.height/2 - 14 + i * 44);
-    x.shadowBlur = 0;
-  });
-}
-
-function _hud(score) {
-  const c = G.canvas, x = G.ctx;
-  // Score pill
-  x.fillStyle = 'rgba(8,0,16,.72)';
-  _pill(x, 10, 10, 114, 40, 10); x.fill();
-  x.fillStyle = '#fff'; x.font = 'bold 19px Poppins,sans-serif'; x.textAlign = 'left';
-  const ic = {fruit:'🍉',target:'🎯',basket:'🏀'};
-  x.fillText((ic[G.type]||'') + ' ' + score, 18, 33);
-  // Timer arc
-  const pct = G.timeLeft / GAME_SEC, cx = c.width - 36, cy = 34;
-  x.strokeStyle = 'rgba(160,32,240,.2)'; x.lineWidth = 5;
-  x.beginPath(); x.arc(cx,cy,24,0,Math.PI*2); x.stroke();
-  x.strokeStyle = pct > .4 ? '#A020F0' : '#EF4444'; x.lineWidth = 5;
-  x.beginPath(); x.arc(cx,cy,24,-Math.PI/2,-Math.PI/2+pct*Math.PI*2); x.stroke();
-  x.fillStyle = '#fff'; x.font = 'bold 14px Poppins,sans-serif'; x.textAlign = 'center';
-  x.fillText(G.timeLeft, cx, cy + 5);
-}
-
-function _pill(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
-  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
-  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
-  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
-  ctx.closePath();
-}
-
-function _showResult() {
-  _stop(); G.phase = 'result';
-  const my = G.myScore, th = G.partnerScore;
-  const won = my > th, tied = my === th;
-  document.getElementById('result-emoji').textContent   = tied?'🤝':won?'🏆':'😅';
-  document.getElementById('result-winner').textContent  = tied?'¡Empate!':won?'🎉 ¡GANASTE!':'¡Ganó tu compañero!';
-  document.getElementById('result-winner').style.color  = tied?'#F59E0B':won?'#A020F0':'#EF4444';
-  document.getElementById('result-score').textContent   = `Tú: ${my} — Compañero: ${th}`;
-  document.getElementById('game-result').classList.add('show');
-}
-
-// ── Start my 30s turn ──────────────────────────────────────────────────────
-function _startMyTurn() {
-  _stop();
-  _resize();
-  G.phase = 'my_turn'; G.timeLeft = GAME_SEC;
-  document.getElementById('game-result').classList.remove('show');
-  const lbl = {fruit:'🍉 ¡Corta!',target:'🎯 ¡Apunta!',basket:'🏀 ¡Encesta!'};
-  document.getElementById('game-status').textContent = (lbl[G.type]||'Tu turno') + ' — 30s';
-  // Start timer FIRST so it's always exactly 30s regardless of game load time
-  G.timerInt = setInterval(() => {
-    if (G.phase !== 'my_turn') { clearInterval(G.timerInt); G.timerInt = null; return; }
-    G.timeLeft--;
-    const ic = {fruit:'🍉',target:'🎯',basket:'🏀'};
-    document.getElementById('game-status').textContent = `${ic[G.type]||''} Tu turno — ${G.timeLeft}s`;
-    if (G.timeLeft <= 0) { clearInterval(G.timerInt); G.timerInt = null; _finishMyTurn(); }
-  }, 1000);
-  if      (G.type==='fruit')  _runFruit();
-  else if (G.type==='target') _runTarget();
-  else if (G.type==='basket') _runBasket();
-}
-
-function _finishMyTurn() {
-  if (G.phase !== 'my_turn') return;
-  _stop(); G.phase = 'waiting';
-  if (app.socket) app.socket.emit('game_score', { score: G.myScore, type: G.type });
-  document.getElementById('game-status').textContent = `⌛ Tu compañero juega… (Tú: ${G.myScore})`;
-  _drawMsg2(G.myScore);
-}
-
-function _drawMsg2(score) {
-  const c = G.canvas, x = G.ctx;
-  if (!c || !x) return;
-  const W = c.width, H = c.height;
-  x.clearRect(0,0,W,H);
-  x.fillStyle='rgba(8,0,16,.78)'; x.fillRect(0,0,W,H);
-  // Score big
-  const sz = Math.min(36, W * 0.07);
-  x.font = `bold ${sz}px Poppins,sans-serif`;
-  x.fillStyle = '#A020F0'; x.textAlign = 'center';
-  x.fillText(`✅ ${score} pts`, W/2, H/2 - 14);
-  x.font = `15px Inter,sans-serif`;
-  x.fillStyle = '#C8A8E0';
-  x.fillText('⌛ Esperando compañero...', W/2, H/2 + 22);
+  if (app.socket) app.socket.emit('game_invite', { type, from: app.user?.name || 'Tu compañero' });
+  GS.myScore = 0; GS.partnerScore = 0; GS.type = type;
+  _showOverlay(type);
+  _beginMyTurn();
 }
 
 function closeGame() {
-  _stop(); G.type = null; G.phase = 'idle';
+  _killGame();
   document.getElementById('game-overlay').classList.remove('active');
   if (app.socket) app.socket.emit('game_end', {});
 }
 
 function restartGame() {
   document.getElementById('game-result').classList.remove('show');
-  G.myScore = 0; G.partnerScore = 0;
-  if (app.socket) app.socket.emit('game_invite', { type: G.type, from: app.user?.name||'' });
-  _boot(G.type); _startMyTurn();
+  GS.myScore = 0; GS.partnerScore = 0;
+  if (app.socket) app.socket.emit('game_invite', { type: GS.type, from: app.user?.name || '' });
+  _beginMyTurn();
 }
 
-// ═══════════════════ FRUIT NINJA ══════════════════════════════════════════
-function _runFruit() {
-  const c = G.canvas, x = G.ctx;
-  let items=[], parts=[], trail=[], score=0, lives=3, spTick=0, ts=performance.now(), alive=true;
+// ─────────────────────────────────────────────────────
+// SOCKET HANDLERS (called from initSocket)
+// ─────────────────────────────────────────────────────
+function onGameInvite(type, fromName) {
+  GS.type = type; GS.myScore = 0; GS.partnerScore = 0;
+  _showOverlay(type);
+  GS.phase = 'partner_turn';
+  _msg(`⏳ ${fromName||'Tu compañero'} está jugando...`, '#C8A8E0');
+  _setStatus('Turno de tu compañero...');
+}
 
-  function kill() { if(!alive)return; alive=false; G.myScore=score; _finishMyTurn(); }
+function onGameScore(partnerScore) {
+  GS.partnerScore = partnerScore;
+  if (GS.phase === 'waiting') {
+    // I already played → show result now
+    _showResult();
+  } else {
+    // Partner finished first → my turn now
+    if (!document.getElementById('game-overlay').classList.contains('active')) {
+      _showOverlay(GS.type);
+    }
+    GS.phase = 'idle';
+    _msg('¡TU TURNO!', '#A020F0');
+    _setStatus('¡Tu turno comienza en 3s!');
+    setTimeout(_beginMyTurn, 2500);
+  }
+}
+
+function onGameEnd() {
+  _killGame();
+  document.getElementById('game-overlay').classList.remove('active');
+  toast('Tu compañero cerró el juego','info');
+}
+
+// ─────────────────────────────────────────────────────
+// INTERNAL HELPERS
+// ─────────────────────────────────────────────────────
+function _showOverlay(type) {
+  document.getElementById('game-title').textContent = GTYPE[type] || '🎮';
+  document.getElementById('game-result').classList.remove('show');
+  document.getElementById('game-overlay').classList.add('active');
+}
+
+function _setStatus(t) { document.getElementById('game-status').textContent = t; }
+
+function _canvas()  { return document.getElementById('game-canvas'); }
+function _ctx()     { const c = _canvas(); return c ? c.getContext('2d') : null; }
+
+function _sizeCanvas() {
+  const c = _canvas(); if (!c) return;
+  const p = c.parentElement;
+  c.width  = p.offsetWidth  || window.innerWidth;
+  c.height = p.offsetHeight || (window.innerHeight - 56);
+}
+
+function _killGame() {
+  GS.alive = false;
+  if (GS.timerID) { clearInterval(GS.timerID);        GS.timerID = null; }
+  if (GS.rafID)   { cancelAnimationFrame(GS.rafID);   GS.rafID   = null; }
+  // Remove touch listeners by replacing canvas
+  const old = _canvas();
+  if (old && old.parentNode) {
+    const neo = old.cloneNode(false);
+    neo.width = old.width; neo.height = old.height;
+    old.parentNode.replaceChild(neo, old);
+  }
+}
+
+function _msg(text, color) {
+  _sizeCanvas();
+  const c = _canvas(), x = _ctx(); if (!c || !x) return;
+  x.clearRect(0, 0, c.width, c.height);
+  x.fillStyle = 'rgba(8,0,16,.82)'; x.fillRect(0, 0, c.width, c.height);
+  x.textAlign = 'center'; x.shadowBlur = 0;
+  const sz = Math.min(44, c.width / 6);
+  x.font = `bold ${sz}px Poppins,sans-serif`;
+  x.fillStyle = color || '#fff';
+  if (color) { x.shadowColor = color; x.shadowBlur = 20; }
+  x.fillText(text, c.width / 2, c.height / 2);
+  x.shadowBlur = 0;
+}
+
+function _msgWaiting(score) {
+  const c = _canvas(), x = _ctx(); if (!c || !x) return;
+  x.clearRect(0, 0, c.width, c.height);
+  x.fillStyle = 'rgba(8,0,16,.82)'; x.fillRect(0, 0, c.width, c.height);
+  x.textAlign = 'center';
+  const sz = Math.min(38, c.width / 7);
+  x.font = `bold ${sz}px Poppins,sans-serif`;
+  x.fillStyle = '#A020F0';
+  x.fillText('✅ Tu puntuación: ' + score, c.width/2, c.height/2 - 18);
+  x.font = `16px Inter,sans-serif`;
+  x.fillStyle = '#C8A8E0';
+  x.fillText('⌛ Esperando a tu compañero...', c.width/2, c.height/2 + 22);
+}
+
+function _hud(score) {
+  const c = _canvas(), x = _ctx(); if (!c || !x) return;
+  // score pill
+  x.fillStyle = 'rgba(8,0,16,.75)';
+  x.beginPath(); x.roundRect(8,8,112,38,10); x.fill();
+  x.fillStyle = '#fff'; x.font = 'bold 18px Poppins,sans-serif'; x.textAlign = 'left';
+  const ic = {fruit:'🍉',target:'🎯',basket:'🏀'};
+  x.fillText((ic[GS.type]||'') + ' ' + score, 16, 31);
+  // timer arc
+  const pct = GS.timeLeft / 30;
+  const cx = c.width - 34, cy = 34;
+  x.strokeStyle = 'rgba(160,32,240,.22)'; x.lineWidth = 5;
+  x.beginPath(); x.arc(cx, cy, 22, 0, Math.PI*2); x.stroke();
+  x.strokeStyle = pct > .4 ? '#A020F0' : '#EF4444'; x.lineWidth = 5;
+  x.beginPath(); x.arc(cx, cy, 22, -Math.PI/2, -Math.PI/2 + pct*Math.PI*2); x.stroke();
+  x.fillStyle = '#fff'; x.font = 'bold 13px Poppins,sans-serif'; x.textAlign = 'center';
+  x.fillText(GS.timeLeft, cx, cy + 5);
+}
+
+function _showResult() {
+  _killGame();
+  GS.phase = 'result';
+  const my = GS.myScore, th = GS.partnerScore;
+  const won = my > th, tied = my === th;
+  document.getElementById('result-emoji').textContent  = tied?'🤝':won?'🏆':'😅';
+  document.getElementById('result-winner').textContent = tied?'¡Empate!':won?'🎉 ¡GANASTE!':'¡Ganó tu compañero!';
+  document.getElementById('result-winner').style.color = tied?'#F59E0B':won?'#A020F0':'#EF4444';
+  document.getElementById('result-score').textContent  = `Tú: ${my} pts — Compañero: ${th} pts`;
+  document.getElementById('game-result').classList.add('show');
+}
+
+// ─────────────────────────────────────────────────────
+// BEGIN MY 30-SECOND TURN
+// ─────────────────────────────────────────────────────
+function _beginMyTurn() {
+  _killGame();        // stop any previous loop
+  _sizeCanvas();
+  GS.phase    = 'my_turn';
+  GS.timeLeft = 30;
+  GS.alive    = true;
+  document.getElementById('game-result').classList.remove('show');
+  _setStatus('Tu turno — 30s');
+
+  // Countdown: fires every 1 second, exactly 30 times
+  GS.timerID = setInterval(() => {
+    GS.timeLeft--;
+    const ic = {fruit:'🍉',target:'🎯',basket:'🏀'};
+    _setStatus(`${ic[GS.type]||''} Tu turno — ${GS.timeLeft}s`);
+    if (GS.timeLeft <= 0) _endMyTurn();
+  }, 1000);
+
+  // Launch the game
+  if      (GS.type === 'fruit')  _fruit();
+  else if (GS.type === 'target') _target();
+  else if (GS.type === 'basket') _basket();
+}
+
+function _endMyTurn() {
+  if (GS.phase !== 'my_turn') return;
+  _killGame();
+  GS.phase = 'waiting';
+  _setStatus(`⌛ Turno de tu compañero... (Tú: ${GS.myScore} pts)`);
+  _msgWaiting(GS.myScore);
+  if (app.socket) app.socket.emit('game_score', { score: GS.myScore, type: GS.type });
+}
+
+// ═══════════════════════════════════════════════════════
+// FRUIT NINJA
+// ═══════════════════════════════════════════════════════
+function _fruit() {
+  const items = [], sparks = [], trail = [];
+  let score = 0, lives = 3, spawnT = 0, ts = performance.now();
+
   function spawn() {
-    const bomb = Math.random()<.1;
+    const bomb = Math.random() < .1;
     items.push({
-      px: 55+Math.random()*(c.width-110), py: c.height+55,
-      vx:(Math.random()-.5)*6, vy:-(c.height*.024+Math.random()*5),
-      rot:0, rv:(Math.random()-.5)*7,
-      e: bomb?'💣':FRUIT_LIST[Math.floor(Math.random()*FRUIT_LIST.length)],
-      bomb, sz:50, dead:false
+      x: 55 + Math.random() * (_canvas().width - 110),
+      y: _canvas().height + 55,
+      vx: (Math.random() - .5) * 6,
+      vy: -(_canvas().height * .024 + Math.random() * 5),
+      rot: 0, rv: (Math.random() - .5) * 7,
+      e: bomb ? '💣' : FRUITS[Math.floor(Math.random() * FRUITS.length)],
+      bomb, sz: 50, dead: false
     });
   }
 
-  function frame(now) {
-    if (!alive || G.phase!=='my_turn') return;
-    const dt = Math.min((now-ts)/16,2.5); ts=now;
-    x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,10,.12)'; x.fillRect(0,0,c.width,c.height); // light overlay only
-
-    // Trail
-    const t0 = Date.now();
-    for(let i=1;i<trail.length;i++){
-      const age=(t0-trail[i].t)/220; if(age>=1)continue;
-      x.globalAlpha=1-age; x.strokeStyle=`hsl(${270+i*4},100%,${55+age*25}%)`;
-      x.lineWidth=Math.max(1,6-age*5); x.lineCap='round';
-      x.beginPath(); x.moveTo(trail[i-1].x,trail[i-1].y); x.lineTo(trail[i].x,trail[i].y); x.stroke();
-    }
-    x.globalAlpha=1;
-    while(trail.length&&t0-trail[0].t>260)trail.shift();
-
-    // Particles
-    for(let i=parts.length-1;i>=0;i--){
-      const p=parts[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=.3*dt; p.l-=dt*.045;
-      if(p.l<=0){parts.splice(i,1);continue;}
-      x.globalAlpha=p.l; x.fillStyle=p.c;
-      x.beginPath(); x.arc(p.x,p.y,p.r*p.l,0,Math.PI*2); x.fill(); x.globalAlpha=1;
-    }
-
-    // Spawn
-    spTick+=dt; if(spTick>26){spawn();spTick=0;}
-
-    // Items
-    for(let i=items.length-1;i>=0;i--){
-      const f=items[i]; if(f.dead){items.splice(i,1);continue;}
-      f.px+=f.vx*dt; f.py+=f.vy*dt; f.vy+=.45*dt; f.rot+=f.rv*dt;
-      if(f.py>c.height+80){items.splice(i,1);if(!f.bomb){lives--;if(lives<=0){kill();return;}}continue;}
-      x.save(); x.translate(f.px,f.py); x.rotate(f.rot*Math.PI/180);
-      x.shadowColor=f.bomb?'rgba(255,80,0,.8)':'rgba(255,210,60,.6)'; x.shadowBlur=12;
-      x.font=f.sz+'px serif'; x.textAlign='center'; x.textBaseline='middle';
-      x.fillText(f.e,0,0); x.restore();
-    }
-
-    // Lives
-    for(let i=0;i<3;i++){x.font='18px serif';x.textAlign='left';x.fillText(i<lives?'❤️':'🖤',10+i*24,c.height-10);}
-    _hud(score);
-    G.frameId = requestAnimationFrame(frame);
-  }
-
-  function cut(px,py) {
-    trail.push({x:px,y:py,t:Date.now()});
-    for(let i=items.length-1;i>=0;i--){
-      const f=items[i]; if(f.dead)continue;
-      const dx=px-f.px,dy=py-f.py;
-      if(Math.sqrt(dx*dx+dy*dy)<f.sz*.58){
-        f.dead=true; if(f.bomb){kill();return;}
-        score++; G.myScore=score;
-        for(let k=0;k<10;k++){const a=Math.random()*Math.PI*2,sp=2+Math.random()*5;parts.push({x:f.px,y:f.py,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,r:5+Math.random()*4,l:1,c:`hsl(${Math.random()*60+10},100%,55%)`});}
+  function slice(px, py) {
+    trail.push({ x: px, y: py, t: Date.now() });
+    for (let i = items.length - 1; i >= 0; i--) {
+      const f = items[i]; if (f.dead) continue;
+      if (Math.hypot(px - f.x, py - f.y) < f.sz * .55) {
+        f.dead = true;
+        if (f.bomb) { _endMyTurn(); return; }
+        score++; GS.myScore = score;
+        for (let k = 0; k < 10; k++) {
+          const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 5;
+          sparks.push({ x: f.x, y: f.y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp-2, r: 4+Math.random()*4, l: 1, c: `hsl(${Math.random()*60+10},100%,55%)` });
+        }
       }
     }
   }
 
-  function ev(e) {
+  const c = _canvas();
+  function onP(e) {
     e.preventDefault();
-    const r=c.getBoundingClientRect();
-    (e.touches?Array.from(e.touches):[e]).forEach(t=>cut((t.clientX-r.left)*(c.width/r.width),(t.clientY-r.top)*(c.height/r.height)));
+    const r = c.getBoundingClientRect();
+    (e.touches ? Array.from(e.touches) : [e]).forEach(t =>
+      slice((t.clientX - r.left) * (c.width / r.width),
+            (t.clientY - r.top)  * (c.height/ r.height))
+    );
   }
-  c.addEventListener('touchstart',ev,{passive:false});
-  c.addEventListener('touchmove', ev,{passive:false});
-  c.addEventListener('mousemove', e=>{if(e.buttons)ev(e);});
+  c.addEventListener('touchstart', onP, { passive: false });
+  c.addEventListener('touchmove',  onP, { passive: false });
+  c.addEventListener('mousemove',  e => { if (e.buttons) onP(e); });
 
-  G.frameId = requestAnimationFrame(frame);
+  function frame(now) {
+    if (!GS.alive || GS.phase !== 'my_turn') return;
+    const dt = Math.min((now - ts) / 16, 2.5); ts = now;
+    const cv = _canvas(), x = _ctx(); if (!cv || !x) return;
+    x.clearRect(0, 0, cv.width, cv.height);
+    // Transparent bg (camera shows through)
+    x.fillStyle = 'rgba(5,0,12,.08)'; x.fillRect(0, 0, cv.width, cv.height);
+
+    // Slice trail
+    const now2 = Date.now();
+    for (let i = 1; i < trail.length; i++) {
+      const age = (now2 - trail[i].t) / 220; if (age >= 1) continue;
+      x.globalAlpha = 1 - age;
+      x.strokeStyle = `hsl(${270 + i*4},100%,${55+age*25}%)`;
+      x.lineWidth = Math.max(1, 6 - age * 5); x.lineCap = 'round';
+      x.beginPath(); x.moveTo(trail[i-1].x, trail[i-1].y); x.lineTo(trail[i].x, trail[i].y); x.stroke();
+    }
+    x.globalAlpha = 1;
+    while (trail.length && now2 - trail[0].t > 260) trail.shift();
+
+    // Sparks
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i]; p.x += p.vx*dt; p.y += p.vy*dt; p.vy += .3*dt; p.l -= dt*.045;
+      if (p.l <= 0) { sparks.splice(i,1); continue; }
+      x.globalAlpha = p.l; x.fillStyle = p.c;
+      x.beginPath(); x.arc(p.x, p.y, p.r * p.l, 0, Math.PI*2); x.fill(); x.globalAlpha = 1;
+    }
+
+    // Spawn + draw items
+    spawnT += dt; if (spawnT > 26) { spawn(); spawnT = 0; }
+    for (let i = items.length - 1; i >= 0; i--) {
+      const f = items[i]; if (f.dead) { items.splice(i,1); continue; }
+      f.x += f.vx*dt; f.y += f.vy*dt; f.vy += .45*dt; f.rot += f.rv*dt;
+      if (f.y > cv.height + 80) {
+        items.splice(i,1);
+        if (!f.bomb) { lives--; if (lives <= 0) { _endMyTurn(); return; } }
+        continue;
+      }
+      x.save(); x.translate(f.x, f.y); x.rotate(f.rot * Math.PI/180);
+      x.shadowColor = f.bomb ? 'rgba(255,80,0,.8)' : 'rgba(255,200,50,.6)'; x.shadowBlur = 12;
+      x.font = f.sz + 'px serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText(f.e, 0, 0); x.restore();
+    }
+
+    // Lives
+    for (let i = 0; i < 3; i++) { x.font = '18px serif'; x.textAlign = 'left'; x.fillText(i < lives ? '❤️' : '🖤', 10 + i*24, cv.height - 10); }
+    _hud(score);
+    GS.rafID = requestAnimationFrame(frame);
+  }
+  GS.rafID = requestAnimationFrame(frame);
 }
 
-// ═══════════════════ TIRO AL BLANCO ═══════════════════════════════════════
-function _runTarget() {
-  const c=G.canvas,x=G.ctx;
-  let tgts=[],score=0,sTick=0,ts=performance.now(),alive=true;
+// ═══════════════════════════════════════════════════════
+// TIRO AL BLANCO
+// ═══════════════════════════════════════════════════════
+function _target() {
+  let tgts = [], score = 0, spawnT = 0, ts = performance.now();
 
-  function kill(){if(!alive)return;alive=false;G.myScore=score;_finishMyTurn();}
-
-  function spawn(){
-    const r=26+Math.random()*28;
-    tgts.push({px:r+Math.random()*(c.width-r*2),py:65+Math.random()*(c.height-110),
-      r,born:performance.now(),maxL:1.6+Math.random()*2,hit:false,anim:0,
-      col:TGT_COLORS[Math.floor(Math.random()*TGT_COLORS.length)]});
+  function spawn() {
+    const r = 26 + Math.random()*28;
+    tgts.push({ x: r + Math.random()*(_canvas().width - r*2), y: 65 + Math.random()*(_canvas().height - 110),
+      r, born: performance.now(), maxL: 1.6+Math.random()*2, hit: false, anim: 0,
+      col: TCOLS[Math.floor(Math.random()*TCOLS.length)] });
   }
 
-  function dTgt(t){
-    [t.r,t.r*.65,t.r*.35].forEach((r,i)=>{
-      x.beginPath();x.arc(0,0,r,0,Math.PI*2);
-      x.fillStyle=i%2===0?t.col:'#fff'; x.shadowColor=t.col; x.shadowBlur=i===0?12:0; x.fill();
+  function drawT(x, t) {
+    [t.r, t.r*.65, t.r*.35].forEach((r,i) => {
+      x.beginPath(); x.arc(0,0,r,0,Math.PI*2);
+      x.fillStyle = i%2===0 ? t.col : '#fff'; x.shadowColor = t.col; x.shadowBlur = i===0?12:0; x.fill();
     });
-    x.shadowBlur=0; x.beginPath();x.arc(0,0,5,0,Math.PI*2);x.fillStyle=t.col;x.fill();
+    x.shadowBlur = 0; x.beginPath(); x.arc(0,0,5,0,Math.PI*2); x.fillStyle = t.col; x.fill();
   }
 
-  function frame(now){
-    if(!alive||G.phase!=='my_turn')return;
-    const dt=Math.min((now-ts)/16,2.5);ts=now;
-    x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,10,.12)';x.fillRect(0,0,c.width,c.height);
-    sTick+=dt; if(sTick>30&&tgts.length<8){spawn();sTick=0;}
-    if(!tgts.length)spawn();
-    for(let i=tgts.length-1;i>=0;i--){
-      const t=tgts[i];
-      const age=(performance.now()-t.born)/1000;
-      const life=Math.max(0,1-age/t.maxL);
-      if(t.hit){t.anim+=dt*.07;if(t.anim>=1){tgts.splice(i,1);continue;}x.globalAlpha=1-t.anim;x.save();x.translate(t.px,t.py);x.scale(1+t.anim*.7,1+t.anim*.7);dTgt(t);x.restore();x.globalAlpha=1;continue;}
-      if(life<=0){tgts.splice(i,1);continue;}
-      x.globalAlpha=life;x.save();x.translate(t.px,t.py);x.scale(1+Math.sin(age*5)*.05,1+Math.sin(age*5)*.05);dTgt(t);x.restore();x.globalAlpha=1;
+  function tap(px, py) {
+    for (let i = tgts.length-1; i >= 0; i--) {
+      const t = tgts[i]; if (t.hit) continue;
+      if (Math.hypot(px - t.x, py - t.y) < t.r) { t.hit = true; score++; GS.myScore = score; break; }
+    }
+  }
+
+  const c = _canvas();
+  c.addEventListener('touchstart', e => { e.preventDefault(); const r=c.getBoundingClientRect(),t=e.touches[0]; tap((t.clientX-r.left)*(c.width/r.width),(t.clientY-r.top)*(c.height/r.height)); }, { passive:false });
+  c.addEventListener('click', e => { const r=c.getBoundingClientRect(); tap((e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height)); });
+
+  spawn(); spawn();
+
+  function frame(now) {
+    if (!GS.alive || GS.phase !== 'my_turn') return;
+    const dt = Math.min((now - ts)/16, 2.5); ts = now;
+    const cv = _canvas(), x = _ctx(); if (!cv||!x) return;
+    x.clearRect(0,0,cv.width,cv.height);
+    x.fillStyle='rgba(5,0,12,.08)'; x.fillRect(0,0,cv.width,cv.height);
+
+    spawnT += dt; if (spawnT > 30 && tgts.length < 8) { spawn(); spawnT = 0; }
+
+    for (let i = tgts.length-1; i >= 0; i--) {
+      const t = tgts[i];
+      const age = (performance.now() - t.born) / 1000;
+      const life = Math.max(0, 1 - age / t.maxL);
+      if (t.hit) {
+        t.anim += dt*.07; if (t.anim>=1){tgts.splice(i,1);continue;}
+        x.globalAlpha=1-t.anim; x.save(); x.translate(t.x,t.y); x.scale(1+t.anim*.7,1+t.anim*.7); drawT(x,t); x.restore(); x.globalAlpha=1; continue;
+      }
+      if (life <= 0) { tgts.splice(i,1); continue; }
+      x.globalAlpha = life; x.save(); x.translate(t.x,t.y); x.scale(1+Math.sin(age*5)*.05,1+Math.sin(age*5)*.05); drawT(x,t); x.restore(); x.globalAlpha=1;
     }
     _hud(score);
-    G.frameId=requestAnimationFrame(frame);
+    GS.rafID = requestAnimationFrame(frame);
   }
-
-  function tap(px,py){
-    let hit=false;
-    for(let i=tgts.length-1;i>=0;i--){
-      const t=tgts[i];if(t.hit)continue;
-      const dx=px-t.px,dy=py-t.py;
-      if(Math.sqrt(dx*dx+dy*dy)<t.r){t.hit=true;hit=true;score++;G.myScore=score;break;}
-    }
-    if(!hit){x.fillStyle='rgba(239,68,68,.15)';x.fillRect(0,0,c.width,c.height);}
-  }
-
-  c.addEventListener('touchstart',e=>{e.preventDefault();const r=c.getBoundingClientRect(),t=e.touches[0];tap((t.clientX-r.left)*(c.width/r.width),(t.clientY-r.top)*(c.height/r.height));},{passive:false});
-  c.addEventListener('click',e=>{const r=c.getBoundingClientRect();tap((e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height));});
-
-  spawn();spawn();
-  G.frameId=requestAnimationFrame(frame);
+  GS.rafID = requestAnimationFrame(frame);
 }
 
-// ═══════════════════ BALONCESTO ═══════════════════════════════════════════
-function _runBasket() {
-  const c=G.canvas,x=G.ctx;
-  let score=0,ts=performance.now(),alive=true,parts=[];
-  const HX=c.width/2,HY=Math.min(110,c.height*.16),HW=68;
-  let netW=0;
-  let ball={x:c.width/2,y:c.height-100,r:26,vx:0,vy:0,free:false,scored:false};
+// ═══════════════════════════════════════════════════════
+// BALONCESTO
+// ═══════════════════════════════════════════════════════
+function _basket() {
+  let score=0, ts=performance.now(), parts=[], netW=0;
+  const cv = _canvas();
+  const HX=cv.width/2, HY=Math.min(110,cv.height*.16), HW=68;
+  let ball={ x:cv.width/2, y:cv.height-100, r:26, vx:0, vy:0, free:false, scored:false };
   let drag=null;
 
-  function kill(){if(!alive)return;alive=false;G.myScore=score;_finishMyTurn();}
-  function newBall(){ball={x:50+Math.random()*(c.width-100),y:c.height-100,r:26,vx:0,vy:0,free:false,scored:false};}
+  function newBall() {
+    ball={ x:50+Math.random()*(cv.width-100), y:cv.height-100, r:26, vx:0, vy:0, free:false, scored:false };
+  }
 
-  function dHoop(){
+  function gxy(e, touch) {
+    const r=cv.getBoundingClientRect(), t=touch?e.changedTouches[0]:e;
+    return [(t.clientX-r.left)*(cv.width/r.width),(t.clientY-r.top)*(cv.height/r.height)];
+  }
+
+  cv.addEventListener('touchstart', e=>{e.preventDefault();const[px,py]=gxy(e,true);if(!ball.free&&Math.hypot(px-ball.x,py-ball.y)<ball.r*2)drag={pvx:0,pvy:0,lx:px,ly:py};},{passive:false});
+  cv.addEventListener('touchmove',  e=>{e.preventDefault();if(!drag)return;const[px,py]=gxy(e,true);drag.pvx=px-drag.lx;drag.pvy=py-drag.ly;drag.lx=px;drag.ly=py;ball.x=px;ball.y=py;},{passive:false});
+  cv.addEventListener('touchend',   e=>{e.preventDefault();if(!drag)return;ball.free=true;ball.vx=drag.pvx*.7;ball.vy=drag.pvy*.7;drag=null;},{passive:false});
+  cv.addEventListener('mousedown',  e=>{const[px,py]=gxy(e,false);if(!ball.free&&Math.hypot(px-ball.x,py-ball.y)<ball.r*2)drag={pvx:0,pvy:0,lx:px,ly:py};});
+  cv.addEventListener('mousemove',  e=>{if(!drag)return;const[px,py]=gxy(e,false);drag.pvx=px-drag.lx;drag.pvy=py-drag.ly;drag.lx=px;drag.ly=py;ball.x=px;ball.y=py;});
+  cv.addEventListener('mouseup',    ()=>{if(!drag)return;ball.free=true;ball.vx=drag.pvx*.7;ball.vy=drag.pvy*.7;drag=null;});
+
+  function frame(now) {
+    if (!GS.alive || GS.phase !== 'my_turn') return;
+    const dt = Math.min((now-ts)/16,2.5); ts=now;
+    const x = _ctx(); if(!x) return;
+    x.clearRect(0,0,cv.width,cv.height);
+    x.fillStyle='rgba(5,0,12,.08)'; x.fillRect(0,0,cv.width,cv.height);
+
+    // Physics
+    if (ball.free && !drag) {
+      ball.x+=ball.vx*dt; ball.y+=ball.vy*dt; ball.vy+=.55*dt; ball.vx*=.997;
+      if(ball.x-ball.r<0){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*.5;}
+      if(ball.x+ball.r>cv.width){ball.x=cv.width-ball.r;ball.vx=-Math.abs(ball.vx)*.5;}
+      if(ball.y+ball.r>cv.height-6){ball.y=cv.height-6-ball.r;ball.vy*=-.38;ball.vx*=.65;if(Math.abs(ball.vy)<1&&Math.abs(ball.vx)<.5)setTimeout(newBall,400);}
+      if(!ball.scored&&ball.vy>0&&ball.y>HY&&ball.y<HY+34&&ball.x>HX-HW/2+ball.r*.25&&ball.x<HX+HW/2-ball.r*.25){
+        ball.scored=true;score++;GS.myScore=score;netW=1.4;
+        for(let i=0;i<14;i++){const a=Math.random()*Math.PI*2,sp=3+Math.random()*6;parts.push({x:HX,y:HY,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,r:5+Math.random()*5,l:1,c:`hsl(${40+Math.random()*20},100%,60%)`});}
+        setTimeout(newBall,900);
+      }
+    }
+
+    // Particles
+    for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=.25*dt;p.l-=dt*.04;if(p.l<=0){parts.splice(i,1);continue;}x.globalAlpha=p.l;x.fillStyle=p.c;x.beginPath();x.arc(p.x,p.y,p.r,0,Math.PI*2);x.fill();x.globalAlpha=1;}
+
+    // Hoop
     x.fillStyle='rgba(255,255,255,.88)';x.fillRect(HX-50,HY-44,100,54);
     x.strokeStyle='#bbb';x.lineWidth=2;x.strokeRect(HX-50,HY-44,100,54);
     x.strokeStyle='rgba(255,50,50,.7)';x.lineWidth=1.5;x.strokeRect(HX-20,HY-30,40,26);
@@ -1656,9 +1709,8 @@ function _runBasket() {
     const wb=Math.sin(netW*10)*4;if(netW>0)netW-=.04;
     for(let i=0;i<=5;i++){const lx=HX-HW/2+i*(HW/5);x.beginPath();x.moveTo(lx,HY);x.lineTo(HX-HW/4+i*(HW/10)+wb/2,HY+30);x.stroke();}
     x.beginPath();x.moveTo(HX-HW/4,HY+30);x.lineTo(HX+HW/4,HY+30);x.stroke();
-  }
 
-  function dBall(){
+    // Ball
     x.save();x.translate(ball.x,ball.y);
     x.beginPath();x.ellipse(0,ball.r*.8,ball.r*.65,.18,0,0,Math.PI*2);x.fillStyle='rgba(0,0,0,.18)';x.fill();
     const g=x.createRadialGradient(-ball.r*.3,-ball.r*.35,ball.r*.1,0,0,ball.r);
@@ -1670,54 +1722,14 @@ function _runBasket() {
     x.beginPath();x.arc(ball.r*.35,0,ball.r*.85,Math.PI*.15,Math.PI*.85);x.stroke();
     x.beginPath();x.arc(-ball.r*.35,0,ball.r*.85,-Math.PI*.85,-Math.PI*.15);x.stroke();
     x.restore();
-    if(drag){
-      x.setLineDash([7,5]);x.strokeStyle='rgba(255,255,255,.25)';x.lineWidth=1.5;
-      x.beginPath();x.moveTo(ball.x,ball.y);x.lineTo(HX,HY);x.stroke();x.setLineDash([]);
-    }
+
+    // Drag guide
+    if(drag){x.setLineDash([7,5]);x.strokeStyle='rgba(255,255,255,.25)';x.lineWidth=1.5;x.beginPath();x.moveTo(ball.x,ball.y);x.lineTo(HX,HY);x.stroke();x.setLineDash([]);}
+
+    _hud(score);
+    GS.rafID = requestAnimationFrame(frame);
   }
-
-  function frame(now){
-    if(!alive||G.phase!=='my_turn')return;
-    const dt=Math.min((now-ts)/16,2.5);ts=now;
-    x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,10,.12)';x.fillRect(0,0,c.width,c.height);
-    if(ball.free&&!drag){
-      ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;ball.vy+=.55*dt;ball.vx*=.997;
-      if(ball.x-ball.r<0){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*.5;}
-      if(ball.x+ball.r>c.width){ball.x=c.width-ball.r;ball.vx=-Math.abs(ball.vx)*.5;}
-      if(ball.y+ball.r>c.height-6){
-        ball.y=c.height-6-ball.r;ball.vy*=-.38;ball.vx*=.65;
-        if(Math.abs(ball.vy)<1&&Math.abs(ball.vx)<.5)setTimeout(newBall,300);
-      }
-      if(!ball.scored&&ball.vy>0&&ball.y>HY&&ball.y<HY+32&&
-         ball.x>HX-HW/2+ball.r*.25&&ball.x<HX+HW/2-ball.r*.25){
-        ball.scored=true;score++;G.myScore=score;netW=1.4;
-        for(let i=0;i<14;i++){const a=Math.random()*Math.PI*2,sp=3+Math.random()*6;parts.push({x:HX,y:HY,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,r:5+Math.random()*5,l:1,c:`hsl(${40+Math.random()*20},100%,60%)`});}
-        setTimeout(newBall,900);
-      }
-    }
-    for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=.25*dt;p.l-=dt*.04;if(p.l<=0){parts.splice(i,1);continue;}x.globalAlpha=p.l;x.fillStyle=p.c;x.beginPath();x.arc(p.x,p.y,p.r,0,Math.PI*2);x.fill();x.globalAlpha=1;}
-    dHoop();dBall();_hud(score);
-    G.frameId=requestAnimationFrame(frame);
-  }
-
-  function getXY(e,touch){
-    const r=c.getBoundingClientRect();
-    const t=touch?e.changedTouches[0]:e;
-    return[(t.clientX-r.left)*(c.width/r.width),(t.clientY-r.top)*(c.height/r.height)];
-  }
-  function startD(px,py){if(ball.free)return;if(Math.sqrt((px-ball.x)**2+(py-ball.y)**2)>ball.r*2)return;drag={pvx:0,pvy:0,lx:px,ly:py};}
-  function moveD(px,py){if(!drag)return;drag.pvx=px-drag.lx;drag.pvy=py-drag.ly;drag.lx=px;drag.ly=py;ball.x=px;ball.y=py;}
-  function endD(){if(!drag)return;ball.free=true;ball.vx=drag.pvx*.65;ball.vy=drag.pvy*.65;drag=null;}
-
-  c.addEventListener('touchstart', e=>{e.preventDefault();const[px,py]=getXY(e,true);startD(px,py);},{passive:false});
-  c.addEventListener('touchmove',  e=>{e.preventDefault();const[px,py]=getXY(e,true);moveD(px,py);},{passive:false});
-  c.addEventListener('touchend',   e=>{e.preventDefault();endD();},{passive:false});
-  c.addEventListener('mousedown',  e=>{const[px,py]=getXY(e,false);startD(px,py);});
-  c.addEventListener('mousemove',  e=>{if(e.buttons){const[px,py]=getXY(e,false);moveD(px,py);}});
-  c.addEventListener('mouseup',    ()=>endD());
-
-  G.frameId=requestAnimationFrame(frame);
+  GS.rafID = requestAnimationFrame(frame);
 }
 
 // ── Auto-login ────────────────────────────────────────────────────────────────
