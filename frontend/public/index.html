@@ -715,7 +715,7 @@ textarea.fc{resize:vertical;min-height:70px}
         <div class="plan feat">
           <div class="plan-badge">🔥 Popular</div>
           <div class="plan-name">Premium</div>
-          <div class="plan-price"><sup>$</sup>399<sub> MXN</sub></div>
+          <div class="plan-price"><sup>$</sup>149<sub> MXN/mes</sub></div>
           <div class="plan-period">Pago único mensual</div>
           <ul class="plan-feats">
             <li><span class="ck">✓</span> Llamadas ilimitadas</li>
@@ -827,7 +827,7 @@ textarea.fc{resize:vertical;min-height:70px}
         <div><div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:17px;color:#fff">Hacer negocios</div><div style="font-size:12px;color:var(--gray-l);margin-top:2px">Networking profesional</div></div>
       </button>
 
-      <button onclick="app._mood=null;_enterChat(null)" class="mood-skip-btn">Sin mood ni filtros →</button>
+      <button onclick="app._mood=null;showMoodStep(2)" class="mood-skip-btn">Continuar sin mood →</button>
     </div>
   </div>
 
@@ -1300,9 +1300,14 @@ function initSocket(){
       leaveLive();
       toast('El live terminó','info');
     }
-    // Always hide badge when any live we know about ends
+    // Always hide badge + notify
     _hideLiveBadge();
-    addSys('📡 El live ha finalizado.');
+    if (app.partnerEmail) addSys('📡 El live ha finalizado.');
+  });
+  // Partner explicitly stopped the live (from videocall)
+  app.socket.on('partner_live_ended', () => {
+    _hideLiveBadge();
+    addSys('📡 Tu amigo terminó el live.');
   });
   app.socket.on('partner_live_started', ({ liveId, hostName }) => {
     // Partner started live — show badge on video area

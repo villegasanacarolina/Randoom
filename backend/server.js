@@ -405,7 +405,7 @@ app.post('/api/payments/create-preference', authUser, async (req, res) => {
     const u = (await pool.query('SELECT name,email FROM users WHERE email=$1', [req.user.email])).rows[0];
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
     const preference = {
-      items: [{ title:'Randoom Premium — 1 mes', quantity:1, unit_price: parseFloat(process.env.PREMIUM_PRICE_MXN)||399, currency_id:'MXN' }],
+      items: [{ title:'Randoom Premium — 1 mes ($149 MXN)', quantity:1, unit_price: parseFloat(process.env.PREMIUM_PRICE_MXN)||149, currency_id:'MXN' }],
       payer: { email: u.email, name: u.name },
       back_urls: {
         success: `${process.env.FRONTEND_URL||'https://randoom-zeta.vercel.app'}/?payment=success`,
@@ -966,6 +966,8 @@ io.on('connection', socket => {
         activeLives.delete(id);
         socket.leave(`live:${id}`);
         io.emit('lives_updated');
+        // Notify videocall partner that live ended
+        if (u.partnerId) io.to(u.partnerId).emit('partner_live_ended');
       }
     }
   });
