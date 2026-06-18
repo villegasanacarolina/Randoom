@@ -289,6 +289,13 @@ textarea.fc{resize:vertical;min-height:70px}
 .mode-card .mc-icon{font-size:52px}
 .mode-card h3{font-family:'Poppins',sans-serif;font-weight:800;font-size:20px}
 .mode-card p{color:var(--gray-l);font-size:13px}
+.mood-btn-card{width:100%;border-radius:16px;padding:20px 24px;cursor:pointer;display:flex;align-items:center;gap:16px;transition:all .2s;text-align:left}
+.mood-btn-card:hover{transform:scale(1.02)}
+.mood-skip-btn{width:100%;background:transparent;border:1px solid var(--bd);border-radius:12px;padding:13px;cursor:pointer;color:var(--gray-l);font-size:13px;font-family:'Inter',sans-serif;transition:all .2s}
+.mood-skip-btn:hover{color:#fff;border-color:var(--pu)}
+.filter-pill{padding:7px 14px;border-radius:20px;border:1.5px solid var(--bd);background:transparent;color:var(--gray-l);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif}
+.filter-pill.active{background:rgba(160,32,240,.2);border-color:var(--pu-l);color:var(--pu-l)}
+.filter-pill:hover{border-color:var(--pu-l);color:#fff}
 
 /* LIVES LIST */
 #s-lives{align-items:flex-start;padding:0;overflow-y:auto;display:flex;flex-direction:column}
@@ -554,11 +561,11 @@ textarea.fc{resize:vertical;min-height:70px}
         <div style="font-size:44px">🔮</div>
         <h3>¡Listo para conectar!</h3>
         <p>Pulsa <strong style="color:var(--pu-l)">⏭ Siguiente</strong> para buscar</p>
-        <button class="btn btn-primary btn-lg" onclick="findPartner()">🎥 Buscar compañero</button>
+        <button class="btn btn-primary btn-lg" onclick="findPartner()">🎥 Buscar amigo</button>
       </div>
       <div class="vid-overlay hidden" id="ov-search">
         <div class="spinner"></div>
-        <h3>Buscando compañero…</h3>
+        <h3>Buscando amigo…</h3>
         <p id="search-sub">Conectando con alguien</p>
         <button class="btn btn-ghost btn-sm" onclick="stopSearch()" style="margin-top:6px">Cancelar</button>
       </div>
@@ -793,34 +800,86 @@ textarea.fc{resize:vertical;min-height:70px}
 <div id="s-mood" class="screen">
   <nav class="nav">
     <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
-    <button class="btn btn-ghost btn-sm" onclick="showScreen('s-mode')">← Volver</button>
+    <button class="btn btn-ghost btn-sm" id="mood-back-btn" onclick="app._mood=null;showScreen('s-mode')">← Volver</button>
   </nav>
-  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px">
+
+  <!-- STEP 1: Mood -->
+  <div id="mood-step1" style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px;overflow-y:auto">
     <div style="width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px">
-      <div style="text-align:center;margin-bottom:6px">
-        <span style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:11px;font-weight:700;padding:3px 14px;border-radius:20px">⭐ PREMIUM</span>
+      <div style="text-align:center;margin-bottom:4px">
+        <span style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:11px;font-weight:700;padding:3px 14px;border-radius:20px">⭐ PREMIUM · Paso 1 de 2</span>
       </div>
-      <h2 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:24px;text-align:center;margin:0 0 4px">¿Cuál es tu mood hoy?</h2>
+      <h2 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:24px;text-align:center;margin:0 0 2px">¿Cuál es tu mood hoy?</h2>
       <p style="text-align:center;color:var(--gray-l);font-size:13px;margin:0 0 8px">Solo conectarás con usuarios en el mismo mood</p>
 
-      <button onclick="_enterChat('pareja')" style="width:100%;background:rgba(236,72,153,.12);border:1.5px solid rgba(236,72,153,.4);border-radius:16px;padding:20px 24px;cursor:pointer;display:flex;align-items:center;gap:16px;transition:all .2s;text-align:left" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+      <button onclick="pickMood('pareja')" class="mood-btn-card" style="background:rgba(236,72,153,.12);border:1.5px solid rgba(236,72,153,.4)">
         <span style="font-size:40px">💕</span>
         <div><div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:17px;color:#fff">Buscar match</div><div style="font-size:12px;color:var(--gray-l);margin-top:2px">Conecta con alguien especial</div></div>
       </button>
 
-      <button onclick="_enterChat('amigos')" style="width:100%;background:rgba(34,197,94,.10);border:1.5px solid rgba(34,197,94,.35);border-radius:16px;padding:20px 24px;cursor:pointer;display:flex;align-items:center;gap:16px;transition:all .2s;text-align:left" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+      <button onclick="pickMood('amigos')" class="mood-btn-card" style="background:rgba(34,197,94,.10);border:1.5px solid rgba(34,197,94,.35)">
         <span style="font-size:40px">👋</span>
         <div><div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:17px;color:#fff">Buscar amigos</div><div style="font-size:12px;color:var(--gray-l);margin-top:2px">Conoce gente nueva</div></div>
       </button>
 
-      <button onclick="_enterChat('negocios')" style="width:100%;background:rgba(59,130,246,.10);border:1.5px solid rgba(59,130,246,.35);border-radius:16px;padding:20px 24px;cursor:pointer;display:flex;align-items:center;gap:16px;transition:all .2s;text-align:left" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+      <button onclick="pickMood('negocios')" class="mood-btn-card" style="background:rgba(59,130,246,.10);border:1.5px solid rgba(59,130,246,.35)">
         <span style="font-size:40px">💼</span>
         <div><div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:17px;color:#fff">Hacer negocios</div><div style="font-size:12px;color:var(--gray-l);margin-top:2px">Networking profesional</div></div>
       </button>
 
-      <button onclick="app._mood=null;_enterChat(null)" style="width:100%;background:transparent;border:1px solid var(--bd);border-radius:12px;padding:12px 24px;cursor:pointer;color:var(--gray-l);font-size:13px;font-family:'Inter',sans-serif;transition:all .2s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--gray-l)'">
-        Continuar sin mood →
+      <button onclick="app._mood=null;_enterChat(null)" class="mood-skip-btn">Sin mood ni filtros →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: Filters -->
+  <div id="mood-step2" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;overflow-y:auto">
+    <div style="width:100%;max-width:400px;display:flex;flex-direction:column;gap:16px">
+      <div style="text-align:center;margin-bottom:4px">
+        <span style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:11px;font-weight:700;padding:3px 14px;border-radius:20px">⭐ PREMIUM · Paso 2 de 2</span>
+      </div>
+      <h2 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:24px;text-align:center;margin:0 0 2px">Filtros de búsqueda</h2>
+      <p style="text-align:center;color:var(--gray-l);font-size:13px;margin:0 0 8px">Opcional — deja en blanco para cualquiera</p>
+
+      <!-- Género -->
+      <div style="background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px 18px">
+        <div style="font-size:11px;font-weight:700;color:var(--pu-l);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Género</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="setFilterBtn(this,'gender','any')" class="filter-pill active" data-filter="gender" data-val="any">Cualquiera</button>
+          <button onclick="setFilterBtn(this,'gender','male')" class="filter-pill" data-filter="gender" data-val="male">Hombre</button>
+          <button onclick="setFilterBtn(this,'gender','female')" class="filter-pill" data-filter="gender" data-val="female">Mujer</button>
+        </div>
+      </div>
+
+      <!-- Edad -->
+      <div style="background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px 18px">
+        <div style="font-size:11px;font-weight:700;color:var(--pu-l);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Rango de edad</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input id="mf-age-min" type="number" placeholder="Mín" min="18" max="99" class="fc" style="width:80px;text-align:center" inputmode="numeric"/>
+          <span style="color:var(--gray-l)">—</span>
+          <input id="mf-age-max" type="number" placeholder="Máx" min="18" max="99" class="fc" style="width:80px;text-align:center" inputmode="numeric"/>
+          <span style="color:var(--gray-l);font-size:13px">años</span>
+        </div>
+      </div>
+
+      <!-- País -->
+      <div style="background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px 18px">
+        <div style="font-size:11px;font-weight:700;color:var(--pu-l);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">País</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="setFilterBtn(this,'country','any')" class="filter-pill active" data-filter="country" data-val="any">Cualquier país</button>
+          <button onclick="setFilterBtn(this,'country','MX')" class="filter-pill" data-filter="country" data-val="MX">🇲🇽 México</button>
+          <button onclick="setFilterBtn(this,'country','US')" class="filter-pill" data-filter="country" data-val="US">🇺🇸 EEUU</button>
+          <button onclick="setFilterBtn(this,'country','CO')" class="filter-pill" data-filter="country" data-val="CO">🇨🇴 Colombia</button>
+          <button onclick="setFilterBtn(this,'country','AR')" class="filter-pill" data-filter="country" data-val="AR">🇦🇷 Argentina</button>
+          <button onclick="setFilterBtn(this,'country','ES')" class="filter-pill" data-filter="country" data-val="ES">🇪🇸 España</button>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <button onclick="applyMoodFilters()" class="btn btn-primary btn-full" style="padding:16px;font-size:16px;font-weight:700">
+        🎯 Buscar con estos filtros
       </button>
+      <button onclick="_enterChat(app._mood)" class="mood-skip-btn">Continuar sin filtros →</button>
+      <button onclick="showMoodStep(1)" style="background:transparent;border:none;color:var(--gray-l);font-size:12px;cursor:pointer;padding:4px">← Cambiar mood</button>
     </div>
   </div>
 </div>
@@ -954,7 +1013,7 @@ textarea.fc{resize:vertical;min-height:70px}
     <!-- Spectator: opponent game shown in corner -->
     <!-- Spectator: partner's live game stream -->
     <canvas id="spec-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;display:none;pointer-events:none;z-index:8;image-rendering:auto"></canvas>
-    <div id="spec-label" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(160,32,240,.85);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:700;font-family:Poppins,sans-serif;padding:4px 16px;border-radius:20px;display:none;z-index:9;pointer-events:none;white-space:nowrap">👁 Tu compañero está jugando</div>
+    <div id="spec-label" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(160,32,240,.85);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:700;font-family:Poppins,sans-serif;padding:4px 16px;border-radius:20px;display:none;z-index:9;pointer-events:none;white-space:nowrap">👁 Tu amigo está jugando</div>
     <div class="game-result" id="game-result">
       <div style="font-size:60px;margin-bottom:10px" id="result-emoji">🏆</div>
       <div class="result-winner" id="result-winner">¡Ganaste!</div>
@@ -990,11 +1049,12 @@ function showPremium(){if(!app.token){showAuth();return;}showScreen('s-premium')
 function backFromPremium(){if(app.token)goToChat();else showScreen('s-landing');}
 function goToChat(){
   if(!app.token){showAuth();return;}
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('s-chat').classList.add('active');
-  updateChatUI();
-  if(!app.socket)initSocket();
-  else if(!app.localStream)requestMedia();
+  // Premium users without a mood → ask first
+  if(app.isPremium && !app._mood){
+    showScreen('s-mood');
+    return;
+  }
+  _enterChat(app._mood||null);
 }
 function showPendingScreen(){goToChat();}
 
@@ -1158,7 +1218,7 @@ function initSocket(){
     catch(e){console.error('Answer error:',e);}
   });
   app.socket.on('ice_candidate',async({candidate})=>{if(app.pc&&candidate)try{await app.pc.addIceCandidate(new RTCIceCandidate(candidate));}catch(e){}});
-  app.socket.on('partner_disconnected',()=>{addSys('❌ Tu compañero se desconectó');stopTimer();hidePartnerInfo();closePC();stopRecording();document.getElementById('remoteVid').srcObject=null;document.getElementById('btn-report').style.display='none';app.partnerEmail=null;showOv('idle');});
+  app.socket.on('partner_disconnected',()=>{addSys('❌ Tu amigo se desconectó');stopTimer();hidePartnerInfo();closePC();stopRecording();document.getElementById('remoteVid').srcObject=null;document.getElementById('btn-report').style.display='none';app.partnerEmail=null;showOv('idle');});
   app.socket.on('chat_message',({text})=>addMsg(text,'partner'));
   app.socket.on('premium_activated',()=>{app.isPremium=true;updateChatUI();toast('⭐ ¡Premium activado!','ok');});
   app.socket.on('premium_removed',()=>{app.isPremium=false;updateChatUI();});
@@ -1168,7 +1228,7 @@ function initSocket(){
   app.socket.on('error',({message})=>toast(message,'err'));
   // ── Game socket events ──────────────────────────────────────────────────
   app.socket.on('game_invite', ({type, from}) => {
-    onGameInvite(type, from || 'Tu compañero');
+    onGameInvite(type, from || 'Tu amigo');
   });
   app.socket.on('game_score', (d) => {
     onGameScore(d.score);
@@ -1183,9 +1243,9 @@ function initSocket(){
     GS.myScore = my; GS.partnerScore = th;
     const won=my>th, tied=my===th;
     document.getElementById('result-emoji').textContent  = tied?'🤝':won?'🏆':'😅';
-    document.getElementById('result-winner').textContent = tied?'¡Empate!':won?'🎉 ¡GANASTE!':'¡Ganó tu compañero!';
+    document.getElementById('result-winner').textContent = tied?'¡Empate!':won?'🎉 ¡GANASTE!':'¡Ganó tu amigo!';
     document.getElementById('result-winner').style.color = tied?'#F59E0B':won?'#A020F0':'#EF4444';
-    document.getElementById('result-score').textContent  = `Tú: ${my} pts   Compañero: ${th} pts`;
+    document.getElementById('result-score').textContent  = `Tú: ${my} pts   Amigo: ${th} pts`;
     document.getElementById('game-result').classList.add('show');
     setTimeout(()=>_snd(tied?'hit':won?'win':'lose'), 100);
   });
@@ -1969,7 +2029,7 @@ function onGameEnd() {
   _kill();
   document.getElementById('game-overlay').classList.remove('active');
   GS.type=null; GS.phase='idle';
-  toast('Tu compañero cerró el juego','info');
+  toast('Tu amigo cerró el juego','info');
 }
 
 // Receive partner's game state and update PT
@@ -2030,9 +2090,9 @@ function _showResult() {
   const my=GS.myScore, th=GS.partnerScore;
   const won=my>th, tied=my===th;
   document.getElementById('result-emoji').textContent  = tied?'🤝':won?'🏆':'😅';
-  document.getElementById('result-winner').textContent = tied?'¡Empate!':won?'🎉 ¡GANASTE!':'¡Ganó tu compañero!';
+  document.getElementById('result-winner').textContent = tied?'¡Empate!':won?'🎉 ¡GANASTE!':'¡Ganó tu amigo!';
   document.getElementById('result-winner').style.color = tied?'#F59E0B':won?'#A020F0':'#EF4444';
-  document.getElementById('result-score').textContent  = `Tú: ${my} pts   Compañero: ${th} pts`;
+  document.getElementById('result-score').textContent  = `Tú: ${my} pts   Amigo: ${th} pts`;
   document.getElementById('game-result').classList.add('show');
   // Victory/defeat sound
   setTimeout(()=>_snd(tied?'hit':won?'win':'lose'), 100);
@@ -2043,7 +2103,7 @@ function _showResult() {
 // ─── Draw HUD (works for both MY and PT) ─────────────────────────────────────
 function _drawHUD(x, cw, score, timeLeft, isMe) {
   const ic={fruit:'🍉',target:'🎯',basket:'🏀'};
-  const label = isMe ? 'Tú' : 'Compañero';
+  const label = isMe ? 'Tú' : 'Amigo';
   const xOff = isMe ? 8 : cw/2+8;
   const w = cw/2 - 16;
 
@@ -2068,35 +2128,66 @@ function _drawHUD(x, cw, score, timeLeft, isMe) {
 // ─── Begin MY 30-second turn ──────────────────────────────────────────────────
 function _beginMyTurn() {
   _kill(); _size();
-  GS.phase='my_turn'; GS.myTimeLeft=30; GS.alive=true;
+  GS.phase='countdown'; GS.myTimeLeft=30; GS.alive=true;
   MY = { items:[], sparks:[], trail:[], tgts:[], ball:null, parts:[], netW:0, score:0, lives:3, spT:0 };
   document.getElementById('game-result').classList.remove('show');
+  document.getElementById('game-status').textContent = '¡Tu turno! Comenzando...';
 
-  const ic={fruit:'🍉',target:'🎯',basket:'🏀'};
-  document.getElementById('game-status').textContent = (ic[GS.type]||'')+'  Tu turno — 30s';
-
-  // Exact 30s countdown
-  GS.timerID = setInterval(()=>{
-    GS.myTimeLeft--;
-    document.getElementById('game-status').textContent = `${ic[GS.type]||''} Tu turno — ${GS.myTimeLeft}s`;
-    if (GS.myTimeLeft<=5 && GS.myTimeLeft>0) _snd('tick');
-    if (GS.myTimeLeft<=0) _endMyTurn();
-  }, 1000);
-
-  // Emit state to partner ~10fps
-  GS.stateInt = setInterval(()=>{
-    if (GS.phase!=='my_turn' || !app.socket) return;
-    const d = { score: MY.score, lives: MY.lives, timeLeft: GS.myTimeLeft };
-    if      (GS.type==='fruit')  d.items = MY.items.filter(f=>!f.dead).map(f=>({x:Math.round(f.x),y:Math.round(f.y),e:f.e,sz:f.sz}));
-    else if (GS.type==='target') d.tgts  = MY.tgts.filter(t=>!t.hit).map(t=>({x:Math.round(t.x),y:Math.round(t.y),r:t.r,col:t.col,life:+(((performance.now()-t.born)/1000/t.maxL)).toFixed(2)}));
-    else if (GS.type==='basket') d.ball  = MY.ball ? {x:Math.round(MY.ball.x),y:Math.round(MY.ball.y),r:MY.ball.r} : null;
-    app.socket.emit('game_state', d);
-  }, 100);
-
-  // Start game
-  if      (GS.type==='fruit')  _fruit();
-  else if (GS.type==='target') _target();
-  else if (GS.type==='basket') _basket();
+  // 3-2-1 GO countdown with sounds
+  const steps = [
+    { n:'3', color:'#A020F0' },
+    { n:'2', color:'#7C3AED' },
+    { n:'1', color:'#EF4444' },
+    { n:'¡YA!', color:'#22C55E' }
+  ];
+  let step = 0;
+  function drawCountdown(txt, color) {
+    const c=_gc(), x=_gx(); if(!c||!x) return;
+    x.clearRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,14,.88)'; x.fillRect(0,0,c.width,c.height);
+    const sz = Math.min(140, c.height*.35);
+    x.font=`bold ${sz}px Poppins,sans-serif`;
+    x.textAlign='center'; x.textBaseline='middle';
+    x.shadowColor=color; x.shadowBlur=40;
+    x.fillStyle=color;
+    x.fillText(txt, c.width/2, c.height/2);
+    x.shadowBlur=0;
+  }
+  function nextStep() {
+    if(step >= steps.length) {
+      // Start actual game
+      GS.phase='my_turn';
+      const ic={fruit:'🍉',target:'🎯',basket:'🏀'};
+      document.getElementById('game-status').textContent = `${ic[GS.type]||''} Tu turno — 30s`;
+      GS.timerID = setInterval(()=>{
+        GS.myTimeLeft--;
+        document.getElementById('game-status').textContent = `${ic[GS.type]||''} Tu turno — ${GS.myTimeLeft}s`;
+        if(GS.myTimeLeft<=5 && GS.myTimeLeft>0) _snd('tick');
+        if(GS.myTimeLeft<=0) _endMyTurn();
+      }, 1000);
+      GS.stateInt = setInterval(()=>{
+        if(GS.phase!=='my_turn'||!app.socket) return;
+        const d={score:MY.score,lives:MY.lives,timeLeft:GS.myTimeLeft};
+        if(GS.type==='fruit')  d.items=MY.items.filter(f=>!f.dead).map(f=>({x:Math.round(f.x),y:Math.round(f.y),e:f.e,sz:f.sz}));
+        else if(GS.type==='target') d.tgts=MY.tgts.filter(t=>!t.hit).map(t=>({x:Math.round(t.x),y:Math.round(t.y),r:t.r,col:t.col,life:+(((performance.now()-t.born)/1000/t.maxL)).toFixed(2)}));
+        else if(GS.type==='basket') d.ball=MY.ball?{x:Math.round(MY.ball.x),y:Math.round(MY.ball.y),r:MY.ball.r}:null;
+        app.socket.emit('game_state',d);
+      }, 100);
+      if(GS.type==='fruit')  _fruit();
+      else if(GS.type==='target') _target();
+      else if(GS.type==='basket') _basket();
+      return;
+    }
+    const {n, color} = steps[step++];
+    drawCountdown(n, color);
+    // Sound: higher pitch for 3, lower for 2, lowest for 1, success for GO
+    if(n==='3') _snd('tick');
+    else if(n==='2') _snd('tick');
+    else if(n==='1') _snd('tick');
+    else if(n==='¡YA!') _snd('hit');
+    setTimeout(nextStep, n==='¡YA!' ? 600 : 900);
+  }
+  nextStep();
 }
 
 function _endMyTurn(reason) {
@@ -2112,7 +2203,7 @@ function _endMyTurn(reason) {
   GS.myScore = MY.score;
   GS.phase = 'waiting';
   if (app.socket) app.socket.emit('game_score',{score:GS.myScore,type:GS.type});
-  document.getElementById('game-status').textContent = `⌛ Compañero jugando... (Tú: ${GS.myScore} pts)`;
+  document.getElementById('game-status').textContent = `⌛ Amigo jugando... (Tú: ${GS.myScore} pts)`;
   document.getElementById('game-result').classList.remove('show');
   // NOW start spectator loop so I watch partner play
   _startSpectatorLoop();
@@ -2129,16 +2220,16 @@ function _startSpectatorLoop() {
     const c=_gc(), x=_gx(); if(!c||!x) return;
     x.clearRect(0,0,c.width,c.height);
     // Dark overlay so fruits/targets are visible
-    x.fillStyle='rgba(5,0,14,.82)'; x.fillRect(0,0,c.width,c.height);
+    // Subtle dark vignette only — lets camera show through
+    x.fillStyle='rgba(5,0,14,.28)'; x.fillRect(0,0,c.width,c.height);
 
     if (GS.type==='fruit') {
       PT.items.forEach(f=>{
         x.save(); x.translate(f.x,f.y);
         x.font=f.sz+'px serif'; x.textAlign='center'; x.textBaseline='middle';
-        x.shadowColor='rgba(255,255,100,1)';
-        x.shadowBlur=24; x.fillText(f.e,0,0);
-        x.shadowBlur=12; x.fillText(f.e,0,0);
-        x.shadowBlur=0;  x.fillText(f.e,0,0);
+        x.shadowColor='rgba(255,255,255,1)'; x.shadowBlur=32; x.fillText(f.e,0,0);
+        x.shadowColor='rgba(255,220,0,1)';   x.shadowBlur=20; x.fillText(f.e,0,0);
+        x.shadowBlur=0; x.fillText(f.e,0,0);
         x.restore();
       });
     } else if (GS.type==='target') {
@@ -2217,7 +2308,8 @@ function _fruit() {
     if(!GS.alive||GS.phase!=='my_turn') return;
     const dt=Math.min((now-ts)/16,2.5); ts=now;
     x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,14,.82)'; x.fillRect(0,0,c.width,c.height);
+    // Subtle dark vignette only — lets camera show through
+    x.fillStyle='rgba(5,0,14,.28)'; x.fillRect(0,0,c.width,c.height);
 
     // Trail
     const t0=Date.now();
@@ -2246,10 +2338,14 @@ function _fruit() {
       if(f.y>c.height+80){MY.items.splice(i,1);if(!f.bomb){MY.lives--;if(MY.lives<0)MY.lives=0;}continue;}
       x.save();x.translate(f.x,f.y);x.rotate(f.rot*Math.PI/180);
       x.font=f.sz+'px serif';x.textAlign='center';x.textBaseline='middle';
-      x.shadowColor=f.bomb?'rgba(255,120,0,1)':'rgba(255,255,100,1)';
-      x.shadowBlur=24; x.fillText(f.e,0,0);
-      x.shadowBlur=12; x.fillText(f.e,0,0);
-      x.shadowBlur=0;  x.fillText(f.e,0,0);
+      // 1) Strong white halo — visible on any bg (light or dark)
+      x.shadowColor='rgba(255,255,255,1)'; x.shadowBlur=32;
+      x.fillText(f.e,0,0);
+      // 2) Colored glow
+      x.shadowColor=f.bomb?'rgba(255,100,0,1)':'rgba(255,220,0,1)'; x.shadowBlur=20;
+      x.fillText(f.e,0,0);
+      // 3) Crisp emoji
+      x.shadowBlur=0; x.fillText(f.e,0,0);
       x.restore();
     }
 
@@ -2273,7 +2369,7 @@ function _fruit() {
       x.restore();
       // Partner label
       x.fillStyle='rgba(160,32,240,.8)';x.font='bold 10px Poppins';x.textAlign='left';
-      x.fillText('👁 Compañero',offX-2,offY+c.height*0.3+12);
+      x.fillText('👁 Amigo',offX-2,offY+c.height*0.3+12);
     }
 
     // Lives
@@ -2332,7 +2428,7 @@ function _target() {
     if(!GS.alive||GS.phase!=='my_turn') return;
     const dt=Math.min((now-ts)/16,2.5); ts=now;
     x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,14,.82)';x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,14,.28)';x.fillRect(0,0,c.width,c.height);
 
     MY.spT+=dt; if(MY.spT>30&&MY.tgts.length<8){spawn();MY.spT=0;}
     if(!MY.tgts.length) spawn();
@@ -2413,7 +2509,7 @@ function _basket() {
     if(!GS.alive||GS.phase!=='my_turn') return;
     const dt=Math.min((now-ts)/16,2.5); ts=now;
     x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,14,.82)';x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,14,.28)';x.fillRect(0,0,c.width,c.height);
 
     const b=MY.ball;
     if(b.free&&!drag){
@@ -2461,23 +2557,63 @@ function _basket() {
 // ── Mode Select & Lives ───────────────────────────────────────────────────────
 function handleStart() {
   if (!app.token) { showAuth(); return; }
-  app._mood = null; // reset mood on fresh start
+  app._mood = null;
   showScreen('s-mode');
 }
-function showMoodSelect() { showScreen('s-mood'); }
+function showMoodSelect() {
+  showScreen('s-mood');
+  showMoodStep(1);
+}
+function showMoodStep(step) {
+  document.getElementById('mood-step1').style.display = step===1 ? 'flex' : 'none';
+  document.getElementById('mood-step2').style.display = step===2 ? 'flex' : 'none';
+  document.getElementById('mood-back-btn').onclick = step===1
+    ? ()=>{ app._mood=null; showScreen('s-mode'); }
+    : ()=>showMoodStep(1);
+}
+function pickMood(mood) {
+  app._mood = mood;
+  // Reset filter pills
+  document.querySelectorAll('.filter-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.val==='any');
+  });
+  document.getElementById('mf-age-min').value = '';
+  document.getElementById('mf-age-max').value = '';
+  showMoodStep(2);
+}
+function setFilterBtn(btn, filter, val) {
+  document.querySelectorAll(`.filter-pill[data-filter="${filter}"]`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function getMoodFilters() {
+  return {
+    gender:  document.querySelector('.filter-pill[data-filter="gender"].active')?.dataset.val  || 'any',
+    country: document.querySelector('.filter-pill[data-filter="country"].active')?.dataset.val || 'any',
+    ageMin:  document.getElementById('mf-age-min')?.value || '',
+    ageMax:  document.getElementById('mf-age-max')?.value || ''
+  };
+}
+function applyMoodFilters() {
+  app._filters = getMoodFilters();
+  _enterChat(app._mood);
+}
 
 function _enterChat(mood) {
   app._mood = mood || null;
-  // Go to chat screen
   document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active'));
   document.getElementById('s-chat').classList.add('active');
   updateChatUI();
-  if (!app.socket) {
-    initSocket();
-    // initSocket calls find_partner after joined — pass mood via global
-  } else {
-    if (app._mood) app.socket.emit('set_mode', { mode: app._mood });
+  const go = () => {
+    if(app._mood) app.socket.emit('set_mode',{mode:app._mood});
+    if(app._filters) app.socket.emit('set_filters', app._filters);
     app.socket.emit('find_partner');
+  };
+  if(!app.socket){
+    initSocket();
+  } else if(!app.localStream){
+    requestMedia().then(go).catch(()=>{});
+  } else {
+    go();
   }
 }
 
