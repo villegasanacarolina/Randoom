@@ -268,6 +268,10 @@ const sendPremiumEmail = (email, name) => sendEmail(email, '⭐ ¡Premium activa
 const activeSockets = {};
 const waitingPool   = [];
 
+// ── Lives (in-memory) ─────────────────────────────────────────────────────────
+// Map: liveId → { id, hostEmail, hostName, title, viewers: Set<socketId>, startedAt }
+const activeLives = new Map();
+
 app.use(cors());
 app.use(bodyParser.json());
 app.use('/uploads', express.static(UPLOADS_DIR));
@@ -804,6 +808,16 @@ app.get('/api/friends/online', authUser, async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
 
+// ── LIVES ────────────────────────────────────────────────────────────────────
+app.get('/api/lives', async (req, res) => {
+  const lives = Array.from(activeLives.values()).map(l => ({
+    id: l.id, hostEmail: l.hostEmail, hostName: l.hostName,
+    title: l.title, viewerCount: l.viewers.size,
+    startedAt: l.startedAt
+  }));
+  res.json(lives);
+});
+
 app.get('/api/health', (req, res) =>
   res.json({ status: 'ok', online: Object.keys(activeSockets).length }));
 
@@ -892,9 +906,90 @@ io.on('connection', socket => {
   });
   socket.on('set_mode',    d => { const u=activeSockets[socket.id]; if(u?.partnerId && u.isPremium) u.mode=d.mode; });
 
+  // ── Live socket events ──────────────────────────────────────────────────────
+  socket.on('live_start', ({ title }) => {
+    const u = activeSockets[socket.id]; if (!u) return;
+    // End any existing live by this host
+    for (const [id, live] of activeLives) {
+      if (live.hostEmail === u.email) {
+        live.viewers.forEach(vid => io.to(vid).emit('live_ended', { liveId: id }));
+        activeLives.delete(id);
+      }
+    }
+    const liveId = uuidv4();
+    activeLives.set(liveId, {
+      id: liveId, hostEmail: u.email, hostName: u.name,
+      title: title || `${u.name} en vivo`,
+      viewers: new Set(), startedAt: new Date().toISOString(),
+      hostSocketId: socket.id
+    });
+    socket.join(`live:${liveId}`);
+    socket.emit('live_started', { liveId });
+    // Broadcast updated list
+    io.emit('lives_updated');
+    console.log(`Live started: ${liveId} by ${u.email}`);
+  });
+
+  socket.on('live_end', () => {
+    const u = activeSockets[socket.id]; if (!u) return;
+    for (const [id, live] of activeLives) {
+      if (live.hostEmail === u.email) {
+        live.viewers.forEach(vid => io.to(vid).emit('live_ended', { liveId: id }));
+        activeLives.delete(id);
+        socket.leave(`live:${id}`);
+        io.emit('lives_updated');
+      }
+    }
+  });
+
+  socket.on('live_join', ({ liveId }) => {
+    const live = activeLives.get(liveId); if (!live) return;
+    live.viewers.add(socket.id);
+    socket.join(`live:${liveId}`);
+    socket.data = { ...socket.data, watchingLive: liveId };
+    socket.emit('live_joined', { liveId, viewerCount: live.viewers.size, hostName: live.hostName, title: live.title });
+    // Tell host + viewers about new count
+    io.to(`live:${liveId}`).emit('live_viewer_count', { liveId, count: live.viewers.size });
+  });
+
+  socket.on('live_leave', ({ liveId }) => {
+    const live = activeLives.get(liveId); if (!live) return;
+    live.viewers.delete(socket.id);
+    socket.leave(`live:${liveId}`);
+    io.to(`live:${liveId}`).emit('live_viewer_count', { liveId, count: live.viewers.size });
+  });
+
+  socket.on('live_comment', ({ liveId, text }) => {
+    const u = activeSockets[socket.id]; if (!u || !text) return;
+    const live = activeLives.get(liveId); if (!live) return;
+    io.to(`live:${liveId}`).emit('live_comment', {
+      from: u.name || 'Anónimo', text: text.slice(0, 200), ts: Date.now()
+    });
+  });
+
+  // Live WebRTC: viewer requests offer from host
+  socket.on('live_request_offer', ({ liveId }) => {
+    const live = activeLives.get(liveId); if (!live) return;
+    io.to(live.hostSocketId).emit('live_viewer_requesting', { viewerSocketId: socket.id });
+  });
+  socket.on('live_offer',     ({ viewerSocketId, offer })     => io.to(viewerSocketId).emit('live_offer', { offer }));
+  socket.on('live_answer',    ({ hostSocketId, answer })      => io.to(hostSocketId).emit('live_answer', { answer }));
+  socket.on('live_ice',       ({ targetId, candidate })       => io.to(targetId).emit('live_ice', { candidate }));
+
   socket.on('disconnect', async () => {
     const u = activeSockets[socket.id];
     if (u) {
+      // Clean up live if this socket was hosting
+      for (const [id, live] of activeLives) {
+        if (live.hostSocketId === socket.id) {
+          live.viewers.forEach(vid => io.to(vid).emit('live_ended', { liveId: id }));
+          activeLives.delete(id);
+          io.emit('lives_updated');
+        } else {
+          live.viewers.delete(socket.id);
+          io.to(`live:${id}`).emit('live_viewer_count', { liveId: id, count: live.viewers.size });
+        }
+      }
       if (u.partnerId) { io.to(u.partnerId).emit('partner_disconnected'); if(activeSockets[u.partnerId]) activeSockets[u.partnerId].partnerId=null; }
       if (u.sessionStart) {
         const mins = Math.floor((Date.now()-u.sessionStart)/60000);

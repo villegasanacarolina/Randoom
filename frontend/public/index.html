@@ -127,19 +127,19 @@ textarea.fc{resize:vertical;min-height:70px}
 .timer-track{flex:1;height:3px;background:rgba(160,32,240,.15);border-radius:2px;overflow:hidden}
 .timer-fill{height:100%;background:linear-gradient(90deg,var(--pu),var(--pu-l));transition:width 1s linear}
 .timer-lbl{font-size:10px;color:var(--gray-l);font-weight:500}
-.chat-ctrls{background:rgba(5,0,8,.97);border-top:1px solid var(--bd);padding:8px 10px;display:flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
+.chat-ctrls{background:rgba(5,0,8,.97);border-top:1px solid var(--bd);padding:8px 6px;display:flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(min-width:769px){.chat-ctrls{justify-content:center;flex-wrap:wrap;overflow-x:visible}}
 .chat-ctrls::-webkit-scrollbar{display:none}
-.ctrl-btn{width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .2s;flex-shrink:0}
+.ctrl-btn{width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:17px;transition:all .2s;flex-shrink:0}
+@media(min-width:769px){.ctrl-btn{width:46px;height:46px;font-size:18px}}
 .ctrl-btn.mic,.ctrl-btn.cam{background:rgba(160,32,240,.12);border:1px solid var(--bd)}
 .ctrl-btn.off{background:rgba(239,68,68,.2);border:1px solid #EF4444}
-.ctrl-btn.next{background:linear-gradient(135deg,var(--pu-l),var(--pu-d));width:54px;height:54px;font-size:20px;box-shadow:0 4px 16px rgba(160,32,240,.45)}
+.ctrl-btn.next{background:linear-gradient(135deg,var(--pu-l),var(--pu-d));width:48px;height:48px;font-size:19px;box-shadow:0 4px 16px rgba(160,32,240,.45)}
+@media(min-width:769px){.ctrl-btn.next{width:54px;height:54px;font-size:20px}}
 .ctrl-btn.stp{background:rgba(239,68,68,.2);border:1px solid #EF4444}
 .ctrl-btn.rpt{background:rgba(245,158,11,.15);border:1px solid #F59E0B}
 
-/* MOBILE CHAT BUTTON */
-.chat-float-btn{position:fixed;bottom:82px;left:14px;background:linear-gradient(135deg,var(--pu-l),var(--pu-d));border:none;border-radius:22px;padding:9px 16px;color:#fff;font-size:13px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;z-index:25;box-shadow:0 4px 16px rgba(160,32,240,.5);display:none;align-items:center;gap:6px}
-@media(max-width:768px){.chat-float-btn{display:flex}}
-@media(min-width:769px){.chat-float-btn{display:none!important}}
+/* Float btn removed */
 
 /* MOBILE CHAT DRAWER */
 .chat-drawer{position:fixed;bottom:0;left:0;right:0;background:rgba(5,0,10,.98);border-top:2px solid var(--pu);border-radius:20px 20px 0 0;z-index:40;transform:translateY(100%);transition:transform .3s ease;max-height:60vh;display:flex;flex-direction:column}
@@ -280,6 +280,44 @@ textarea.fc{resize:vertical;min-height:70px}
 @keyframes pulse-big{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
 .result-score{font-size:18px;color:var(--gray-l);margin-top:10px}
 
+/* MODE SELECT */
+#s-mode{align-items:center;justify-content:center;padding:20px 16px}
+.mode-choice{display:flex;flex-direction:column;gap:16px;width:100%;max-width:420px}
+.mode-choice h2{font-family:'Poppins',sans-serif;font-weight:900;font-size:26px;text-align:center;margin-bottom:8px}
+.mode-card{background:var(--card);border:1.5px solid var(--bd);border-radius:20px;padding:24px 20px;cursor:pointer;transition:all .25s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.mode-card:hover,.mode-card:active{border-color:var(--pu);background:rgba(160,32,240,.12);transform:scale(1.02)}
+.mode-card .mc-icon{font-size:52px}
+.mode-card h3{font-family:'Poppins',sans-serif;font-weight:800;font-size:20px}
+.mode-card p{color:var(--gray-l);font-size:13px}
+
+/* LIVES LIST */
+#s-lives{align-items:flex-start;padding:0;overflow-y:auto}
+.lives-header{padding:16px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd);flex-shrink:0}
+.lives-header h2{font-family:'Poppins',sans-serif;font-weight:800;font-size:20px}
+.lives-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px}
+@media(min-width:600px){.lives-grid{grid-template-columns:repeat(3,1fr)}}
+.live-card{background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .2s;position:relative}
+.live-card:hover{border-color:var(--pu);transform:scale(1.02)}
+.live-thumb{width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,rgba(160,32,240,.3),rgba(8,0,16,.8));display:flex;align-items:center;justify-content:center;font-size:32px;position:relative}
+.live-badge{position:absolute;top:6px;left:6px;background:#EF4444;color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:6px}
+.live-viewers{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.7);color:#fff;font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px}
+.live-info{padding:8px 10px}
+.live-host{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live-title{font-size:11px;color:var(--gray-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* LIVE VIEWER SCREEN */
+#s-liveview{display:none;position:fixed;inset:0;z-index:60;flex-direction:column;background:var(--dk)}
+#s-liveview.active{display:flex}
+.liveview-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(8,0,16,.9);border-bottom:1px solid var(--bd);flex-shrink:0}
+.liveview-vid{flex:1;position:relative;background:#000;min-height:0}
+#live-remote-vid{width:100%;height:100%;object-fit:cover}
+.live-stats{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.7);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:6px}
+.live-dot{width:8px;height:8px;background:#EF4444;border-radius:50%;animation:pulse 1s infinite}
+.liveview-chat{height:200px;display:flex;flex-direction:column;border-top:1px solid var(--bd);flex-shrink:0}
+.live-comments{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+.live-comment{font-size:12px;color:var(--gray-l)}.live-comment strong{color:var(--pu-l)}
+.live-comment-inp{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--bd);flex-shrink:0}
+
 /* CONFIRM */
 #s-confirm{align-items:center;padding:16px 14px;overflow-y:auto;text-align:center}
 .confirm-wrap{max-width:420px;margin:0 auto;padding:20px 0}
@@ -373,7 +411,7 @@ textarea.fc{resize:vertical;min-height:70px}
       <h1>Conecta con el <span class="hl">mundo</span> al instante</h1>
       <p>Videochat aleatorio verificado. Comunidad segura, divertida y anónima.</p>
       <div class="hero-cta">
-        <button class="btn btn-primary btn-lg" onclick="showAuth()">🎥 Comenzar ahora</button>
+        <button class="btn btn-primary btn-lg" onclick="handleStart()">🎥 Comenzar ahora</button>
         <button class="btn btn-outline btn-lg" onclick="showPremium()">⭐ Ver Premium</button>
       </div>
     </div>
@@ -385,7 +423,7 @@ textarea.fc{resize:vertical;min-height:70px}
     </div>
     <div class="feat-grid" style="padding:0 0 20px;width:100%">
       <div class="feat-card"><div class="feat-icon">🎥</div><h3>Video en tiempo real</h3><p>WebRTC directo en tu navegador.</p></div>
-      <div class="feat-card"><div class="feat-icon">🪪</div><h3>Comunidad verificada</h3><p>Todos pasan verificación de INE.</p></div>
+      <div class="feat-card"><div class="feat-icon">📡</div><h3>Lives en vivo</h3><p>Haz streaming para todos o únete a un live.</p></div>
       <div class="feat-card"><div class="feat-icon">⭐</div><h3>Filtros Premium</h3><p>Elige género, edad y país.</p></div>
       <div class="feat-card"><div class="feat-icon">💕</div><h3>Elige tu modo</h3><p>Pareja, amigos o negocios.</p></div>
     </div>
@@ -505,6 +543,7 @@ textarea.fc{resize:vertical;min-height:70px}
     <div class="vid-area">
       <video id="remoteVid" autoplay playsinline></video>
       <video id="localVid" autoplay playsinline muted></video>
+      <button onclick="swapCameras()" style="position:absolute;top:8px;left:8px;z-index:15;background:rgba(8,0,16,.7);border:1px solid var(--bd);color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px)">⇄ Cámara</button>
       <div class="vid-overlay" id="ov-idle">
         <div style="font-size:44px">🔮</div>
         <h3>¡Listo para conectar!</h3>
@@ -523,7 +562,8 @@ textarea.fc{resize:vertical;min-height:70px}
     <div id="timer-bar" style="display:none">
       <span id="timer-disp"></span><span id="timer-fill"></span><span id="timer-type"></span>
     </div>
-    <div class="chat-ctrls" style="justify-content:center;flex-wrap:wrap">
+    <div class="chat-ctrls">
+      <button class="ctrl-btn" onclick="openDrawer()" id="btn-chat" style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));position:relative" title="Chat">💬<span id="online-num-m" style="position:absolute;top:-4px;right:-4px;background:#EF4444;color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:8px;display:none" id="chat-badge"></span></button>
       <button class="ctrl-btn mic" id="btn-mic" onclick="toggleMic()">🎤</button>
       <button class="ctrl-btn cam" id="btn-cam" onclick="toggleCam()">📷</button>
       <button class="ctrl-btn next" onclick="findPartner()">⏭</button>
@@ -533,11 +573,10 @@ textarea.fc{resize:vertical;min-height:70px}
       <button class="ctrl-btn" onclick="openGame('target')" id="btn-target" style="display:none;background:rgba(59,130,246,.15);border:1px solid #3B82F6" title="Tiro al blanco">🎯</button>
       <button class="ctrl-btn" onclick="openGame('basket')" id="btn-basket" style="display:none;background:rgba(245,158,11,.15);border:1px solid #F59E0B" title="Baloncesto">🏀</button>
       <button class="ctrl-btn" onclick="sendFriendReq()" id="btn-addfriend" style="display:none;background:rgba(160,32,240,.15);border:1px solid var(--pu)" title="Agregar amigo">👤+</button>
+      <button class="ctrl-btn" onclick="toggleLive()" id="btn-live" style="background:rgba(239,68,68,.15);border:1px solid #EF4444" title="Iniciar Live">📡</button>
     </div>
   </div>
 
-  <!-- Mobile: floating chat button -->
-  <button class="chat-float-btn" onclick="openDrawer()">💬 Chat <span id="online-num-m" style="background:rgba(255,255,255,.2);border-radius:10px;padding:1px 6px;font-size:11px"></span></button>
 
   <!-- Mobile: slide-up drawer -->
   <div class="chat-drawer" id="chat-drawer">
@@ -721,6 +760,77 @@ textarea.fc{resize:vertical;min-height:70px}
   </div>
 </div>
 
+<!-- ═══ MODE SELECT ═══ -->
+<div id="s-mode" class="screen">
+  <nav class="nav">
+    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <button class="btn btn-ghost btn-sm" onclick="goHome()">← Salir</button>
+  </nav>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:20px 16px">
+    <div class="mode-choice">
+      <h2>¿Qué quieres hacer?</h2>
+      <div class="mode-card" onclick="showLives()">
+        <div class="mc-icon">📡</div>
+        <h3>Ver Lives</h3>
+        <p>Únete a transmisiones en vivo de otros usuarios</p>
+      </div>
+      <div class="mode-card" onclick="goToChat()">
+        <div class="mc-icon">🎲</div>
+        <h3>Videollamada aleatoria</h3>
+        <p>Conéctate con alguien al azar</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LIVES LIST ═══ -->
+<div id="s-lives" class="screen">
+  <nav class="nav">
+    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <button class="btn btn-ghost btn-sm" onclick="showScreen('s-mode')">← Volver</button>
+  </nav>
+  <div class="lives-header">
+    <h2>📡 Lives en vivo</h2>
+    <button class="btn btn-ghost btn-sm" onclick="loadLives()">🔄</button>
+  </div>
+  <div id="lives-grid" class="lives-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--gray-l)">
+      <div style="font-size:48px;margin-bottom:12px">📡</div>
+      <p>No hay lives en este momento</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LIVE VIEWER ═══ -->
+<div id="s-liveview">
+  <div class="liveview-header">
+    <div>
+      <div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:15px" id="lv-title">Live</div>
+      <div class="live-stats" style="position:static;display:inline-flex;background:transparent;padding:0;margin-top:2px">
+        <div class="live-dot"></div>
+        <span id="lv-viewers">0</span> viendo
+      </div>
+    </div>
+    <button class="btn btn-danger btn-sm" onclick="leaveLive()">✕ Salir</button>
+  </div>
+  <div class="liveview-vid">
+    <video id="live-remote-vid" autoplay playsinline></video>
+    <div style="position:absolute;top:8px;left:8px;background:rgba(239,68,68,.9);color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:6px;display:flex;align-items:center;gap:5px">
+      <div class="live-dot"></div> EN VIVO
+    </div>
+    <div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:12px">
+      👁 <span id="lv-viewers2">0</span>
+    </div>
+  </div>
+  <div class="liveview-chat">
+    <div class="live-comments" id="live-comments"></div>
+    <div class="live-comment-inp">
+      <input class="fc" id="live-comment-in" placeholder="Escribe un comentario..." maxlength="200" style="font-size:13px" onkeydown="if(event.key==='Enter')sendLiveComment()"/>
+      <button class="send-btn" onclick="sendLiveComment()">➤</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ PROFILE SCREEN ═══ -->
 <div id="s-profile" class="screen">
   <nav class="nav">
@@ -800,9 +910,9 @@ textarea.fc{resize:vertical;min-height:70px}
   <div class="game-canvas-wrap">
     <canvas id="game-canvas"></canvas>
     <!-- Spectator: opponent game shown in corner -->
-    <!-- Spectator canvas: shows partner's game full size when waiting, mini when playing -->
-    <canvas id="spec-canvas" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none;pointer-events:none;z-index:6;opacity:.92"></canvas>
-    <div id="spec-label" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(160,32,240,.7);color:#fff;font-size:11px;font-weight:700;font-family:Poppins,sans-serif;padding:3px 12px;border-radius:12px;display:none;z-index:7;pointer-events:none">👁 Jugando tu compañero</div>
+    <!-- Spectator: partner's live game stream -->
+    <canvas id="spec-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none;z-index:8"></canvas>
+    <div id="spec-label" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(160,32,240,.8);color:#fff;font-size:11px;font-weight:700;font-family:Poppins,sans-serif;padding:4px 14px;border-radius:12px;display:none;z-index:9;pointer-events:none">👁 Jugando tu compañero</div>
     <div class="game-result" id="game-result">
       <div style="font-size:60px;margin-bottom:10px" id="result-emoji">🏆</div>
       <div class="result-winner" id="result-winner">¡Ganaste!</div>
@@ -1014,13 +1124,11 @@ function initSocket(){
     onGameInvite(type, from || 'Tu compañero');
   });
   app.socket.on('game_score', (d) => {
-    onGameScore(d.score, d.type);
+    onGameScore(d.score);
   });
   app.socket.on('game_state', (d) => {
-    // Render partner's canvas frame on spec-canvas
-    if (d.frame) _renderSpecFrame(d.frame, d.score);
-    else _drawSpectator(d.score||0);
-    if (d.sliced) _playSound('slice');
+    if (d.f) _onPartnerFrame(d);
+    if (d.sliced) _snd('slice');
   });
   app.socket.on('game_end', () => {
     onGameEnd();
@@ -1046,9 +1154,96 @@ function initSocket(){
     toast('Tu amigo rechazó la llamada','info');
   });
   app.socket.on('friend_online',({email,online})=>{
-    // Update online dot in friends list if visible
     const dot = document.querySelector(`[data-friend-email="${email}"] .friend-dot`);
     if (dot) dot.style.background = online ? 'var(--ok)' : 'var(--gray)';
+  });
+
+  // ── Live socket events ────────────────────────────────────────────────────
+  app.socket.on('live_started', ({ liveId }) => {
+    app_liveId = liveId;
+    const btn = document.getElementById('btn-live');
+    if (btn) { btn.style.background='rgba(239,68,68,.6)'; btn.textContent='🔴'; }
+    toast('📡 ¡Live iniciado! Ya pueden verte.','ok');
+  });
+
+  app.socket.on('lives_updated', () => {
+    // If lives screen is open, refresh
+    if (document.getElementById('s-lives')?.classList.contains('active')) loadLives();
+  });
+
+  app.socket.on('live_ended', ({ liveId }) => {
+    if (app_watchLiveId === liveId) {
+      leaveLive();
+      toast('El live terminó','info');
+    }
+  });
+
+  app.socket.on('live_viewer_count', ({ count }) => {
+    ['lv-viewers','lv-viewers2'].forEach(id => {
+      const el = document.getElementById(id); if(el) el.textContent = count;
+    });
+  });
+
+  app.socket.on('live_joined', ({ viewerCount, hostName, title }) => {
+    ['lv-viewers','lv-viewers2'].forEach(id => {
+      const el = document.getElementById(id); if(el) el.textContent = viewerCount;
+    });
+  });
+
+  app.socket.on('live_comment', ({ from, text }) => {
+    addLiveComment(from, text);
+    _snd('hit'); // subtle sound
+  });
+
+  // Live WebRTC (host side)
+  app.socket.on('live_viewer_requesting', async ({ viewerSocketId }) => {
+    if (!app_liveId || !app.localStream) return;
+    const pc = new RTCPeerConnection({ iceServers: [
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'turn:global.relay.metered.ca:80',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'},
+      {urls:'turns:global.relay.metered.ca:443?transport=tcp',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'}
+    ]});
+    app.localStream.getTracks().forEach(t => pc.addTrack(t, app.localStream));
+    pc.onicecandidate = ({candidate}) => { if(candidate) app.socket.emit('live_ice',{targetId:viewerSocketId,candidate}); };
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    app.socket.emit('live_offer', { viewerSocketId, offer });
+    app_liveViewers.set(viewerSocketId, pc);
+  });
+
+  // Live WebRTC (viewer side)
+  app.socket.on('live_offer', async ({ offer }) => {
+    if (!app_watchLiveId) return;
+    app_watchPC = new RTCPeerConnection({ iceServers: [
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'turn:global.relay.metered.ca:80',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'},
+      {urls:'turns:global.relay.metered.ca:443?transport=tcp',username:'d038e323c1897b02bb6cad44',credential:'muM9FsL8arKgVRw2'}
+    ]});
+    app_watchPC.ontrack = ({ streams }) => {
+      const vid = document.getElementById('live-remote-vid');
+      if (vid && streams[0]) { vid.srcObject = streams[0]; vid.play().catch(()=>{}); }
+    };
+    app_watchPC.onicecandidate = ({candidate}) => {
+      if(candidate) app.socket.emit('live_ice',{targetId:'host',candidate});
+    };
+    await app_watchPC.setRemoteDescription(offer);
+    const answer = await app_watchPC.createAnswer();
+    await app_watchPC.setLocalDescription(answer);
+    app.socket.emit('live_answer', { answer });
+  });
+
+  app.socket.on('live_answer', async ({ answer }) => {
+    // For each viewer's PC, set answer
+    for (const [,pc] of app_liveViewers) {
+      if (pc.signalingState === 'have-local-offer') {
+        await pc.setRemoteDescription(answer).catch(()=>{});
+        break;
+      }
+    }
+  });
+
+  app.socket.on('live_ice', async ({ candidate }) => {
+    if (app_watchPC) await app_watchPC.addIceCandidate(candidate).catch(()=>{});
   });
 }
 
@@ -1499,547 +1694,438 @@ async function sendFriendReq() {
   } catch(e) {toast(e.message,'err');}
 }
 
-// ── Sound System ────────────────────────────────────────────────────────────
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
-let _ac = null;
-function _getAC() { if (!_ac) _ac = new AudioCtx(); return _ac; }
-
-function _playSound(type) {
+// ── Sound System ─────────────────────────────────────────────────────────────
+let _AC = null;
+function _ac() { if (!_AC) _AC = new (window.AudioContext||window.webkitAudioContext)(); return _AC; }
+function _snd(type) {
   try {
-    const ac = _getAC();
-    const g = ac.createGain();
-    g.connect(ac.destination);
-    if (type === 'slice') {
-      // Woosh
-      const o = ac.createOscillator(); o.type = 'sawtooth';
-      o.frequency.setValueAtTime(800, ac.currentTime);
-      o.frequency.exponentialRampToValueAtTime(200, ac.currentTime + 0.15);
-      g.gain.setValueAtTime(0.3, ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
-      o.connect(g); o.start(); o.stop(ac.currentTime + 0.15);
-    } else if (type === 'bomb') {
-      // Low boom
-      const o = ac.createOscillator(); o.type = 'sine';
-      o.frequency.setValueAtTime(120, ac.currentTime);
-      o.frequency.exponentialRampToValueAtTime(30, ac.currentTime + 0.4);
-      g.gain.setValueAtTime(0.6, ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.4);
-      o.connect(g); o.start(); o.stop(ac.currentTime + 0.4);
-    } else if (type === 'score') {
-      // Happy ding
-      [523, 659, 784].forEach((f, i) => {
-        const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = f;
-        const gi = ac.createGain();
-        gi.gain.setValueAtTime(0.3, ac.currentTime + i*0.07);
-        gi.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i*0.07 + 0.2);
-        o.connect(gi); gi.connect(ac.destination); o.start(ac.currentTime + i*0.07); o.stop(ac.currentTime + i*0.07 + 0.2);
-      });
-    } else if (type === 'hit') {
-      // Target hit pop
-      const o = ac.createOscillator(); o.type = 'square';
-      o.frequency.setValueAtTime(600, ac.currentTime);
-      o.frequency.exponentialRampToValueAtTime(300, ac.currentTime + 0.1);
-      g.gain.setValueAtTime(0.25, ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.1);
-      o.connect(g); o.start(); o.stop(ac.currentTime + 0.1);
-    } else if (type === 'basket') {
-      // Swish
-      [440, 554, 659].forEach((f, i) => {
-        const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = f;
-        const gi = ac.createGain();
-        gi.gain.setValueAtTime(0.35, ac.currentTime + i*0.05);
-        gi.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i*0.05 + 0.3);
-        o.connect(gi); gi.connect(ac.destination); o.start(ac.currentTime + i*0.05); o.stop(ac.currentTime + i*0.05 + 0.3);
-      });
-    } else if (type === 'win') {
-      [523,659,784,1047].forEach((f,i) => {
-        const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = f;
-        const gi = ac.createGain();
-        gi.gain.setValueAtTime(0.4, ac.currentTime + i*0.12);
-        gi.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i*0.12 + 0.35);
-        o.connect(gi); gi.connect(ac.destination); o.start(ac.currentTime + i*0.12); o.stop(ac.currentTime + i*0.12 + 0.35);
-      });
-    } else if (type === 'lose') {
-      [400,300,200].forEach((f,i) => {
-        const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
-        const gi = ac.createGain();
-        gi.gain.setValueAtTime(0.35, ac.currentTime + i*0.15);
-        gi.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i*0.15 + 0.3);
-        o.connect(gi); gi.connect(ac.destination); o.start(ac.currentTime + i*0.15); o.stop(ac.currentTime + i*0.15 + 0.3);
-      });
-    } else if (type === 'countdown') {
-      const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = 440;
-      g.gain.setValueAtTime(0.2, ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.1);
-      o.connect(g); o.start(); o.stop(ac.currentTime + 0.1);
-    }
+    const ac = _ac(), g = ac.createGain(); g.connect(ac.destination);
+    const play = (freq, dur, vol=0.3, wave='sine', delay=0) => {
+      const o = ac.createOscillator(), gi = ac.createGain();
+      o.type = wave; o.frequency.value = freq;
+      gi.gain.setValueAtTime(vol, ac.currentTime+delay);
+      gi.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+delay+dur);
+      o.connect(gi); gi.connect(ac.destination);
+      o.start(ac.currentTime+delay); o.stop(ac.currentTime+delay+dur);
+    };
+    if (type==='slice')  { play(600,0.08,0.2,'sawtooth'); play(300,0.1,0.1,'sawtooth',0.05); }
+    if (type==='bomb')   { play(80,0.5,0.6,'sine'); play(50,0.4,0.4,'sine',0.1); }
+    if (type==='hit')    { play(800,0.06,0.25,'square'); play(400,0.08,0.15,'square',0.04); }
+    if (type==='basket') { [440,554,659].forEach((f,i)=>play(f,0.3,0.3,'sine',i*0.06)); }
+    if (type==='tick')   { play(880,0.05,0.15,'sine'); }
+    if (type==='win')    { [523,659,784,1047].forEach((f,i)=>play(f,0.35,0.35,'sine',i*0.12)); }
+    if (type==='lose')   { [400,300,200].forEach((f,i)=>play(f,0.3,0.3,'sawtooth',i*0.15)); }
   } catch(e) {}
 }
 
-// ═══════════════════════════════════════════════════════
-// GAMES  – turn-based, 30s each, no canvas-clone bugs
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// GAMES — Clean rewrite. Both players see both games via canvas streaming.
+// ═══════════════════════════════════════════════════════════════════════
 
-const GTYPE  = { fruit:'🍉 Fruit Ninja', target:'🎯 Tiro al Blanco', basket:'🏀 Baloncesto' };
 const FRUITS = ['🍉','🍊','🍋','🍇','🍓','🥝','🍑','🍒'];
 const TCOLS  = ['#EF4444','#3B82F6','#22C55E','#F59E0B','#A020F0','#EC4899'];
 
-// ── Single mutable state ──────────────────────────────
-let GS = {
-  type: null, phase: 'idle',
+// Single state object
+const GS = {
+  type: null,
+  phase: 'idle', // idle | my_turn | waiting | partner_turn | result
   myScore: 0, partnerScore: 0,
-  timeLeft: 30, timerID: null, rafID: null,
-  alive: false   // set true when a game loop is running
+  timeLeft: 30,
+  timerID: null, rafID: null, frameInt: null,
+  alive: false
 };
 
-// ─────────────────────────────────────────────────────
-// PUBLIC: called by HTML buttons
-// ─────────────────────────────────────────────────────
+// ─── Canvas helpers ──────────────────────────────────────────────────────────
+function _gc()  { return document.getElementById('game-canvas'); }
+function _gx()  { const c=_gc(); return c?c.getContext('2d'):null; }
+function _sc()  { return document.getElementById('spec-canvas'); }
+function _sx()  { const c=_sc(); return c?c.getContext('2d'):null; }
+
+function _sizeMain() {
+  const c=_gc(); if(!c)return;
+  c.width  = c.parentElement.offsetWidth  || window.innerWidth;
+  c.height = c.parentElement.offsetHeight || window.innerHeight-56;
+}
+
+// ─── Open game (I pressed the button) ───────────────────────────────────────
 function openGame(type) {
   if (!app.partnerEmail) { toast('Debes estar en una llamada','err'); return; }
-  if (app.socket) app.socket.emit('game_invite', { type, from: app.user?.name || 'Tu compañero' });
-  GS.myScore = 0; GS.partnerScore = 0; GS.type = type;
-  _showOverlay(type);
+  GS.type=type; GS.myScore=0; GS.partnerScore=0;
+  if (app.socket) app.socket.emit('game_invite',{type,from:app.user?.name||''});
+  _openOverlay(type);
   _beginMyTurn();
 }
 
+// ─── Close game ──────────────────────────────────────────────────────────────
 function closeGame() {
-  _killGame();
+  _kill();
   document.getElementById('game-overlay').classList.remove('active');
-  if (app.socket) app.socket.emit('game_end', {});
+  if (app.socket) app.socket.emit('game_end',{});
+  GS.type=null; GS.phase='idle';
 }
 
+// ─── Restart ─────────────────────────────────────────────────────────────────
 function restartGame() {
   document.getElementById('game-result').classList.remove('show');
-  GS.myScore = 0; GS.partnerScore = 0;
-  if (app.socket) app.socket.emit('game_invite', { type: GS.type, from: app.user?.name || '' });
+  GS.myScore=0; GS.partnerScore=0;
+  if (app.socket) app.socket.emit('game_invite',{type:GS.type,from:app.user?.name||''});
   _beginMyTurn();
 }
 
-// ─────────────────────────────────────────────────────
-// SOCKET HANDLERS (called from initSocket)
-// ─────────────────────────────────────────────────────
+// ─── Socket handlers (called from initSocket) ────────────────────────────────
 function onGameInvite(type, fromName) {
-  GS.type = type; GS.myScore = 0; GS.partnerScore = 0;
-  _showOverlay(type);
-  GS.phase = 'partner_turn';
-  _msg(`⏳ ${fromName||'Tu compañero'} está jugando...`, '#C8A8E0');
-  _setStatus('Turno de tu compañero...');
-  _showSpectator();
+  // Partner started — show their game live, wait for score, then my turn
+  GS.type=type; GS.myScore=0; GS.partnerScore=0; GS.phase='partner_turn';
+  _openOverlay(type);
+  _showSpec(true);  // show spec canvas fullscreen
+  _hideMain();      // hide main canvas (partner's game is on spec)
+  document.getElementById('game-status').textContent='👁 '+fromName+' está jugando...';
+  document.getElementById('game-result').classList.remove('show');
 }
 
-function onGameScore(partnerScore, type) {
-  _drawSpectator(partnerScore); // update spectator mini-view
+function onGameScore(partnerScore) {
   GS.partnerScore = partnerScore;
-  if (type && !GS.type) GS.type = type;
-  
-  if (GS.phase === 'waiting' || GS.phase === 'result') {
+  if (GS.phase==='waiting') {
     // I already played → show result
     _showResult();
   } else {
-    // Partner finished first → my turn
-    // Make sure overlay is open
-    if (!document.getElementById('game-overlay').classList.contains('active')) {
-      _showOverlay(GS.type || type);
-    }
-    // Kill any running loop first
-    _killGame();
-    GS.phase = 'partner_done';
-    _sizeCanvas();
-    _msg('¡TU TURNO!', '#A020F0');
-    _setStatus('¡Tu turno en 3s!');
-    _hideSpectator();
-    setTimeout(() => {
-      if (GS.phase === 'partner_done') _beginMyTurn();
-    }, 2500);
+    // Partner done → now MY turn
+    _showSpec(false);
+    _showMain();
+    GS.phase='idle';
+    // Announce then start
+    _writeCanvas('🎮 ¡TU TURNO!','#A020F0','Prepárate...');
+    document.getElementById('game-status').textContent='¡Tu turno en 3s!';
+    document.getElementById('game-result').classList.remove('show');
+    setTimeout(()=>{ if(GS.phase==='idle'||GS.phase==='partner_turn'||GS.phase==='partner_done') _beginMyTurn(); },2500);
   }
 }
 
 function onGameEnd() {
-  _killGame();
+  _kill();
   document.getElementById('game-overlay').classList.remove('active');
+  GS.type=null; GS.phase='idle';
   toast('Tu compañero cerró el juego','info');
 }
 
-// ─────────────────────────────────────────────────────
-// INTERNAL HELPERS
-// ─────────────────────────────────────────────────────
-function _showOverlay(type) {
-  document.getElementById('game-title').textContent = GTYPE[type] || '🎮';
+// ─── Overlay helpers ─────────────────────────────────────────────────────────
+function _openOverlay(type) {
+  const titles={fruit:'🍉 Fruit Ninja',target:'🎯 Tiro al Blanco',basket:'🏀 Baloncesto'};
+  document.getElementById('game-title').textContent=titles[type]||'🎮';
   document.getElementById('game-result').classList.remove('show');
   document.getElementById('game-overlay').classList.add('active');
+  _sizeMain();
+  // Size spec canvas too
+  const sc=_sc(); if(sc){ sc.width=_gc().width; sc.height=_gc().height; }
 }
 
-function _setStatus(t) { document.getElementById('game-status').textContent = t; }
-
-function _canvas()  { return document.getElementById('game-canvas'); }
-function _ctx()     { const c = _canvas(); return c ? c.getContext('2d') : null; }
-
-function _sizeCanvas() {
-  const c = _canvas(); if (!c) return;
-  const p = c.parentElement;
-  c.width  = p.offsetWidth  || window.innerWidth;
-  c.height = p.offsetHeight || (window.innerHeight - 56);
+function _showSpec(show) {
+  const sc=_sc(), lb=document.getElementById('spec-label');
+  if(sc) sc.style.display=show?'block':'none';
+  if(lb) lb.style.display=show?'block':'none';
 }
+function _showMain() { const c=_gc(); if(c) c.style.display='block'; }
+function _hideMain() { const c=_gc(); if(c) c.style.display='none'; }
 
-function _killGame() {
-  GS.alive = false;
-  if (GS.timerID) { clearInterval(GS.timerID);        GS.timerID = null; }
-  if (GS.rafID)   { cancelAnimationFrame(GS.rafID);   GS.rafID   = null; }
-  // Remove touch listeners by replacing canvas
-  const old = _canvas();
-  if (old && old.parentNode) {
-    const neo = old.cloneNode(false);
-    neo.width = old.width; neo.height = old.height;
-    old.parentNode.replaceChild(neo, old);
+function _writeCanvas(line1, color, line2) {
+  _showMain(); _sizeMain();
+  const c=_gc(),x=_gx(); if(!c||!x)return;
+  x.clearRect(0,0,c.width,c.height);
+  x.fillStyle='rgba(8,0,16,.88)'; x.fillRect(0,0,c.width,c.height);
+  const sz=Math.min(46,c.width/6);
+  x.textAlign='center'; x.shadowBlur=0;
+  x.font=`bold ${sz}px Poppins,sans-serif`;
+  x.fillStyle=color||'#fff';
+  x.shadowColor=color; x.shadowBlur=20;
+  x.fillText(line1, c.width/2, c.height/2-10);
+  x.shadowBlur=0;
+  if(line2){
+    x.font='16px Inter,sans-serif'; x.fillStyle='#C8A8E0';
+    x.fillText(line2, c.width/2, c.height/2+32);
   }
 }
 
-function _msg(text, color) {
-  _sizeCanvas();
-  const c = _canvas(), x = _ctx(); if (!c || !x) return;
-  x.clearRect(0, 0, c.width, c.height);
-  x.fillStyle = 'rgba(8,0,16,.82)'; x.fillRect(0, 0, c.width, c.height);
-  x.textAlign = 'center'; x.shadowBlur = 0;
-  const sz = Math.min(44, c.width / 6);
-  x.font = `bold ${sz}px Poppins,sans-serif`;
-  x.fillStyle = color || '#fff';
-  if (color) { x.shadowColor = color; x.shadowBlur = 20; }
-  x.fillText(text, c.width / 2, c.height / 2);
-  x.shadowBlur = 0;
-}
-
-function _msgWaiting(score) {
-  const c = _canvas(), x = _ctx(); if (!c || !x) return;
-  x.clearRect(0, 0, c.width, c.height);
-  x.fillStyle = 'rgba(8,0,16,.82)'; x.fillRect(0, 0, c.width, c.height);
-  x.textAlign = 'center';
-  const sz = Math.min(38, c.width / 7);
-  x.font = `bold ${sz}px Poppins,sans-serif`;
-  x.fillStyle = '#A020F0';
-  x.fillText('✅ Tu puntuación: ' + score, c.width/2, c.height/2 - 18);
-  x.font = `16px Inter,sans-serif`;
-  x.fillStyle = '#C8A8E0';
-  x.fillText('⌛ Esperando a tu compañero...', c.width/2, c.height/2 + 22);
+function _writeWaiting(score) {
+  const c=_gc(),x=_gx(); if(!c||!x)return;
+  x.clearRect(0,0,c.width,c.height);
+  x.fillStyle='rgba(8,0,16,.82)'; x.fillRect(0,0,c.width,c.height);
+  const sz=Math.min(38,c.width/7);
+  x.textAlign='center';
+  x.font=`bold ${sz}px Poppins,sans-serif`; x.fillStyle='#A020F0';
+  x.fillText('✅ Tu puntuación: '+score, c.width/2, c.height/2-14);
+  x.font='16px Inter,sans-serif'; x.fillStyle='#C8A8E0';
+  x.fillText('⌛ Esperando a tu compañero...', c.width/2, c.height/2+24);
 }
 
 function _hud(score) {
-  const c = _canvas(), x = _ctx(); if (!c || !x) return;
-  // score pill
-  x.fillStyle = 'rgba(8,0,16,.75)';
-  x.beginPath(); x.roundRect(8,8,112,38,10); x.fill();
-  x.fillStyle = '#fff'; x.font = 'bold 18px Poppins,sans-serif'; x.textAlign = 'left';
-  const ic = {fruit:'🍉',target:'🎯',basket:'🏀'};
-  x.fillText((ic[GS.type]||'') + ' ' + score, 16, 31);
-  // timer arc
-  const pct = GS.timeLeft / 30;
-  const cx = c.width - 34, cy = 34;
-  x.strokeStyle = 'rgba(160,32,240,.22)'; x.lineWidth = 5;
-  x.beginPath(); x.arc(cx, cy, 22, 0, Math.PI*2); x.stroke();
-  x.strokeStyle = pct > .4 ? '#A020F0' : '#EF4444'; x.lineWidth = 5;
-  x.beginPath(); x.arc(cx, cy, 22, -Math.PI/2, -Math.PI/2 + pct*Math.PI*2); x.stroke();
-  x.fillStyle = '#fff'; x.font = 'bold 13px Poppins,sans-serif'; x.textAlign = 'center';
-  x.fillText(GS.timeLeft, cx, cy + 5);
+  const c=_gc(),x=_gx(); if(!c||!x)return;
+  // Score pill
+  x.fillStyle='rgba(8,0,16,.75)';
+  x.beginPath(); x.roundRect(8,8,116,40,10); x.fill();
+  x.fillStyle='#fff'; x.font='bold 18px Poppins,sans-serif'; x.textAlign='left';
+  const ic={fruit:'🍉',target:'🎯',basket:'🏀'};
+  x.fillText((ic[GS.type]||'')+'  '+score, 16, 32);
+  // Timer arc
+  const pct=GS.timeLeft/30, cx=c.width-34, cy=32;
+  x.strokeStyle='rgba(160,32,240,.2)'; x.lineWidth=5;
+  x.beginPath(); x.arc(cx,cy,22,0,Math.PI*2); x.stroke();
+  x.strokeStyle=pct>.4?'#A020F0':'#EF4444'; x.lineWidth=5;
+  x.beginPath(); x.arc(cx,cy,22,-Math.PI/2,-Math.PI/2+pct*Math.PI*2); x.stroke();
+  x.fillStyle='#fff'; x.font='bold 13px Poppins,sans-serif'; x.textAlign='center';
+  x.fillText(GS.timeLeft, cx, cy+5);
 }
 
-// Spectator: data received from partner
-let _specItems = [], _specScore = 0, _specRaf = null;
-
-function _showSpectator() {
-  const sc = document.getElementById('spec-canvas');
-  const lb = document.getElementById('spec-label');
-  if (sc) { sc.style.display = 'block'; sc.width = sc.offsetWidth||320; sc.height = sc.offsetHeight||480; }
-  if (lb) lb.style.display = 'block';
-}
-function _hideSpectator() {
-  const sc = document.getElementById('spec-canvas');
-  const lb = document.getElementById('spec-label');
-  if (sc) { sc.style.display = 'none'; sc.getContext('2d')?.clearRect(0,0,sc.width,sc.height); }
-  if (lb) lb.style.display = 'none';
-}
-function _specLoop() {
-  // Driven by incoming socket frames — nothing to loop here
-}
-function _drawSpectator(score) {
-  _specScore = score;
-}
-function _renderSpecFrame(dataUrl, score) {
-  const sc = document.getElementById('spec-canvas');
-  if (!sc || sc.style.display === 'none') return;
-  sc.width = 130; sc.height = 100;
-  const x = sc.getContext('2d');
-  if (dataUrl) {
-    const img = new Image();
-    img.onload = () => { x.clearRect(0,0,130,100); x.drawImage(img,0,0,130,100); };
-    img.src = dataUrl;
+// ─── Kill everything ──────────────────────────────────────────────────────────
+function _kill() {
+  GS.alive=false;
+  if(GS.timerID)  { clearInterval(GS.timerID);       GS.timerID=null; }
+  if(GS.rafID)    { cancelAnimationFrame(GS.rafID);  GS.rafID=null; }
+  if(GS.frameInt) { clearInterval(GS.frameInt);      GS.frameInt=null; }
+  // Replace canvas to nuke all event listeners
+  const old=_gc();
+  if(old&&old.parentNode){
+    const neo=old.cloneNode(false);
+    neo.width=old.width; neo.height=old.height;
+    old.parentNode.replaceChild(neo,old);
   }
-  _specScore = score || _specScore;
 }
 
+// ─── Show result ──────────────────────────────────────────────────────────────
 function _showResult() {
-  _killGame();
-  GS.phase = 'result';
-  const my = GS.myScore, th = GS.partnerScore;
-  const won = my > th, tied = my === th;
+  _kill(); _showSpec(false); _showMain();
+  GS.phase='result';
+  const my=GS.myScore, th=GS.partnerScore;
+  const won=my>th, tied=my===th;
   document.getElementById('result-emoji').textContent  = tied?'🤝':won?'🏆':'😅';
   document.getElementById('result-winner').textContent = tied?'¡Empate!':won?'🎉 ¡GANASTE!':'¡Ganó tu compañero!';
   document.getElementById('result-winner').style.color = tied?'#F59E0B':won?'#A020F0':'#EF4444';
   document.getElementById('result-score').textContent  = `Tú: ${my} pts — Compañero: ${th} pts`;
   document.getElementById('game-result').classList.add('show');
-  setTimeout(() => _playSound(tied?'hit':won?'win':'lose'), 100);
+  setTimeout(()=>_snd(tied?'hit':won?'win':'lose'),100);
 }
 
-// ─────────────────────────────────────────────────────
-// BEGIN MY 30-SECOND TURN
-// ─────────────────────────────────────────────────────
+// ─── Begin MY 30-second turn ──────────────────────────────────────────────────
 function _beginMyTurn() {
-  _killGame();        // stop any previous loop
-  _sizeCanvas();
-  GS.phase    = 'my_turn';
-  GS.timeLeft = 30;
-  GS.alive    = true;
+  _kill();
+  _showSpec(false);
+  _showMain();
+  _sizeMain();
+  GS.phase='my_turn'; GS.timeLeft=30; GS.alive=true;
   document.getElementById('game-result').classList.remove('show');
-  _setStatus('Tu turno — 30s');
+  const ic={fruit:'🍉',target:'🎯',basket:'🏀'};
+  document.getElementById('game-status').textContent=(ic[GS.type]||'')+'  Tu turno — 30s';
 
-  // Countdown: fires every 1 second, exactly 30 times
-  GS.timerID = setInterval(() => {
+  // Exact 30s timer
+  GS.timerID=setInterval(()=>{
     GS.timeLeft--;
-    const ic = {fruit:'🍉',target:'🎯',basket:'🏀'};
-    _setStatus(`${ic[GS.type]||''} Tu turno — ${GS.timeLeft}s`);
-    if (GS.timeLeft <= 5 && GS.timeLeft > 0) _playSound('countdown');
-    if (GS.timeLeft <= 0) _endMyTurn();
-  }, 1000);
+    document.getElementById('game-status').textContent=`${ic[GS.type]||''} Tu turno — ${GS.timeLeft}s`;
+    if(GS.timeLeft<=5&&GS.timeLeft>0) _snd('tick');
+    if(GS.timeLeft<=0) _endMyTurn();
+  },1000);
 
-  // Launch the game
-  if      (GS.type === 'fruit')  _fruit();
-  else if (GS.type === 'target') _target();
-  else if (GS.type === 'basket') _basket();
-  _startFrameEmit(); // stream canvas to partner
+  // Start game
+  if      (GS.type==='fruit')  _fruit();
+  else if (GS.type==='target') _target();
+  else if (GS.type==='basket') _basket();
+
+  // Stream canvas to partner at ~8fps
+  GS.frameInt=setInterval(()=>{
+    if(GS.phase!=='my_turn'||!app.socket){clearInterval(GS.frameInt);GS.frameInt=null;return;}
+    try{
+      const c=_gc(); if(!c)return;
+      const d=c.toDataURL('image/jpeg',0.3);
+      app.socket.emit('game_state',{f:d,s:GS.myScore,t:GS.type});
+    }catch(e){}
+  },120);
 }
 
 function _endMyTurn() {
-  if (GS.phase !== 'my_turn') return;
-  _killGame();
-  if (_frameEmitInt) { clearInterval(_frameEmitInt); _frameEmitInt = null; }
-  GS.phase = 'waiting';
-  _setStatus(`⌛ Turno de tu compañero... (Tú: ${GS.myScore} pts)`);
-  _showSpectator();
-  _msgWaiting(GS.myScore);
-  if (app.socket) app.socket.emit('game_score', { score: GS.myScore, type: GS.type });
-  // Hide spectator canvas - game done
-  _hideSpectator();
+  if(GS.phase!=='my_turn')return;
+  _kill();
+  GS.phase='waiting';
+  _writeWaiting(GS.myScore);
+  document.getElementById('game-status').textContent=`⌛ Turno de tu compañero... (Tú: ${GS.myScore})`;
+  if(app.socket) app.socket.emit('game_score',{score:GS.myScore,type:GS.type});
 }
 
-// ═══════════════════════════════════════════════════════
-// FRUIT NINJA
-// ═══════════════════════════════════════════════════════
-function _fruit() {
-  const items = [], sparks = [], trail = [];
-  let score = 0, lives = 3, spawnT = 0, ts = performance.now();
+// ─── Receive partner's frame ──────────────────────────────────────────────────
+function _onPartnerFrame(d) {
+  // Render partner's canvas onto spec-canvas (full size)
+  _showSpec(true);
+  const sc=_sc(); if(!sc||sc.style.display==='none')return;
+  if(sc.width<10){ sc.width=_gc()?.width||320; sc.height=_gc()?.height||480; }
+  const x=_sx(); if(!x)return;
+  const img=new Image();
+  img.onload=()=>x.drawImage(img,0,0,sc.width,sc.height);
+  img.src=d.f;
+}
 
-  function spawn() {
-    const bomb = Math.random() < .1;
-    items.push({
-      x: 55 + Math.random() * (_canvas().width - 110),
-      y: _canvas().height + 55,
-      vx: (Math.random() - .5) * 6,
-      vy: -(_canvas().height * .024 + Math.random() * 5),
-      rot: 0, rv: (Math.random() - .5) * 7,
-      e: bomb ? '💣' : FRUITS[Math.floor(Math.random() * FRUITS.length)],
-      bomb, sz: 50, dead: false
-    });
+// ═══════════════════════════════ FRUIT NINJA ═════════════════════════════════
+function _fruit() {
+  const c=_gc(),x=_gx(); if(!c||!x)return;
+  let items=[],sparks=[],trail=[],score=0,lives=3,spT=0,ts=performance.now();
+
+  function spawn(){
+    const bomb=Math.random()<.1;
+    items.push({x:55+Math.random()*(c.width-110),y:c.height+55,
+      vx:(Math.random()-.5)*6,vy:-(c.height*.024+Math.random()*5),
+      rot:0,rv:(Math.random()-.5)*7,
+      e:bomb?'💣':FRUITS[Math.floor(Math.random()*FRUITS.length)],
+      bomb,sz:50,dead:false});
   }
 
-  function slice(px, py) {
-    trail.push({ x: px, y: py, t: Date.now() });
-    for (let i = items.length - 1; i >= 0; i--) {
-      const f = items[i]; if (f.dead) continue;
-      if (Math.hypot(px - f.x, py - f.y) < f.sz * .55) {
-        f.dead = true;
-        if (f.bomb) { score = Math.max(0, score - 3); GS.myScore = score; _playSound('bomb'); return; } // bomb = -3pts, don't end turn
-        score++; GS.myScore = score; _playSound('slice');
-        if (app.socket) app.socket.emit('game_state', { score, sliced: true, items: [] });
-        for (let k = 0; k < 10; k++) {
-          const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 5;
-          sparks.push({ x: f.x, y: f.y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp-2, r: 4+Math.random()*4, l: 1, c: `hsl(${Math.random()*60+10},100%,55%)` });
-        }
+  function slice(px,py){
+    trail.push({x:px,y:py,t:Date.now()});
+    for(let i=items.length-1;i>=0;i--){
+      const f=items[i]; if(f.dead)continue;
+      if(Math.hypot(px-f.x,py-f.y)<f.sz*.55){
+        f.dead=true;
+        if(f.bomb){score=Math.max(0,score-3);GS.myScore=score;_snd('bomb');return;}
+        score++;GS.myScore=score;_snd('slice');
+        for(let k=0;k<8;k++){const a=Math.random()*Math.PI*2,sp=2+Math.random()*5;
+          sparks.push({x:f.x,y:f.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,r:4+Math.random()*4,l:1,c:`hsl(${Math.random()*60+10},100%,55%)`});}
       }
     }
   }
 
-  const c = _canvas();
-  function onP(e) {
-    e.preventDefault();
-    const r = c.getBoundingClientRect();
-    (e.touches ? Array.from(e.touches) : [e]).forEach(t =>
-      slice((t.clientX - r.left) * (c.width / r.width),
-            (t.clientY - r.top)  * (c.height/ r.height))
-    );
-  }
-  c.addEventListener('touchstart', onP, { passive: false });
-  c.addEventListener('touchmove',  onP, { passive: false });
-  c.addEventListener('mousemove',  e => { if (e.buttons) onP(e); });
+  c.addEventListener('touchstart', e=>{e.preventDefault();const r=c.getBoundingClientRect();Array.from(e.touches).forEach(t=>slice((t.clientX-r.left)*(c.width/r.width),(t.clientY-r.top)*(c.height/r.height)));},{passive:false});
+  c.addEventListener('touchmove',  e=>{e.preventDefault();const r=c.getBoundingClientRect();Array.from(e.touches).forEach(t=>slice((t.clientX-r.left)*(c.width/r.width),(t.clientY-r.top)*(c.height/r.height)));},{passive:false});
+  c.addEventListener('mousemove',  e=>{if(e.buttons){const r=c.getBoundingClientRect();slice((e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height));}});
 
-  function frame(now) {
-    if (!GS.alive || GS.phase !== 'my_turn') return;
-    const dt = Math.min((now - ts) / 16, 2.5); ts = now;
-    const cv = _canvas(), x = _ctx(); if (!cv || !x) return;
-    x.clearRect(0, 0, cv.width, cv.height);
-    // Transparent bg (camera shows through)
-    // No fill — transparent canvas, camera shows through
+  function frame(now){
+    if(!GS.alive||GS.phase!=='my_turn')return;
+    const dt=Math.min((now-ts)/16,2.5);ts=now;
+    x.clearRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,12,.06)';x.fillRect(0,0,c.width,c.height);
 
-    // Slice trail
-    const now2 = Date.now();
-    for (let i = 1; i < trail.length; i++) {
-      const age = (now2 - trail[i].t) / 220; if (age >= 1) continue;
-      x.globalAlpha = 1 - age;
-      x.strokeStyle = `hsl(${270 + i*4},100%,${55+age*25}%)`;
-      x.lineWidth = Math.max(1, 6 - age * 5); x.lineCap = 'round';
-      x.beginPath(); x.moveTo(trail[i-1].x, trail[i-1].y); x.lineTo(trail[i].x, trail[i].y); x.stroke();
+    // Trail
+    const t0=Date.now();
+    for(let i=1;i<trail.length;i++){
+      const age=(t0-trail[i].t)/220;if(age>=1)continue;
+      x.globalAlpha=1-age;x.strokeStyle=`hsl(${270+i*4},100%,${55+age*25}%)`;
+      x.lineWidth=Math.max(1,6-age*5);x.lineCap='round';
+      x.beginPath();x.moveTo(trail[i-1].x,trail[i-1].y);x.lineTo(trail[i].x,trail[i].y);x.stroke();
     }
-    x.globalAlpha = 1;
-    while (trail.length && now2 - trail[0].t > 260) trail.shift();
+    x.globalAlpha=1;
+    while(trail.length&&t0-trail[0].t>260)trail.shift();
 
     // Sparks
-    for (let i = sparks.length - 1; i >= 0; i--) {
-      const p = sparks[i]; p.x += p.vx*dt; p.y += p.vy*dt; p.vy += .3*dt; p.l -= dt*.045;
-      if (p.l <= 0) { sparks.splice(i,1); continue; }
-      x.globalAlpha = p.l; x.fillStyle = p.c;
-      x.beginPath(); x.arc(p.x, p.y, p.r * p.l, 0, Math.PI*2); x.fill(); x.globalAlpha = 1;
+    for(let i=sparks.length-1;i>=0;i--){
+      const p=sparks[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=.3*dt;p.l-=dt*.045;
+      if(p.l<=0){sparks.splice(i,1);continue;}
+      x.globalAlpha=p.l;x.fillStyle=p.c;
+      x.beginPath();x.arc(p.x,p.y,p.r*p.l,0,Math.PI*2);x.fill();x.globalAlpha=1;
     }
 
-    // Spawn + draw items
-    spawnT += dt; if (spawnT > 26) { spawn(); spawnT = 0; }
-    for (let i = items.length - 1; i >= 0; i--) {
-      const f = items[i]; if (f.dead) { items.splice(i,1); continue; }
-      f.x += f.vx*dt; f.y += f.vy*dt; f.vy += .45*dt; f.rot += f.rv*dt;
-      if (f.y > cv.height + 80) {
-        items.splice(i,1);
-        if (!f.bomb) { lives = Math.max(0, lives - 1); } // no early end
-        continue;
-      }
-      x.save(); x.translate(f.x, f.y); x.rotate(f.rot * Math.PI/180);
-      x.shadowColor = f.bomb ? 'rgba(255,80,0,.8)' : 'rgba(255,200,50,.6)'; x.shadowBlur = 12;
-      x.font = f.sz + 'px serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-      x.fillText(f.e, 0, 0); x.restore();
+    // Spawn + fruits
+    spT+=dt;if(spT>26){spawn();spT=0;}
+    for(let i=items.length-1;i>=0;i--){
+      const f=items[i];if(f.dead){items.splice(i,1);continue;}
+      f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=.45*dt;f.rot+=f.rv*dt;
+      if(f.y>c.height+80){items.splice(i,1);if(!f.bomb){lives--;if(lives<0)lives=0;}continue;}
+      x.save();x.translate(f.x,f.y);x.rotate(f.rot*Math.PI/180);
+      x.shadowColor=f.bomb?'rgba(255,80,0,.8)':'rgba(255,200,50,.6)';x.shadowBlur=12;
+      x.font=f.sz+'px serif';x.textAlign='center';x.textBaseline='middle';
+      x.fillText(f.e,0,0);x.restore();
     }
 
     // Lives
-    for (let i = 0; i < 3; i++) { x.font = '18px serif'; x.textAlign = 'left'; x.fillText(i < lives ? '❤️' : '🖤', 10 + i*24, cv.height - 10); }
+    for(let i=0;i<3;i++){x.font='18px serif';x.textAlign='left';x.fillText(i<lives?'❤️':'🖤',10+i*24,c.height-10);}
     _hud(score);
-    // Canvas frame emit handled by _startFrameEmit()
-    GS.rafID = requestAnimationFrame(frame);
+    GS.rafID=requestAnimationFrame(frame);
   }
-  GS.rafID = requestAnimationFrame(frame);
+  GS.rafID=requestAnimationFrame(frame);
 }
 
-// ═══════════════════════════════════════════════════════
-// TIRO AL BLANCO
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════ TIRO AL BLANCO ══════════════════════════════════
 function _target() {
-  let tgts = [], score = 0, spawnT = 0, ts = performance.now();
+  const c=_gc(),x=_gx(); if(!c||!x)return;
+  let tgts=[],score=0,spT=0,ts=performance.now();
 
-  function spawn() {
-    const r = 26 + Math.random()*28;
-    tgts.push({ x: r + Math.random()*(_canvas().width - r*2), y: 65 + Math.random()*(_canvas().height - 110),
-      r, born: performance.now(), maxL: 1.6+Math.random()*2, hit: false, anim: 0,
-      col: TCOLS[Math.floor(Math.random()*TCOLS.length)] });
+  function spawn(){
+    const r=26+Math.random()*28;
+    tgts.push({x:r+Math.random()*(c.width-r*2),y:65+Math.random()*(c.height-110),
+      r,born:performance.now(),maxL:1.6+Math.random()*2,hit:false,anim:0,
+      col:TCOLS[Math.floor(Math.random()*TCOLS.length)]});
   }
 
-  function drawT(x, t) {
-    [t.r, t.r*.65, t.r*.35].forEach((r,i) => {
-      x.beginPath(); x.arc(0,0,r,0,Math.PI*2);
-      x.fillStyle = i%2===0 ? t.col : '#fff'; x.shadowColor = t.col; x.shadowBlur = i===0?12:0; x.fill();
+  function dT(t){
+    [t.r,t.r*.65,t.r*.35].forEach((r,i)=>{
+      x.beginPath();x.arc(0,0,r,0,Math.PI*2);
+      x.fillStyle=i%2===0?t.col:'#fff';x.shadowColor=t.col;x.shadowBlur=i===0?12:0;x.fill();
     });
-    x.shadowBlur = 0; x.beginPath(); x.arc(0,0,5,0,Math.PI*2); x.fillStyle = t.col; x.fill();
+    x.shadowBlur=0;x.beginPath();x.arc(0,0,5,0,Math.PI*2);x.fillStyle=t.col;x.fill();
   }
 
-  function tap(px, py) {
-    for (let i = tgts.length-1; i >= 0; i--) {
-      const t = tgts[i]; if (t.hit) continue;
-      if (Math.hypot(px - t.x, py - t.y) < t.r) { t.hit = true; score++; GS.myScore = score; _playSound('hit'); break; }
+  function tap(px,py){
+    for(let i=tgts.length-1;i>=0;i--){
+      const t=tgts[i];if(t.hit)continue;
+      if(Math.hypot(px-t.x,py-t.y)<t.r){t.hit=true;score++;GS.myScore=score;_snd('hit');break;}
     }
   }
 
-  const c = _canvas();
-  c.addEventListener('touchstart', e => { e.preventDefault(); const r=c.getBoundingClientRect(),t=e.touches[0]; tap((t.clientX-r.left)*(c.width/r.width),(t.clientY-r.top)*(c.height/r.height)); }, { passive:false });
-  c.addEventListener('click', e => { const r=c.getBoundingClientRect(); tap((e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height)); });
+  c.addEventListener('touchstart',e=>{e.preventDefault();const r=c.getBoundingClientRect(),t=e.touches[0];tap((t.clientX-r.left)*(c.width/r.width),(t.clientY-r.top)*(c.height/r.height));},{passive:false});
+  c.addEventListener('click',e=>{const r=c.getBoundingClientRect();tap((e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height));});
 
-  spawn(); spawn();
+  spawn();spawn();
 
-  function frame(now) {
-    if (!GS.alive || GS.phase !== 'my_turn') return;
-    const dt = Math.min((now - ts)/16, 2.5); ts = now;
-    const cv = _canvas(), x = _ctx(); if (!cv||!x) return;
-    x.clearRect(0,0,cv.width,cv.height);
-    // No fill — transparent canvas
-
-    spawnT += dt; if (spawnT > 30 && tgts.length < 8) { spawn(); spawnT = 0; }
-
-    for (let i = tgts.length-1; i >= 0; i--) {
-      const t = tgts[i];
-      const age = (performance.now() - t.born) / 1000;
-      const life = Math.max(0, 1 - age / t.maxL);
-      if (t.hit) {
-        t.anim += dt*.07; if (t.anim>=1){tgts.splice(i,1);continue;}
-        x.globalAlpha=1-t.anim; x.save(); x.translate(t.x,t.y); x.scale(1+t.anim*.7,1+t.anim*.7); drawT(x,t); x.restore(); x.globalAlpha=1; continue;
-      }
-      if (life <= 0) { tgts.splice(i,1); continue; }
-      x.globalAlpha = life; x.save(); x.translate(t.x,t.y); x.scale(1+Math.sin(age*5)*.05,1+Math.sin(age*5)*.05); drawT(x,t); x.restore(); x.globalAlpha=1;
+  function frame(now){
+    if(!GS.alive||GS.phase!=='my_turn')return;
+    const dt=Math.min((now-ts)/16,2.5);ts=now;
+    x.clearRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,12,.06)';x.fillRect(0,0,c.width,c.height);
+    spT+=dt;if(spT>30&&tgts.length<8){spawn();spT=0;}
+    if(!tgts.length)spawn();
+    for(let i=tgts.length-1;i>=0;i--){
+      const t=tgts[i];const age=(performance.now()-t.born)/1000;const life=Math.max(0,1-age/t.maxL);
+      if(t.hit){t.anim+=dt*.07;if(t.anim>=1){tgts.splice(i,1);continue;}
+        x.globalAlpha=1-t.anim;x.save();x.translate(t.x,t.y);x.scale(1+t.anim*.7,1+t.anim*.7);dT(t);x.restore();x.globalAlpha=1;continue;}
+      if(life<=0){tgts.splice(i,1);continue;}
+      x.globalAlpha=life;x.save();x.translate(t.x,t.y);x.scale(1+Math.sin(age*5)*.05,1+Math.sin(age*5)*.05);dT(t);x.restore();x.globalAlpha=1;
     }
     _hud(score);
-    GS.rafID = requestAnimationFrame(frame);
+    GS.rafID=requestAnimationFrame(frame);
   }
-  GS.rafID = requestAnimationFrame(frame);
+  GS.rafID=requestAnimationFrame(frame);
 }
 
-// ═══════════════════════════════════════════════════════
-// BALONCESTO
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════ BALONCESTO ══════════════════════════════════════
 function _basket() {
-  let score=0, ts=performance.now(), parts=[], netW=0;
-  const cv = _canvas();
-  const HX=cv.width/2, HY=Math.min(110,cv.height*.16), HW=68;
-  let ball={ x:cv.width/2, y:cv.height-100, r:26, vx:0, vy:0, free:false, scored:false };
+  const c=_gc(),x=_gx(); if(!c||!x)return;
+  let score=0,ts=performance.now(),parts=[],netW=0;
+  const HX=c.width/2,HY=Math.min(110,c.height*.16),HW=68;
+  let ball={x:c.width/2,y:c.height-100,r:26,vx:0,vy:0,free:false,scored:false};
   let drag=null;
 
-  function newBall() {
-    ball={ x:50+Math.random()*(cv.width-100), y:cv.height-100, r:26, vx:0, vy:0, free:false, scored:false };
-  }
+  function newBall(){ball={x:50+Math.random()*(c.width-100),y:c.height-100,r:26,vx:0,vy:0,free:false,scored:false};}
 
-  function gxy(e, touch) {
-    const r=cv.getBoundingClientRect(), t=touch?e.changedTouches[0]:e;
-    return [(t.clientX-r.left)*(cv.width/r.width),(t.clientY-r.top)*(cv.height/r.height)];
-  }
+  function gxy(e,touch){const r=c.getBoundingClientRect(),t=touch?e.changedTouches[0]:e;return[(t.clientX-r.left)*(c.width/r.width),(t.clientY-r.top)*(c.height/r.height)];}
 
-  cv.addEventListener('touchstart', e=>{e.preventDefault();const[px,py]=gxy(e,true);if(!ball.free&&Math.hypot(px-ball.x,py-ball.y)<ball.r*2)drag={pvx:0,pvy:0,lx:px,ly:py};},{passive:false});
-  cv.addEventListener('touchmove',  e=>{e.preventDefault();if(!drag)return;const[px,py]=gxy(e,true);drag.pvx=px-drag.lx;drag.pvy=py-drag.ly;drag.lx=px;drag.ly=py;ball.x=px;ball.y=py;},{passive:false});
-  cv.addEventListener('touchend',   e=>{e.preventDefault();if(!drag)return;ball.free=true;ball.vx=drag.pvx*.7;ball.vy=drag.pvy*.7;drag=null;},{passive:false});
-  cv.addEventListener('mousedown',  e=>{const[px,py]=gxy(e,false);if(!ball.free&&Math.hypot(px-ball.x,py-ball.y)<ball.r*2)drag={pvx:0,pvy:0,lx:px,ly:py};});
-  cv.addEventListener('mousemove',  e=>{if(!drag)return;const[px,py]=gxy(e,false);drag.pvx=px-drag.lx;drag.pvy=py-drag.ly;drag.lx=px;drag.ly=py;ball.x=px;ball.y=py;});
-  cv.addEventListener('mouseup',    ()=>{if(!drag)return;ball.free=true;ball.vx=drag.pvx*.7;ball.vy=drag.pvy*.7;drag=null;});
+  c.addEventListener('touchstart',e=>{e.preventDefault();const[px,py]=gxy(e,true);if(!ball.free&&Math.hypot(px-ball.x,py-ball.y)<ball.r*2)drag={pvx:0,pvy:0,lx:px,ly:py};},{passive:false});
+  c.addEventListener('touchmove', e=>{e.preventDefault();if(!drag)return;const[px,py]=gxy(e,true);drag.pvx=px-drag.lx;drag.pvy=py-drag.ly;drag.lx=px;drag.ly=py;ball.x=px;ball.y=py;},{passive:false});
+  c.addEventListener('touchend',  e=>{e.preventDefault();if(!drag)return;ball.free=true;ball.vx=drag.pvx*.7;ball.vy=drag.pvy*.7;drag=null;},{passive:false});
+  c.addEventListener('mousedown', e=>{const[px,py]=gxy(e,false);if(!ball.free&&Math.hypot(px-ball.x,py-ball.y)<ball.r*2)drag={pvx:0,pvy:0,lx:px,ly:py};});
+  c.addEventListener('mousemove', e=>{if(!drag)return;const[px,py]=gxy(e,false);drag.pvx=px-drag.lx;drag.pvy=py-drag.ly;drag.lx=px;drag.ly=py;ball.x=px;ball.y=py;});
+  c.addEventListener('mouseup',   ()=>{if(!drag)return;ball.free=true;ball.vx=drag.pvx*.7;ball.vy=drag.pvy*.7;drag=null;});
 
-  function frame(now) {
-    if (!GS.alive || GS.phase !== 'my_turn') return;
-    const dt = Math.min((now-ts)/16,2.5); ts=now;
-    const x = _ctx(); if(!x) return;
-    x.clearRect(0,0,cv.width,cv.height);
-    // No fill — transparent canvas
+  function frame(now){
+    if(!GS.alive||GS.phase!=='my_turn')return;
+    const dt=Math.min((now-ts)/16,2.5);ts=now;
+    x.clearRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,12,.06)';x.fillRect(0,0,c.width,c.height);
 
-    // Physics
-    if (ball.free && !drag) {
-      ball.x+=ball.vx*dt; ball.y+=ball.vy*dt; ball.vy+=.55*dt; ball.vx*=.997;
+    if(ball.free&&!drag){
+      ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;ball.vy+=.55*dt;ball.vx*=.997;
       if(ball.x-ball.r<0){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*.5;}
-      if(ball.x+ball.r>cv.width){ball.x=cv.width-ball.r;ball.vx=-Math.abs(ball.vx)*.5;}
-      if(ball.y+ball.r>cv.height-6){ball.y=cv.height-6-ball.r;ball.vy*=-.38;ball.vx*=.65;if(Math.abs(ball.vy)<1&&Math.abs(ball.vx)<.5)setTimeout(newBall,400);}
+      if(ball.x+ball.r>c.width){ball.x=c.width-ball.r;ball.vx=-Math.abs(ball.vx)*.5;}
+      if(ball.y+ball.r>c.height-6){ball.y=c.height-6-ball.r;ball.vy*=-.38;ball.vx*=.65;if(Math.abs(ball.vy)<1&&Math.abs(ball.vx)<.5)setTimeout(newBall,400);}
       if(!ball.scored&&ball.vy>0&&ball.y>HY&&ball.y<HY+34&&ball.x>HX-HW/2+ball.r*.25&&ball.x<HX+HW/2-ball.r*.25){
-        ball.scored=true;score++;GS.myScore=score;netW=1.4;_playSound('basket');
+        ball.scored=true;score++;GS.myScore=score;netW=1.4;_snd('basket');
         for(let i=0;i<14;i++){const a=Math.random()*Math.PI*2,sp=3+Math.random()*6;parts.push({x:HX,y:HY,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,r:5+Math.random()*5,l:1,c:`hsl(${40+Math.random()*20},100%,60%)`});}
         setTimeout(newBall,900);
       }
     }
 
-    // Particles
     for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=.25*dt;p.l-=dt*.04;if(p.l<=0){parts.splice(i,1);continue;}x.globalAlpha=p.l;x.fillStyle=p.c;x.beginPath();x.arc(p.x,p.y,p.r,0,Math.PI*2);x.fill();x.globalAlpha=1;}
 
     // Hoop
@@ -2065,14 +2151,138 @@ function _basket() {
     x.beginPath();x.arc(ball.r*.35,0,ball.r*.85,Math.PI*.15,Math.PI*.85);x.stroke();
     x.beginPath();x.arc(-ball.r*.35,0,ball.r*.85,-Math.PI*.85,-Math.PI*.15);x.stroke();
     x.restore();
-
-    // Drag guide
     if(drag){x.setLineDash([7,5]);x.strokeStyle='rgba(255,255,255,.25)';x.lineWidth=1.5;x.beginPath();x.moveTo(ball.x,ball.y);x.lineTo(HX,HY);x.stroke();x.setLineDash([]);}
 
     _hud(score);
-    GS.rafID = requestAnimationFrame(frame);
+    GS.rafID=requestAnimationFrame(frame);
   }
-  GS.rafID = requestAnimationFrame(frame);
+  GS.rafID=requestAnimationFrame(frame);
+}
+
+
+// ── Mode Select & Lives ───────────────────────────────────────────────────────
+function handleStart() {
+  if (!app.token) { showAuth(); return; }
+  showScreen('s-mode');
+}
+
+function showLives() {
+  showScreen('s-lives');
+  loadLives();
+  // Subscribe to live updates
+  if (app.socket) app.socket.emit('subscribe_lives');
+}
+
+async function loadLives() {
+  try {
+    const lives = await api('/api/lives','GET');
+    const grid = document.getElementById('lives-grid');
+    if (!lives.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--gray-l)"><div style="font-size:48px;margin-bottom:12px">📡</div><p>No hay lives en este momento.<br>¡Sé el primero en hacer uno!</p></div>';
+      return;
+    }
+    grid.innerHTML = lives.map(l => `
+      <div class="live-card" onclick="joinLive('${l.id}','${l.hostName.replace(/'/g,"\'")}','${l.title.replace(/'/g,"\'")}')">
+        <div class="live-thumb">
+          📡
+          <div class="live-badge">EN VIVO</div>
+          <div class="live-viewers">👁 ${l.viewerCount}</div>
+        </div>
+        <div class="live-info">
+          <div class="live-host">${l.hostName}</div>
+          <div class="live-title">${l.title}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+// ── Live hosting ──────────────────────────────────────────────────────────────
+let app_liveId = null;
+let app_liveViewers = new Map(); // viewerSocketId → RTCPeerConnection
+
+function toggleLive() {
+  if (app_liveId) stopLive();
+  else startLive();
+}
+
+async function startLive() {
+  const title = prompt('Título de tu live (opcional):', '') ?? '';
+  if (!app.socket) return;
+  app.socket.emit('live_start', { title: title || `${app.user?.name} en vivo` });
+}
+
+function stopLive() {
+  if (!app.socket) return;
+  app.socket.emit('live_end');
+  app_liveId = null;
+  // Update button
+  const btn = document.getElementById('btn-live');
+  if (btn) { btn.style.background='rgba(239,68,68,.15)'; btn.textContent='📡'; }
+  app_liveViewers.forEach(pc => pc.close());
+  app_liveViewers.clear();
+}
+
+// ── Live watching ─────────────────────────────────────────────────────────────
+let app_watchLiveId = null;
+let app_watchPC = null;
+
+async function joinLive(liveId, hostName, title) {
+  if (!app.token) { showAuth(); return; }
+  if (!app.socket) return;
+  app_watchLiveId = liveId;
+  document.getElementById('lv-title').textContent = title || hostName + ' en vivo';
+  document.getElementById('live-comments').innerHTML = '';
+  document.getElementById('s-liveview').classList.add('active');
+  app.socket.emit('live_join', { liveId });
+  // Request video from host
+  app.socket.emit('live_request_offer', { liveId });
+}
+
+function leaveLive() {
+  if (app_watchLiveId && app.socket) app.socket.emit('live_leave', { liveId: app_watchLiveId });
+  if (app_watchPC) { app_watchPC.close(); app_watchPC = null; }
+  document.getElementById('s-liveview').classList.remove('active');
+  const vid = document.getElementById('live-remote-vid');
+  if (vid) vid.srcObject = null;
+  app_watchLiveId = null;
+}
+
+function sendLiveComment() {
+  const inp = document.getElementById('live-comment-in');
+  const text = inp.value.trim();
+  if (!text || !app.socket || !app_watchLiveId) return;
+  app.socket.emit('live_comment', { liveId: app_watchLiveId, text });
+  inp.value = '';
+}
+
+function addLiveComment(from, text) {
+  const el = document.getElementById('live-comments');
+  if (!el) return;
+  const d = document.createElement('div');
+  d.className = 'live-comment';
+  d.innerHTML = `<strong>${from}:</strong> ${text}`;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+  // Keep only last 100 comments
+  while (el.children.length > 100) el.removeChild(el.firstChild);
+}
+
+// ── Camera swap ───────────────────────────────────────────────────────────────
+let _showingLocal = false; // false = remote is big (default)
+function swapCameras() {
+  _showingLocal = !_showingLocal;
+  const remoteVid = document.getElementById('remoteVid');
+  const localVid  = document.getElementById('localVid');
+  if (_showingLocal) {
+    // My cam big, partner small
+    remoteVid.style.cssText = 'position:absolute;bottom:10px;right:10px;width:88px;height:66px;object-fit:cover;border-radius:8px;border:2px solid var(--pu);z-index:10';
+    localVid.style.cssText  = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1';
+  } else {
+    // Partner cam big (default)
+    remoteVid.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1';
+    localVid.style.cssText  = 'position:absolute;bottom:10px;right:10px;width:88px;height:66px;object-fit:cover;border-radius:8px;border:2px solid var(--pu);z-index:10';
+  }
 }
 
 // ── Auto-login ────────────────────────────────────────────────────────────────
