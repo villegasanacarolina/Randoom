@@ -926,32 +926,81 @@ app.post('/api/track/visit', async (req, res) => {
 // ── Analytics for admin ───────────────────────────────────────────────────────
 app.get('/api/admin/analytics', authAdmin, async (req, res) => {
   try {
-    const [total, today, week, month, byDevice, dailyChart, uniqueIPs, hourlyChart, uniqueToday] =
-      await Promise.all([
-        pool.query('SELECT COUNT(*) FROM page_visits'),
-        pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '1 day'"),
-        pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '7 days'"),
-        pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '30 days'"),
-        pool.query("SELECT device, COUNT(*) as count FROM page_visits GROUP BY device ORDER BY count DESC"),
-        pool.query(`SELECT DATE(visited_at) as day, COUNT(*) as visits, COUNT(DISTINCT ip) as unique_visits
-                    FROM page_visits WHERE visited_at >= NOW() - INTERVAL '30 days'
-                    GROUP BY DATE(visited_at) ORDER BY day ASC`),
-        pool.query('SELECT COUNT(DISTINCT ip) FROM page_visits'),
-        pool.query(`SELECT EXTRACT(HOUR FROM visited_at)::int as hour, COUNT(*) as visits
-                    FROM page_visits WHERE visited_at >= NOW() - INTERVAL '7 days'
-                    GROUP BY hour ORDER BY hour ASC`),
-        pool.query("SELECT COUNT(DISTINCT ip) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '1 day'"),
-      ]);
+    const [
+      total, today, week, month,
+      byDevice, dailyChart, uniqueIPs, hourlyChart, uniqueToday,
+      totalUsers, newUsersToday, newUsersWeek,
+      returningVisitors, avgSessionLen
+    ] = await Promise.all([
+      // ── Visitas ──────────────────────────────────────────────────────────────
+      pool.query('SELECT COUNT(*) FROM page_visits'),
+      pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '1 day'"),
+      pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '7 days'"),
+      pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '30 days'"),
+      pool.query("SELECT device, COUNT(*) as count FROM page_visits GROUP BY device ORDER BY count DESC"),
+      pool.query(`SELECT DATE(visited_at) as day,
+                    COUNT(*) as visits,
+                    COUNT(DISTINCT ip) as unique_visits
+                  FROM page_visits WHERE visited_at >= NOW() - INTERVAL '30 days'
+                  GROUP BY DATE(visited_at) ORDER BY day ASC`),
+      pool.query('SELECT COUNT(DISTINCT ip) FROM page_visits'),
+      pool.query(`SELECT EXTRACT(HOUR FROM visited_at)::int as hour, COUNT(*) as visits
+                  FROM page_visits WHERE visited_at >= NOW() - INTERVAL '7 days'
+                  GROUP BY hour ORDER BY hour ASC`),
+      pool.query("SELECT COUNT(DISTINCT ip) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '1 day'"),
+      // ── Conversión: visitas → registros ──────────────────────────────────────
+      pool.query('SELECT COUNT(*) FROM users'),
+      pool.query("SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '1 day'"),
+      pool.query("SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '7 days'"),
+      // ── Retención: usuarios que volvieron (misma IP, >1 visita en 7 días) ───
+      pool.query(`SELECT COUNT(*) FROM (
+                    SELECT ip FROM page_visits
+                    WHERE visited_at >= NOW() - INTERVAL '7 days'
+                    GROUP BY ip HAVING COUNT(*) > 1
+                  ) t`),
+      // ── Tiempo promedio en el sitio (diferencia entre primera y última visita del día por IP) ──
+      pool.query(`SELECT ROUND(AVG(session_secs)) as avg_secs FROM (
+                    SELECT ip, DATE(visited_at) as day,
+                      EXTRACT(EPOCH FROM (MAX(visited_at) - MIN(visited_at))) as session_secs
+                    FROM page_visits
+                    WHERE visited_at >= NOW() - INTERVAL '30 days'
+                    GROUP BY ip, DATE(visited_at)
+                    HAVING COUNT(*) > 1
+                  ) t`)
+    ]);
+
+    const totalV  = parseInt(total.rows[0].count);
+    const totalU  = parseInt(totalUsers.rows[0].count);
+    const uniqueV = parseInt(uniqueIPs.rows[0].count);
+    // Tasa de rebote: personas que solo visitaron 1 vez (no volvieron) / total únicas
+    const returning = parseInt(returningVisitors.rows[0].count);
+    const bounced   = Math.max(0, uniqueV - returning);
+    const bounceRate = uniqueV > 0 ? Math.round(bounced / uniqueV * 100) : 0;
+    // Conversión visitas → registros
+    const convRate = totalV > 0 ? ((totalU / totalV) * 100).toFixed(1) : '0';
+    // Tiempo promedio en segundos
+    const avgSecs = parseInt(avgSessionLen.rows[0]?.avg_secs || 0);
+
     res.json({
-      total:       parseInt(total.rows[0].count),
-      today:       parseInt(today.rows[0].count),
-      week:        parseInt(week.rows[0].count),
-      month:       parseInt(month.rows[0].count),
-      uniqueIPs:   parseInt(uniqueIPs.rows[0].count),
-      uniqueToday: parseInt(uniqueToday.rows[0].count),
-      byDevice:    byDevice.rows,
-      dailyChart:  dailyChart.rows,
-      hourlyChart: hourlyChart.rows,
+      // Visitas
+      total:        totalV,
+      today:        parseInt(today.rows[0].count),
+      week:         parseInt(week.rows[0].count),
+      month:        parseInt(month.rows[0].count),
+      uniqueIPs:    uniqueV,
+      uniqueToday:  parseInt(uniqueToday.rows[0].count),
+      byDevice:     byDevice.rows,
+      dailyChart:   dailyChart.rows,
+      hourlyChart:  hourlyChart.rows,
+      // Conversión
+      totalUsers:    totalU,
+      newUsersToday: parseInt(newUsersToday.rows[0].count),
+      newUsersWeek:  parseInt(newUsersWeek.rows[0].count),
+      convRate:      convRate,          // % visitas que se registraron
+      // Retención
+      returningVisitors: returning,    // IPs que volvieron en 7 días
+      bounceRate:    bounceRate,       // % que nunca volvió
+      avgSessionSecs: avgSecs,         // seg promedio en el sitio
     });
   } catch(e) { console.error('Analytics error:', e.message); res.status(500).json({ error: e.message }); }
 });
