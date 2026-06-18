@@ -396,12 +396,13 @@ textarea.fc{resize:vertical;min-height:70px}
 <!-- ═══ LANDING ═══ -->
 <div id="s-landing" class="screen active">
   <nav class="nav">
-    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
     <div class="nav-actions">
       <button class="btn btn-ghost btn-sm" onclick="showSearch()" id="nav-search-btn" style="display:none;padding:8px 10px" title="Buscar usuarios">🔍</button>
       <button class="btn btn-outline btn-sm" onclick="showPremium()">⭐ Premium</button>
-      <button class="btn btn-primary btn-sm" onclick="showAuth()" id="nav-login-btn">Entrar</button>
+      <button class="btn btn-primary btn-sm" onclick="showAuth()" id="nav-login-btn">Log in</button>
       <span class="btn btn-ghost btn-sm" id="nav-user-btn" style="display:none;cursor:pointer" onclick="showProfile()">👤</span>
+      <button class="btn btn-ghost btn-sm" id="nav-logout-btn" style="display:none;color:var(--gray-l);font-size:12px" onclick="doLogout()">Log out</button>
     </div>
   </nav>
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 12px 28px;width:100%;overflow:hidden">
@@ -432,7 +433,7 @@ textarea.fc{resize:vertical;min-height:70px}
 <!-- ═══ AUTH ═══ -->
 <div id="s-auth" class="screen">
   <nav class="nav">
-    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
     <button class="btn btn-ghost btn-sm" onclick="goHome()">← Volver</button>
   </nav>
   <div style="flex:1;padding:16px 14px;overflow-y:auto;display:flex;flex-direction:column;align-items:center">
@@ -532,7 +533,7 @@ textarea.fc{resize:vertical;min-height:70px}
 <div id="s-chat" class="screen">
   <div class="chat-main">
     <nav class="nav">
-      <div class="logo" onclick="leaveChat()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+      <div class="logo" onclick="leaveChat()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
       <div class="nav-actions">
         <span id="prem-badge" class="hidden" style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase">⭐ Premium</span>
         <button class="btn btn-ghost btn-sm" onclick="showSearch()" style="padding:8px 10px;font-size:13px" title="Buscar usuarios">🔍</button>
@@ -681,7 +682,7 @@ textarea.fc{resize:vertical;min-height:70px}
 <!-- ═══ PREMIUM ═══ -->
 <div id="s-premium" class="screen">
   <nav class="nav">
-    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
     <button class="btn btn-ghost btn-sm" onclick="backFromPremium()">← Volver</button>
   </nav>
   <div style="flex:1;padding:16px 14px;overflow-y:auto">
@@ -733,7 +734,7 @@ textarea.fc{resize:vertical;min-height:70px}
 
 <!-- ═══ CONFIRM ═══ -->
 <div id="s-confirm" class="screen">
-  <nav class="nav"><div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div></nav>
+  <nav class="nav"><div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div></nav>
   <div style="flex:1;padding:16px 14px;overflow-y:auto">
     <div class="confirm-wrap">
       <div class="confirm-ico">✓</div>
@@ -750,7 +751,7 @@ textarea.fc{resize:vertical;min-height:70px}
 <!-- ═══ SEARCH SCREEN ═══ -->
 <div id="s-search" class="screen">
   <nav class="nav">
-    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
     <button class="btn btn-ghost btn-sm" onclick="showScreen('s-landing')">← Volver</button>
   </nav>
   <div style="flex:1;padding:16px 14px;overflow-y:auto;display:flex;flex-direction:column;align-items:center">
@@ -768,7 +769,7 @@ textarea.fc{resize:vertical;min-height:70px}
 <!-- ═══ START MODE SELECT ═══ -->
 <div id="s-mode" class="screen">
   <nav class="nav">
-    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
     <button class="btn btn-ghost btn-sm" onclick="goHome()">← Salir</button>
   </nav>
   <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:20px 16px">
@@ -791,7 +792,7 @@ textarea.fc{resize:vertical;min-height:70px}
 <!-- ═══ MOOD SELECT (premium only) ═══ -->
 <div id="s-mood" class="screen">
   <nav class="nav">
-    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
     <button class="btn btn-ghost btn-sm" onclick="showScreen('s-mode')">← Volver</button>
   </nav>
   <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:20px 16px">
@@ -823,7 +824,7 @@ textarea.fc{resize:vertical;min-height:70px}
 <!-- ═══ LIVES LIST ═══ -->
 <div id="s-lives" class="screen">
   <nav class="nav">
-    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
     <button class="btn btn-ghost btn-sm" onclick="showScreen('s-mode')">← Volver</button>
   </nav>
   <div class="lives-header">
@@ -871,7 +872,7 @@ textarea.fc{resize:vertical;min-height:70px}
 <!-- ═══ PROFILE SCREEN ═══ -->
 <div id="s-profile" class="screen">
   <nav class="nav">
-    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
     <button class="btn btn-ghost btn-sm" onclick="backFromProfile()">← Volver</button>
   </nav>
   <div id="profile-view" style="width:100%;max-width:500px;margin:0 auto">
@@ -1199,10 +1200,7 @@ function initSocket(){
     app_liveId = liveId;
     const btn = document.getElementById('btn-live');
     if (btn) { btn.style.background='rgba(239,68,68,.7)'; btn.style.color='#fff'; btn.innerHTML='⏹ DETENER'; }
-    const badge = document.getElementById('live-cam-badge');
-    if (badge) badge.style.display='flex';
-    const vbadge = document.getElementById('live-viewer-badge');
-    if (vbadge) vbadge.style.display='flex';
+    _showLiveBadge();
     addSys('📡 ¡Live iniciado! Los viewers pueden verte ahora.');
     toast('📡 ¡Live iniciado! Ya pueden verte.','ok');
   });
@@ -1217,13 +1215,15 @@ function initSocket(){
       leaveLive();
       toast('El live terminó','info');
     }
+    // If my partner ended their live, hide the badge from MY camera area
+    _hideLiveBadge();
+    addSys('📡 El live ha finalizado.');
   });
   app.socket.on('partner_live_started', ({ liveId, hostName }) => {
-    // Partner started a live — show badge on their video too
-    const badge = document.getElementById('live-cam-badge');
-    if (badge) { badge.style.display='flex'; }
+    // Partner started live — show badge on video area
+    _showLiveBadge();
     addSys(`📡 ${hostName} inició un live. ¡Están en vivo!`);
-    toast(`📡 ${hostName} inició un live`,'info');
+    toast(`📡 ${hostName} está en vivo`,'info');
   });
 
   app.socket.on('live_viewer_count', ({ count }) => {
@@ -1446,6 +1446,23 @@ async function saveUsername() {
     toast('✅ ¡Usuario @'+val+' guardado!','ok');
     goToChat();
   } catch(e) { toast(e.message,'err'); }
+}
+
+function doLogout() {
+  if (app.socket) { app.socket.disconnect(); app.socket = null; }
+  app.token = null; app.user = null; app.isPremium = false; app.partnerEmail = null;
+  localStorage.removeItem('rd_token');
+  // Reset nav
+  const lb  = document.getElementById('nav-login-btn');
+  const lob = document.getElementById('nav-logout-btn');
+  const nb  = document.getElementById('nav-search-btn');
+  const ub  = document.getElementById('nav-user-btn');
+  if(lb)  lb.style.display  = 'flex';
+  if(lob) lob.style.display = 'none';
+  if(nb)  nb.style.display  = 'none';
+  if(ub)  ub.style.display  = 'none';
+  showScreen('s-landing');
+  toast('Sesión cerrada','ok');
 }
 
 function showSearch() {
@@ -1784,21 +1801,45 @@ function _ac() { if (!_AC) _AC = new (window.AudioContext||window.webkitAudioCon
 function _snd(type) {
   try {
     const ac = _ac();
-    const play = (freq, dur, vol, wave='sine', delay=0) => {
-      const o = ac.createOscillator(), g = ac.createGain();
-      o.type = wave; o.frequency.value = freq;
-      g.gain.setValueAtTime(vol, ac.currentTime+delay);
-      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+delay+dur);
-      o.connect(g); g.connect(ac.destination);
-      o.start(ac.currentTime+delay); o.stop(ac.currentTime+delay+dur);
+    // Create a short, pleasant musical note
+    const note = (freq, dur, vol=0.18, delay=0) => {
+      const osc = ac.createOscillator();
+      const env = ac.createGain();
+      const t = ac.currentTime + delay;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      // Smooth attack + decay envelope — no clicks or harshness
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(vol, t + 0.015);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(env); env.connect(ac.destination);
+      osc.start(t); osc.stop(t + dur + 0.01);
     };
-    if (type==='slice')  { play(1200,0.06,0.12,'sine'); }
-    if (type==='bomb')   { play(120,0.3,0.18,'sine'); play(60,0.25,0.12,'sine',0.08); }
-    if (type==='hit')    { play(900,0.05,0.12,'sine'); }
-    if (type==='basket') { play(523,0.12,0.15,'sine'); play(659,0.12,0.15,'sine',0.1); }
-    if (type==='tick')   { play(1000,0.04,0.08,'sine'); }
-    if (type==='win')    { [523,659,784].forEach((f,i)=>play(f,0.2,0.15,'sine',i*0.1)); }
-    if (type==='lose')   { [400,300].forEach((f,i)=>play(f,0.18,0.12,'sine',i*0.12)); }
+    if (type === 'slice') {
+      // Soft swoosh: two quick sine notes
+      note(880, 0.08, 0.12);
+      note(660, 0.08, 0.08, 0.04);
+    } else if (type === 'bomb') {
+      // Low soft thud
+      note(120, 0.25, 0.15);
+      note(80,  0.3,  0.10, 0.05);
+    } else if (type === 'hit') {
+      // Clean pop
+      note(1046, 0.06, 0.13);
+      note(784,  0.08, 0.09, 0.03);
+    } else if (type === 'basket') {
+      // Happy ding — major chord arpeggio
+      [523, 659, 784].forEach((f, i) => note(f, 0.18, 0.14, i * 0.07));
+    } else if (type === 'tick') {
+      // Gentle click for countdown
+      note(1047, 0.05, 0.09);
+    } else if (type === 'win') {
+      // Cheerful ascending fanfare
+      [523, 659, 784, 1047].forEach((f, i) => note(f, 0.22, 0.16, i * 0.11));
+    } else if (type === 'lose') {
+      // Short descending tone
+      [494, 392, 330].forEach((f, i) => note(f, 0.2, 0.13, i * 0.13));
+    }
   } catch(e) {}
 }
 
@@ -2060,10 +2101,12 @@ function _startSpectatorLoop() {
     if (GS.type==='fruit') {
       PT.items.forEach(f=>{
         x.save(); x.translate(f.x,f.y);
+        x.beginPath();x.arc(0,0,f.sz*0.55,0,Math.PI*2);
+        x.fillStyle='rgba(0,0,0,0.45)';x.fill();
         x.font=f.sz+'px serif'; x.textAlign='center'; x.textBaseline='middle';
-        x.shadowColor='rgba(255,220,0,1)';
-        x.shadowBlur=30; x.fillText(f.e,0,0);
-        x.shadowBlur=16; x.fillText(f.e,0,0);
+        x.shadowColor='rgba(255,240,80,1)';
+        x.shadowBlur=22; x.fillText(f.e,0,0);
+        x.shadowBlur=10; x.fillText(f.e,0,0);
         x.shadowBlur=0;  x.fillText(f.e,0,0);
         x.restore();
       });
@@ -2171,11 +2214,13 @@ function _fruit() {
       f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=.45*dt;f.rot+=f.rv*dt;
       if(f.y>c.height+80){MY.items.splice(i,1);if(!f.bomb){MY.lives--;if(MY.lives<0)MY.lives=0;}continue;}
       x.save();x.translate(f.x,f.y);x.rotate(f.rot*Math.PI/180);
+      // Dark circle backdrop so shadow is always visible
+      x.beginPath();x.arc(0,0,f.sz*0.55,0,Math.PI*2);
+      x.fillStyle='rgba(0,0,0,0.45)';x.fill();
       x.font=f.sz+'px serif';x.textAlign='center';x.textBaseline='middle';
-      // Triple draw: glow layers ensure always visible on any background
-      x.shadowColor=f.bomb?'rgba(255,80,0,1)':'rgba(255,220,0,1)';
-      x.shadowBlur=30; x.fillText(f.e,0,0);
-      x.shadowBlur=16; x.fillText(f.e,0,0);
+      x.shadowColor=f.bomb?'rgba(255,120,0,1)':'rgba(255,240,80,1)';
+      x.shadowBlur=22; x.fillText(f.e,0,0);
+      x.shadowBlur=10; x.fillText(f.e,0,0);
       x.shadowBlur=0;  x.fillText(f.e,0,0);
       x.restore();
     }
@@ -2191,9 +2236,11 @@ function _fruit() {
       PT.items.forEach(f=>{
         const px=offX+f.x*scl, py=offY+f.y*scl;
         if(px<offX||py<0||px>c.width||py>c.height*0.3) return;
-        x.shadowColor='rgba(255,220,0,1)'; x.shadowBlur=14;
+        x.beginPath();x.arc(px,py,Math.round(f.sz*scl)*0.55,0,Math.PI*2);
+        x.fillStyle='rgba(0,0,0,0.4)';x.fill();
+        x.shadowColor='rgba(255,240,80,1)'; x.shadowBlur=12;
         x.font=Math.round(f.sz*scl)+'px serif';x.textAlign='center';x.textBaseline='middle';
-        x.fillText(f.e,px,py); x.shadowBlur=7; x.fillText(f.e,px,py); x.shadowBlur=0;
+        x.fillText(f.e,px,py); x.shadowBlur=6; x.fillText(f.e,px,py); x.shadowBlur=0;
       });
       x.restore();
       // Partner label
@@ -2431,9 +2478,26 @@ function toggleLive() {
 }
 
 async function startLive() {
+  if (!app.partnerEmail) {
+    toast('Debes estar en una videollamada para iniciar un live','err');
+    return;
+  }
   const title = prompt('Título de tu live (opcional):', '') ?? '';
   if (!app.socket) return;
   app.socket.emit('live_start', { title: title || `${app.user?.name} en vivo` });
+}
+
+function _showLiveBadge() {
+  const badge = document.getElementById('live-cam-badge');
+  if (badge) badge.style.display='flex';
+  const vbadge = document.getElementById('live-viewer-badge');
+  if (vbadge) vbadge.style.display='flex';
+}
+function _hideLiveBadge() {
+  const badge = document.getElementById('live-cam-badge');
+  if (badge) badge.style.display='none';
+  const vbadge = document.getElementById('live-viewer-badge');
+  if (vbadge) vbadge.style.display='none';
 }
 
 function stopLive() {
@@ -2442,10 +2506,7 @@ function stopLive() {
   app_liveId = null;
   const btn = document.getElementById('btn-live');
   if (btn) { btn.style.background='rgba(239,68,68,.15)'; btn.style.color='#EF4444'; btn.innerHTML='📡 LIVE'; }
-  const badge = document.getElementById('live-cam-badge');
-  if (badge) badge.style.display='none';
-  const vbadge = document.getElementById('live-viewer-badge');
-  if (vbadge) vbadge.style.display='none';
+  _hideLiveBadge();
   addSys('📡 Live terminado.');
   app_liveViewers.forEach(pc => pc.close());
   app_liveViewers.clear();
