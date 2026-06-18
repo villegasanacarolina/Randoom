@@ -429,6 +429,7 @@ app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   // Admin goes through /api/admin/login, not here
   try {
+    if (email === ADMIN_EMAIL) return res.status(401).json({ error: 'Admin: entra desde /admin.html' });
     const r = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
     if (!r.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
     const u = r.rows[0];
