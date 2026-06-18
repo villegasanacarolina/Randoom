@@ -245,8 +245,8 @@ textarea.fc{resize:vertical;min-height:70px}
 
 /* GAME OVERLAY - on top of video */
 .game-overlay{
-  position:fixed;inset:0;z-index:500;display:none;flex-direction:column;
-  background:rgba(0,0,0,.0);pointer-events:none;
+  position:absolute;inset:0;z-index:50;display:none;flex-direction:column;
+  background:transparent;pointer-events:none;
 }
 .game-overlay.active{display:flex;pointer-events:auto}
 .game-header{
@@ -540,6 +540,32 @@ textarea.fc{resize:vertical;min-height:70px}
         <button class="btn btn-ghost btn-sm" onclick="stopSearch()" style="margin-top:6px">Cancelar</button>
       </div>
       <div class="vid-overlay hidden" id="ov-conn" style="background:transparent;pointer-events:none"></div>
+
+<div class="game-overlay" id="game-overlay">
+  <div class="game-header">
+    <h2 id="game-title">🎮 Juego</h2>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div id="game-status" style="font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;color:var(--pu-l)">—</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeGame()">✕</button>
+    </div>
+  </div>
+  <div class="game-canvas-wrap">
+    <canvas id="game-canvas"></canvas>
+    <!-- Spectator: opponent game shown in corner -->
+    <!-- Spectator: partner's live game stream -->
+    <canvas id="spec-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;display:none;pointer-events:none;z-index:8;image-rendering:auto"></canvas>
+    <div id="spec-label" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(160,32,240,.85);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:700;font-family:Poppins,sans-serif;padding:4px 16px;border-radius:20px;display:none;z-index:9;pointer-events:none;white-space:nowrap">👁 Tu amigo está jugando</div>
+    <div class="game-result" id="game-result">
+      <div style="font-size:60px;margin-bottom:10px" id="result-emoji">🏆</div>
+      <div class="result-winner" id="result-winner">¡Ganaste!</div>
+      <div class="result-score" id="result-score"></div>
+      <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+        <button class="btn btn-primary" onclick="restartGame()">🔄 De nuevo</button>
+        <button class="btn btn-ghost" onclick="closeGame()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
     </div>
     <!-- No timer - unlimited for all -->
     <div id="timer-bar" style="display:none">
@@ -916,31 +942,6 @@ textarea.fc{resize:vertical;min-height:70px}
 </div>
 
 <!-- ═══ GAME OVERLAY ═══ -->
-<div class="game-overlay" id="game-overlay">
-  <div class="game-header">
-    <h2 id="game-title">🎮 Juego</h2>
-    <div style="display:flex;align-items:center;gap:8px">
-      <div id="game-status" style="font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;color:var(--pu-l)">—</div>
-      <button class="btn btn-ghost btn-sm" onclick="closeGame()">✕</button>
-    </div>
-  </div>
-  <div class="game-canvas-wrap">
-    <canvas id="game-canvas"></canvas>
-    <!-- Spectator: opponent game shown in corner -->
-    <!-- Spectator: partner's live game stream -->
-    <canvas id="spec-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;display:none;pointer-events:none;z-index:8;image-rendering:auto"></canvas>
-    <div id="spec-label" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(160,32,240,.85);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:700;font-family:Poppins,sans-serif;padding:4px 16px;border-radius:20px;display:none;z-index:9;pointer-events:none;white-space:nowrap">👁 Tu amigo está jugando</div>
-    <div class="game-result" id="game-result">
-      <div style="font-size:60px;margin-bottom:10px" id="result-emoji">🏆</div>
-      <div class="result-winner" id="result-winner">¡Ganaste!</div>
-      <div class="result-score" id="result-score"></div>
-      <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-        <button class="btn btn-primary" onclick="restartGame()">🔄 De nuevo</button>
-        <button class="btn btn-ghost" onclick="closeGame()">Cerrar</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <script>
 const SERVER='https://randoom-production.up.railway.app';
@@ -1938,28 +1939,32 @@ function _showResult() {
 }
 
 // ─── Draw HUD (works for both MY and PT) ─────────────────────────────────────
-function _drawHUD(x, cw, score, timeLeft, isMe) {
+function _drawHUD(x, cw, ch, score, timeLeft, isMe) {
+  // HUD at BOTTOM of canvas — away from top buttons (swap cam, chat)
   const ic={fruit:'🍉',target:'🎯',basket:'🏀'};
-  const label = isMe ? 'Tú' : 'Amigo';
-  const xOff = isMe ? 8 : cw/2+8;
-  const w = cw/2 - 16;
-
-  // Background pill
-  x.fillStyle='rgba(8,0,16,.78)';
-  x.beginPath(); x.roundRect(xOff,8,w,40,10); x.fill();
-
-  // Score
-  x.fillStyle='#fff'; x.font='bold 15px Poppins,sans-serif'; x.textAlign='left';
-  x.fillText(`${ic[GS.type]||''} ${score}  ${label}`, xOff+10, 32);
-
-  // Timer bar inside pill
-  const barX=xOff+w-70, barY=18, barW=60, barH=12;
-  x.fillStyle='rgba(160,32,240,.2)'; x.beginPath(); x.roundRect(barX,barY,barW,barH,6); x.fill();
-  const pct = timeLeft/30;
-  x.fillStyle = pct>.4?'#A020F0':'#EF4444';
-  x.beginPath(); x.roundRect(barX,barY,barW*pct,barH,6); x.fill();
-  x.fillStyle='#fff'; x.font='bold 10px Poppins'; x.textAlign='center';
-  x.fillText(timeLeft+'s', barX+barW/2, barY+9);
+  const BY = ch - 14; // baseline y near bottom
+  if (isMe) {
+    // My score pill — bottom left
+    x.fillStyle='rgba(8,0,16,.85)';
+    x.beginPath(); x.roundRect(8, BY-32, 130, 38, 10); x.fill();
+    x.fillStyle='#fff'; x.font='bold 14px Poppins,sans-serif'; x.textAlign='left';
+    x.fillText(`${ic[GS.type]||''} ${score}  Tú`, 16, BY-8);
+    // Timer arc — bottom right
+    const pct = timeLeft/30;
+    const cx = cw-34, cy = BY-14;
+    x.strokeStyle='rgba(160,32,240,.25)'; x.lineWidth=5;
+    x.beginPath(); x.arc(cx,cy,20,0,Math.PI*2); x.stroke();
+    x.strokeStyle=pct>.4?'#A020F0':'#EF4444'; x.lineWidth=5;
+    x.beginPath(); x.arc(cx,cy,20,-Math.PI/2,-Math.PI/2+pct*Math.PI*2); x.stroke();
+    x.fillStyle='#fff'; x.font='bold 11px Poppins,sans-serif'; x.textAlign='center';
+    x.fillText(timeLeft+'s', cx, cy+4);
+  } else {
+    // Partner score — bottom center
+    x.fillStyle='rgba(8,0,16,.75)';
+    x.beginPath(); x.roundRect(cw/2-60, BY-32, 120, 38, 10); x.fill();
+    x.fillStyle='#C8A8E0'; x.font='bold 13px Poppins,sans-serif'; x.textAlign='center';
+    x.fillText(`${ic[GS.type]||''} ${score} Amigo`, cw/2, BY-8);
+  }
 }
 
 // ─── Begin MY 30-second turn ──────────────────────────────────────────────────
@@ -2119,9 +2124,8 @@ function _startSpectatorLoop() {
     }
 
     // Both HUDs during spectating
-    _drawHUD(x, c.width, GS.myScore, 0, true);
-    // PT.score = live score from game_state; fallback to GS.partnerScore if available
-    _drawHUD(x, c.width, PT.score, GS.ptTimeLeft, false);
+    _drawHUD(x, c.width, c.height, GS.myScore, 0, true);
+    _drawHUD(x, c.width, c.height, PT.score, GS.ptTimeLeft, false);
 
     GS.rafID = requestAnimationFrame(specFrame);
   }
@@ -2216,35 +2220,14 @@ function _fruit() {
       x.restore();
     }
 
-    // Draw PARTNER fruits (PT) — smaller, top-right quadrant
-    if(PT.items.length){
-      const scl=0.28, offX=c.width*0.72, offY=0;
-      x.save(); x.globalAlpha=0.85;
-      // Mini border
-      x.strokeStyle='rgba(160,32,240,.4)';x.lineWidth=1.5;
-      x.strokeRect(offX-4,offY,c.width*0.28+4,c.height*0.3);
-      x.fillStyle='rgba(8,0,16,.4)';x.fillRect(offX-4,offY,c.width*0.28+4,c.height*0.3);
-      PT.items.forEach(f=>{
-        const px=offX+f.x*scl, py=offY+f.y*scl;
-        if(px<offX||py<0||px>c.width||py>c.height*0.3) return;
-        x.shadowColor='rgba(255,255,255,0.9)'; x.shadowBlur=12;
-        x.font=Math.round(f.sz*scl)+'px serif';x.textAlign='center';x.textBaseline='middle';
-        x.fillText(f.e,px,py);
-        x.shadowColor='rgba(255,230,0,1)'; x.shadowBlur=8;
-        x.fillText(f.e,px,py); x.shadowBlur=0;
-      });
-      x.restore();
-      // Partner label
-      x.fillStyle='rgba(160,32,240,.8)';x.font='bold 10px Poppins';x.textAlign='left';
-      x.fillText('👁 Amigo',offX-2,offY+c.height*0.3+12);
-    }
+    // Partner sees fullscreen on their own turn
 
     // Lives
     for(let i=0;i<3;i++) x.fillText(i<MY.lives?'❤️':'🖤',10+i*24,c.height-10);
 
     // HUD — both players
-    _drawHUD(x, c.width, MY.score, GS.myTimeLeft, true);
-    _drawHUD(x, c.width, PT.score, GS.ptTimeLeft, false);
+    _drawHUD(x, c.width, c.height, MY.score, GS.myTimeLeft, true);
+    _drawHUD(x, c.width, c.height, PT.score, GS.ptTimeLeft, false);
 
     GS.rafID=requestAnimationFrame(frame);
   }
@@ -2308,22 +2291,10 @@ function _target() {
       x.globalAlpha=life; dT(t,x,1+Math.sin(age*5)*.05); x.globalAlpha=1;
     }
 
-    // Partner targets mini view
-    if(PT.tgts.length){
-      const scl=0.28, offX=c.width*0.72;
-      x.save(); x.globalAlpha=0.8;
-      x.fillStyle='rgba(8,0,16,.4)';x.fillRect(offX,0,c.width*0.28,c.height*0.3);
-      x.strokeStyle='rgba(160,32,240,.4)';x.lineWidth=1.5;x.strokeRect(offX,0,c.width*0.28,c.height*0.3);
-      PT.tgts.forEach(t=>{
-        const px=offX+t.x*scl, py=t.y*scl;
-        if(px>c.width||py>c.height*0.3) return;
-        x.beginPath();x.arc(px,py,Math.max(4,t.r*scl),0,Math.PI*2);x.fillStyle=t.col;x.fill();
-      });
-      x.restore();
-    }
+    // Partner sees fullscreen on their own turn
 
-    _drawHUD(x,c.width,MY.score,GS.myTimeLeft,true);
-    _drawHUD(x,c.width,PT.score,GS.ptTimeLeft,false);
+    _drawHUD(x,c.width,c.height,MY.score,GS.myTimeLeft,true);
+    _drawHUD(x,c.width,c.height,PT.score,GS.ptTimeLeft,false);
     GS.rafID=requestAnimationFrame(frame);
   }
   GS.rafID=requestAnimationFrame(frame);
@@ -2403,18 +2374,10 @@ function _basket() {
     if(drag){x.setLineDash([7,5]);x.strokeStyle='rgba(255,255,255,.25)';x.lineWidth=1.5;
       x.beginPath();x.moveTo(b.x,b.y);x.lineTo(HX,HY);x.stroke();x.setLineDash([]);}
 
-    // Partner ball mini
-    if(PT.ball){
-      const scl=0.25, offX=c.width*0.74;
-      x.save();x.globalAlpha=0.8;
-      x.fillStyle='rgba(8,0,16,.5)';x.fillRect(offX,0,c.width*0.26,c.height*0.28);
-      x.strokeStyle='rgba(160,32,240,.4)';x.lineWidth=1.5;x.strokeRect(offX,0,c.width*0.26,c.height*0.28);
-      dBall(offX+PT.ball.x*scl,PT.ball.y*scl,PT.ball.r*scl,x);
-      x.restore();
-    }
+    // Partner sees fullscreen on their own turn
 
-    _drawHUD(x,c.width,MY.score,GS.myTimeLeft,true);
-    _drawHUD(x,c.width,PT.score,GS.ptTimeLeft,false);
+    _drawHUD(x,c.width,c.height,MY.score,GS.myTimeLeft,true);
+    _drawHUD(x,c.width,c.height,PT.score,GS.ptTimeLeft,false);
     GS.rafID=requestAnimationFrame(frame);
   }
   GS.rafID=requestAnimationFrame(frame);
