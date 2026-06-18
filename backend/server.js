@@ -531,6 +531,19 @@ app.post('/api/admin/users/:email/premium', authAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
 
+app.post('/api/admin/users/:email/username', authAdmin, async (req, res) => {
+  const email = decodeURIComponent(req.params.email);
+  const { username } = req.body;
+  if (!username || username.length < 3) return res.status(400).json({ error: 'Username muy corto' });
+  const clean = username.toLowerCase().trim().replace(/[^a-z0-9_]/g,'');
+  try {
+    const exists = await pool.query('SELECT email FROM users WHERE username=$1 AND email!=$2', [clean, email]);
+    if (exists.rows.length) return res.status(409).json({ error: 'Username ya en uso' });
+    await pool.query('UPDATE users SET username=$1 WHERE email=$2', [clean, email]);
+    res.json({ ok: true, username: clean });
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
 app.post('/api/admin/users/:email/ban', authAdmin, async (req, res) => {
   const email = decodeURIComponent(req.params.email);
   try {

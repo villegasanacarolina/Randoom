@@ -565,8 +565,8 @@ textarea.fc{resize:vertical;min-height:70px}
       </div>
       <div class="vid-overlay hidden" id="ov-search">
         <div class="spinner"></div>
-        <h3>Buscando amigo…</h3>
-        <p id="search-sub">Conectando con alguien</p>
+        <h3 id="search-title">Buscando…</h3>
+        <p id="search-sub"></p>
         <button class="btn btn-ghost btn-sm" onclick="stopSearch()" style="margin-top:6px">Cancelar</button>
       </div>
       <div class="vid-overlay hidden" id="ov-conn" style="background:transparent;pointer-events:none"></div>
@@ -1172,7 +1172,23 @@ function initSocket(){
     if(app._mood) app.socket.emit('set_mode',{mode:app._mood});
     app.socket.emit('find_partner');
   });
-  app.socket.on('searching',()=>{showOv('search');document.getElementById('search-sub').textContent=app.isPremium?'Aplicando filtros…':'Buscando a alguien…';});
+  app.socket.on('searching',()=>{
+    showOv('search');
+    const moodTitle = {
+      pareja:   '💕 Encontrando tu match...',
+      amigos:   '👋 Encontrando amigos...',
+      negocios: '💼 Encontrando partners...'
+    };
+    const moodSub = {
+      pareja:   'Conectando con usuarios premium buscando pareja',
+      amigos:   'Conectando con usuarios premium buscando amigos',
+      negocios: 'Conectando con usuarios premium para networking'
+    };
+    const t = document.getElementById('search-title');
+    const p = document.getElementById('search-sub');
+    if(t) t.textContent = app._mood ? (moodTitle[app._mood]||'Buscando...') : 'Buscando amigo…';
+    if(p) p.textContent = app._mood ? (moodSub[app._mood]||'') : '';
+  });
   app.socket.on('partner_found',async({partner,initiator})=>{
     showOv('conn');app.partnerEmail=partner.email;
     showPartnerInfo(partner);addSys(`🔮 Conectado con ${partner.name}, ${partner.age} años`);
@@ -1977,7 +1993,7 @@ function openGame(type) {
   if (!app.partnerEmail) { toast('Debes estar en una llamada','err'); return; }
   GS.type=type; GS.myScore=0; GS.partnerScore=0;
   MY = { items:[], sparks:[], trail:[], tgts:[], ball:null, parts:[], netW:0, score:0, lives:3, spT:0 };
-  PT = { items:[], tgts:[], ball:null, score:0, lives:3 };
+  PT = { items:[], tgts:[], ball:null, score:0, lives:3 }; // reset only on new game
   if (app.socket) app.socket.emit('game_invite',{type,from:app.user?.name||''});
   _openOverlay(type);
   _beginMyTurn();
@@ -2004,7 +2020,7 @@ function onGameInvite(type, fromName) {
   GS.type=type; GS.myScore=0; GS.partnerScore=0; GS.phase='partner_turn';
   GS.ptTimeLeft=30;
   MY = { items:[], sparks:[], trail:[], tgts:[], ball:null, parts:[], netW:0, score:0, lives:3, spT:0 };
-  PT = { items:[], tgts:[], ball:null, score:0, lives:3 };
+  PT = { items:[], tgts:[], ball:null, score:0, lives:3 }; // partner starts at 0
   _openOverlay(type);
   document.getElementById('game-status').textContent = '👁 ' + fromName + ' está jugando — 30s';
   document.getElementById('game-result').classList.remove('show');
@@ -2015,6 +2031,7 @@ function onGameInvite(type, fromName) {
 
 function onGameScore(partnerScore) {
   GS.partnerScore = partnerScore;
+  PT.score = partnerScore; // keep PT in sync so HUD shows correct score
   if (GS.phase === 'waiting') {
     _showResult();
   } else {
@@ -2022,7 +2039,7 @@ function onGameScore(partnerScore) {
     _kill();
     GS.phase = 'announce';
     MY = { items:[], sparks:[], trail:[], tgts:[], ball:null, parts:[], netW:0, score:0, lives:3, spT:0 };
-    PT = { items:[], tgts:[], ball:null, score:0, lives:3 };
+    // Keep PT.score = partnerScore (already set above) — don't reset to 0
     _writeBig('¡TU TURNO!', '#A020F0', 'Comienza en 3...');
     document.getElementById('game-status').textContent = '¡Tu turno en 3s!';
     document.getElementById('game-result').classList.remove('show');
@@ -2135,6 +2152,7 @@ function _beginMyTurn() {
   _kill(); _size();
   GS.phase='countdown'; GS.myTimeLeft=30; GS.alive=true;
   MY = { items:[], sparks:[], trail:[], tgts:[], ball:null, parts:[], netW:0, score:0, lives:3, spT:0 };
+  // DON'T reset PT — keep partner's last known score visible in HUD
   document.getElementById('game-result').classList.remove('show');
   document.getElementById('game-status').textContent = '¡Tu turno! Comenzando...';
 
@@ -2258,8 +2276,9 @@ function _startSpectatorLoop() {
     }
 
     // Both HUDs during spectating
-    _drawHUD(x, c.width, GS.myScore, 0, true);   // my final score (time=0 = done)
-    _drawHUD(x, c.width, PT.score, GS.ptTimeLeft, false); // partner live
+    _drawHUD(x, c.width, GS.myScore, 0, true);
+    // PT.score = live score from game_state; fallback to GS.partnerScore if available
+    _drawHUD(x, c.width, PT.score, GS.ptTimeLeft, false);
 
     GS.rafID = requestAnimationFrame(specFrame);
   }
