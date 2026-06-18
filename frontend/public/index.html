@@ -340,6 +340,8 @@ textarea.fc{resize:vertical;min-height:70px}
 .hidden{display:none!important}
 .pu{color:var(--pu-l)}
 </style>
+  <!-- LiveKit Client SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
 </head>
 <body>
 <div id="toasts"></div>
@@ -2681,14 +2683,66 @@ function toggleLive() {
   else startLive();
 }
 
+let app_lkRoom = null; // LiveKit room instance (host)
+let app_lkViewRoom = null; // LiveKit room instance (viewer)
+
 async function startLive() {
   if (!app.partnerEmail) {
     toast('Debes estar en una videollamada para iniciar un live','err');
     return;
   }
   const title = prompt('Título de tu live (opcional):', '') ?? '';
-  if (!app.socket) return;
-  app.socket.emit('live_start', { title: title || `${app.user?.name} en vivo` });
+  try {
+    // 1. Get token from backend
+    const r = await api('/api/lives/start','POST',{ title: title || `${app.user?.name} en vivo` });
+    const { token, url, liveId } = r;
+
+    // 2. Connect to LiveKit room as publisher
+    app_lkRoom = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
+
+    app_lkRoom.on(LivekitClient.RoomEvent.ParticipantConnected, () => {
+      const cnt = app_lkRoom.remoteParticipants.size;
+      // Update viewer count badge
+      const vc = document.getElementById('live-viewer-count');
+      if (vc) vc.textContent = cnt;
+      const vb = document.getElementById('live-viewer-badge');
+      if (vb) vb.style.display = 'flex';
+      if (app.socket) io_updateViewerCount(liveId, cnt);
+    });
+    app_lkRoom.on(LivekitClient.RoomEvent.ParticipantDisconnected, () => {
+      const cnt = app_lkRoom.remoteParticipants.size;
+      const vc = document.getElementById('live-viewer-count');
+      if (vc) vc.textContent = cnt;
+    });
+
+    await app_lkRoom.connect(url, token);
+
+    // 3. Publish local camera + mic
+    if (app.localStream) {
+      const tracks = app.localStream.getTracks();
+      for (const track of tracks) {
+        await app_lkRoom.localParticipant.publishTrack(track);
+      }
+    } else {
+      await LivekitClient.createLocalTracks({ audio: true, video: true }).then(async tracks => {
+        for (const t of tracks) await app_lkRoom.localParticipant.publishTrack(t);
+      });
+    }
+
+    // 4. Tell server (for list + partner badge)
+    if (app.socket) app.socket.emit('live_start', { title, liveId });
+
+    toast('📡 ¡Live iniciado con LiveKit!','ok');
+  } catch(e) {
+    console.error('LiveKit start error:', e);
+    // Fallback to old WebRTC if LiveKit not configured
+    if (app.socket) app.socket.emit('live_start', { title });
+  }
+}
+
+function io_updateViewerCount(liveId, count) {
+  // Emit via socket so others see count update
+  if (app.socket) app.socket.emit('live_viewer_update', { liveId, count });
 }
 
 function _showLiveBadge() {
@@ -2704,16 +2758,22 @@ function _hideLiveBadge() {
   if (vbadge) vbadge.style.display='none';
 }
 
-function stopLive() {
-  if (!app.socket) return;
-  app.socket.emit('live_end');
+async function stopLive() {
+  // Disconnect LiveKit room if connected
+  if (app_lkRoom) {
+    await app_lkRoom.disconnect();
+    app_lkRoom = null;
+  }
+  // Fallback: close old WebRTC connections
+  app_liveViewers.forEach(pc => pc.close());
+  app_liveViewers.clear();
+
+  if (app.socket) app.socket.emit('live_end');
   app_liveId = null;
   const btn = document.getElementById('btn-live');
   if (btn) { btn.style.background='rgba(239,68,68,.15)'; btn.style.color='#EF4444'; btn.innerHTML='📡 LIVE'; }
   _hideLiveBadge();
   addSys('📡 Live terminado.');
-  app_liveViewers.forEach(pc => pc.close());
-  app_liveViewers.clear();
 }
 
 // ── Live watching ─────────────────────────────────────────────────────────────
@@ -2722,22 +2782,56 @@ let app_watchPC = null;
 
 async function joinLive(liveId, hostName, title) {
   if (!app.token) { showAuth(); return; }
-  if (!app.socket) return;
   app_watchLiveId = liveId;
   document.getElementById('lv-title').textContent = title || hostName + ' en vivo';
   document.getElementById('live-comments').innerHTML = '';
   document.getElementById('s-liveview').classList.add('active');
-  app.socket.emit('live_join', { liveId });
-  // Request video from host
-  app.socket.emit('live_request_offer', { liveId });
+
+  // Notify server for viewer count
+  if (app.socket) app.socket.emit('live_join', { liveId });
+
+  try {
+    // Get viewer token from backend
+    const r = await api('/api/lives/token','POST',{ liveId, isHost: false });
+    const { token, url } = r;
+
+    // Connect as subscriber (no publish)
+    app_lkViewRoom = new LivekitClient.Room({ adaptiveStream: true });
+
+    app_lkViewRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track, pub, participant) => {
+      const vid = document.getElementById('live-remote-vid');
+      if (!vid) return;
+      if (track.kind === 'video') {
+        track.attach(vid);
+        vid.play().catch(()=>{});
+      }
+    });
+
+    app_lkViewRoom.on(LivekitClient.RoomEvent.Disconnected, () => {
+      toast('Live desconectado','info');
+      leaveLive();
+    });
+
+    await app_lkViewRoom.connect(url, token);
+  } catch(e) {
+    console.error('LiveKit join error:', e);
+    // Fallback to old WebRTC
+    if (app.socket) app.socket.emit('live_request_offer', { liveId });
+  }
 }
 
-function leaveLive() {
+async function leaveLive() {
   if (app_watchLiveId && app.socket) app.socket.emit('live_leave', { liveId: app_watchLiveId });
+  // Disconnect LiveKit viewer room
+  if (app_lkViewRoom) {
+    await app_lkViewRoom.disconnect();
+    app_lkViewRoom = null;
+  }
+  // Fallback cleanup
   if (app_watchPC) { app_watchPC.close(); app_watchPC = null; }
   document.getElementById('s-liveview').classList.remove('active');
   const vid = document.getElementById('live-remote-vid');
-  if (vid) vid.srcObject = null;
+  if (vid) { vid.srcObject = null; vid.src = ''; }
   app_watchLiveId = null;
 }
 

@@ -4,6 +4,26 @@ const { Server } = require('socket.io');
 const cors       = require('cors');
 const bodyParser = require('body-parser');
 const { v4: uuidv4 } = require('uuid');
+const { AccessToken, RoomServiceClient } = require('livekit-server-sdk');
+
+// ── LiveKit config ────────────────────────────────────────────────────────────
+const LK_API_KEY    = process.env.LIVEKIT_API_KEY    || '';
+const LK_API_SECRET = process.env.LIVEKIT_API_SECRET || '';
+const LK_URL        = process.env.LIVEKIT_URL        || '';
+const LK_ENABLED    = !!(LK_API_KEY && LK_API_SECRET && LK_URL);
+const lkRoom        = LK_ENABLED ? new RoomServiceClient(LK_URL, LK_API_KEY, LK_API_SECRET) : null;
+
+function lkToken(identity, roomName, isHost) {
+  const at = new AccessToken(LK_API_KEY, LK_API_SECRET, { identity, ttl: '4h' });
+  at.addGrant({
+    roomJoin: true,
+    room: roomName,
+    canPublish: !!isHost,
+    canSubscribe: true,
+    canPublishData: true,
+  });
+  return at.toJwt();
+}
 const multer     = require('multer');
 const path       = require('path');
 const fs         = require('fs');
@@ -846,6 +866,36 @@ app.get('/api/lives', async (req, res) => {
   res.json(lives);
 });
 
+// ── LiveKit token ─────────────────────────────────────────────────────────────
+app.post('/api/lives/token', authUser, async (req, res) => {
+  const { liveId, isHost } = req.body;
+  if (!LK_ENABLED) return res.status(503).json({ error: 'LiveKit no configurado' });
+  if (!liveId) return res.status(400).json({ error: 'Falta liveId' });
+  try {
+    const identity = req.user.email;
+    const token = await lkToken(identity, liveId, !!isHost);
+    res.json({ token, url: LK_URL, liveId });
+  } catch(e) { console.error('LiveKit token error:', e); res.status(500).json({ error: 'Error generando token' }); }
+});
+
+// Endpoint para que el host cree la sala y obtenga su token
+app.post('/api/lives/start', authUser, async (req, res) => {
+  const { title } = req.body;
+  if (!LK_ENABLED) return res.status(503).json({ error: 'LiveKit no configurado' });
+  try {
+    const liveId = uuidv4();
+    const token = await lkToken(req.user.email, liveId, true);
+    // Store in activeLives
+    activeLives.set(liveId, {
+      id: liveId, hostEmail: req.user.email, hostName: req.user.name||req.user.email,
+      title: title || `${req.user.name} en vivo`,
+      viewers: new Set(), startedAt: new Date().toISOString(),
+      hostSocketId: null // will be set via socket
+    });
+    res.json({ token, url: LK_URL, liveId });
+  } catch(e) { console.error('LiveKit start error:', e); res.status(500).json({ error: 'Error iniciando live' }); }
+});
+
 app.get('/api/health', (req, res) =>
   res.json({ status: 'ok', online: Object.keys(activeSockets).length }));
 
@@ -945,7 +995,7 @@ io.on('connection', socket => {
   socket.on('set_mode',    d => { const u=activeSockets[socket.id]; if(u?.partnerId && u.isPremium) u.mode=d.mode; });
 
   // ── Live socket events ──────────────────────────────────────────────────────
-  socket.on('live_start', ({ title }) => {
+  socket.on('live_start', ({ title, liveId: existingLiveId }) => {
     const u = activeSockets[socket.id]; if (!u) return;
     // End any existing live by this host
     for (const [id, live] of activeLives) {
@@ -954,21 +1004,24 @@ io.on('connection', socket => {
         activeLives.delete(id);
       }
     }
-    const liveId = uuidv4();
-    activeLives.set(liveId, {
-      id: liveId, hostEmail: u.email, hostName: u.name,
-      title: title || `${u.name} en vivo`,
-      viewers: new Set(), startedAt: new Date().toISOString(),
-      hostSocketId: socket.id
-    });
+    // Use liveId from /api/lives/start if provided, otherwise create new
+    const liveId = existingLiveId || uuidv4();
+    if (!activeLives.has(liveId)) {
+      activeLives.set(liveId, {
+        id: liveId, hostEmail: u.email, hostName: u.name,
+        title: title || `${u.name} en vivo`,
+        viewers: new Set(), startedAt: new Date().toISOString(),
+        hostSocketId: socket.id
+      });
+    } else {
+      // Update hostSocketId for existing room (created via REST)
+      activeLives.get(liveId).hostSocketId = socket.id;
+    }
     socket.join(`live:${liveId}`);
     socket.emit('live_started', { liveId });
-    // Notify videocall partner that host started live
     const partnerSock = activeSockets[socket.id]?.partnerId;
     if (partnerSock) io.to(partnerSock).emit('partner_live_started', { liveId, hostName: u.name });
-    // Broadcast updated list
     io.emit('lives_updated');
-    console.log(`Live started: ${liveId} by ${u.email}`);
   });
 
   socket.on('live_end', () => {
