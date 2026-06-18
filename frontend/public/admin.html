@@ -310,12 +310,17 @@ async function doAdminLogin(){
   if(!email||!pass){toast('Completa los campos','err');return;}
   try{
     const r=await api('/api/admin/login','POST',{email,password:pass});
-    if(!r.isAdmin){toast('Acceso denegado','err');return;}
+    if(!r.isAdmin){toast('Acceso denegado — no eres admin','err');return;}
     adminToken=r.token;
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='flex';
-    refreshAll();setInterval(refreshAll,12000);
-  }catch(e){toast(e.message,'err');}
+    refreshAll();
+    setInterval(refreshAll,12000);
+  }catch(e){
+    // Show clear error
+    toast('❌ ' + (e.message||'Error de conexión'), 'err');
+    console.error('Admin login error:', e);
+  }
 }
 
 function doLogout(){adminToken=null;document.getElementById('login-screen').style.display='flex';document.getElementById('app').style.display='none';}
