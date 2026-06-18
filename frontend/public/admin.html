@@ -309,7 +309,7 @@ async function doAdminLogin(){
   const pass=document.getElementById('a-pass').value;
   if(!email||!pass){toast('Completa los campos','err');return;}
   try{
-    const r=await api('/api/auth/login','POST',{email,password:pass});
+    const r=await api('/api/admin/login','POST',{email,password:pass});
     if(!r.isAdmin){toast('Acceso denegado','err');return;}
     adminToken=r.token;
     document.getElementById('login-screen').style.display='none';

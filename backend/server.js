@@ -415,10 +415,19 @@ app.post('/api/auth/resend', async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Error al enviar correo' }); }
 });
 
+// ── Dedicated admin login (never hits DB) ────────────────────────────────────
+app.post('/api/admin/login', (req, res) => {
+  const { email, password } = req.body;
+  if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+    const token = jwt.sign({ email, isAdmin: true }, JWT_SECRET, { expiresIn: '8h' });
+    return res.json({ token, isAdmin: true });
+  }
+  res.status(401).json({ error: 'Credenciales incorrectas' });
+});
+
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
-  if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD)
-    return res.json({ token: jwt.sign({ email, isAdmin: true }, JWT_SECRET, { expiresIn: '8h' }), isAdmin: true });
+  // Admin goes through /api/admin/login, not here
   try {
     const r = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
     if (!r.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
