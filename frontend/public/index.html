@@ -6,8 +6,6 @@
 <title>Randoom – Conecta con el mundo</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -732,25 +730,17 @@ textarea.fc{resize:vertical;min-height:70px}
   <div class="game-header">
     <h2 id="game-title">🎮 Juego</h2>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;color:var(--pu-l)" id="game-status">Cargando...</div>
+      <div id="game-status" style="font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;color:var(--pu-l)">—</div>
       <button class="btn btn-ghost btn-sm" onclick="closeGame()">✕</button>
     </div>
   </div>
   <div class="game-canvas-wrap">
-    <!-- Hand cam feed (mirrored, behind game canvas) -->
-    <video id="hand-video" playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;pointer-events:none"></video>
     <canvas id="game-canvas"></canvas>
-    <!-- Loading state -->
-    <div id="game-loading" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,0,16,.9);gap:14px">
-      <div class="spinner"></div>
-      <div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:16px;color:#fff" id="loading-text">Cargando IA de manos...</div>
-      <div style="font-size:12px;color:var(--gray-l)">Acepta el permiso de cámara</div>
-    </div>
     <div class="game-result" id="game-result">
       <div style="font-size:60px;margin-bottom:10px" id="result-emoji">🏆</div>
       <div class="result-winner" id="result-winner">¡Ganaste!</div>
       <div class="result-score" id="result-score"></div>
-      <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
         <button class="btn btn-primary" onclick="restartGame()">🔄 De nuevo</button>
         <button class="btn btn-ghost" onclick="closeGame()">Cerrar</button>
       </div>
@@ -950,36 +940,17 @@ function initSocket(){
   app.socket.on('account_banned',({reason})=>{toast('Cuenta suspendida: '+reason,'err');setTimeout(()=>{leaveChat();goHome();},2500);});
   app.socket.on('start_recording',({reportId})=>{startRecording(reportId);});
   app.socket.on('error',({message})=>toast(message,'err'));
-  // Game events
-  app.socket.on('game_invite',({type,from})=>{
-    toast(`🎮 ${from} te invitó a jugar ${type==='fruit'?'🍉 Fruit Ninja':'🎯 Tiro al Blanco'}. ¡Toca el botón del juego!`,'info');
+  // ── Game socket events ──────────────────────────────────────────────────
+  app.socket.on('game_invite', ({type, from}) => {
+    onGameInvite(type, from || 'Tu compañero');
   });
-  app.socket.on('game_score',({score,type})=>{
-    // Partner finished their turn
-    G.partnerScore = score;
-    if(G.phase === 'waiting'){
-      // I already played, show final result
-      showGameResult(G.myScore, G.partnerScore);
-    } else {
-      // I haven't played yet - partner went first, now it's my turn
-      G.type = type || G.type;
-      if(!document.getElementById('game-overlay').classList.contains('active')){
-        document.getElementById('game-overlay').classList.add('active');
-        document.getElementById('game-title').textContent = G.type==='fruit'?'🍉 Fruit Ninja':'🎯 Tiro al Blanco';
-        document.getElementById('game-result').classList.remove('show');
-        setTimeout(initGameCanvas, 100);
-      }
-    }
+  app.socket.on('game_score', ({score, type}) => {
+    onGameScore(score, type);
   });
-  app.socket.on('game_end',()=>{
-    if(G.type){
-      stopGameLoop();
-      document.getElementById('game-overlay').classList.remove('active');
-      G.type=null; G.phase='idle';
-      toast('Tu compañero cerró el juego','info');
-    }
+  app.socket.on('game_end', () => {
+    onGameEnd();
   });
-  app.socket.on('friend_request',({fromEmail,fromName})=>{
+    app.socket.on('friend_request',({fromEmail,fromName})=>{
     toast(`👤 ${fromName} te envió solicitud de amistad`,'info');
   });
   app.socket.on('friend_accepted',({name})=>{
@@ -1315,159 +1286,67 @@ async function sendFriendReq() {
   } catch(e) {toast(e.message,'err');}
 }
 
-// ── GAMES — TensorFlow HandPose ──────────────────────────────────────────────
-// State
-let G = {
-  type: null, phase: 'idle',
-  myScore: 0, partnerScore: 0,
-  timeLeft: 30, frameId: null, timerInt: null,
-  canvas: null, ctx: null,
-  detector: null, handStream: null, handVideo: null,
-  lastHand: null, // cached hand landmarks
-  detectionRunning: false
-};
+// ══════════════════════════════════════════════════════════════════════
+// GAMES — Touch only, 2-player turn system, no bugs
+// ══════════════════════════════════════════════════════════════════════
+/*
+  FLOW:
+  Player A taps game button → sees "Tu turno" → plays 30s → score sent
+  Player B automatically sees "¡TU TURNO!" overlay → plays 30s → result shown to both
+*/
 
+const GAME_DURATION = 30; // seconds per player
 const FRUITS_EMOJIS = ['🍉','🍊','🍋','🍇','🍓','🥝','🍑','🍒'];
+const TARGET_COLORS  = ['#EF4444','#3B82F6','#22C55E','#F59E0B','#A020F0','#EC4899'];
 
-// ── Load TF model once ────────────────────────────────────────────────────────
-let tfDetector = null;
-let tfLoading = false;
+// ── State ──────────────────────────────────────────────────────────────
 
-async function loadDetector() {
-  if (tfDetector) return tfDetector;
-  if (tfLoading) {
-    // Wait
-    while (tfLoading) await new Promise(r => setTimeout(r, 100));
-    return tfDetector;
-  }
-  tfLoading = true;
-  try {
-    const model = handPoseDetection.SupportedModels.MediaPipeHands;
-    tfDetector = await handPoseDetection.createDetector(model, {
-      runtime: 'tfjs',
-      modelType: 'lite',
-      maxHands: 1
-    });
-    console.log('HandPose loaded ✅');
-  } catch(e) {
-    console.error('HandPose failed:', e);
-    tfDetector = null;
-  }
-  tfLoading = false;
-  return tfDetector;
-}
-
-// ── Open game ─────────────────────────────────────────────────────────────────
-async function openGame(type) {
+// ── Open / Close ────────────────────────────────────────────────────────
+function openGame(type) {
   if (!app.partnerEmail) { toast('Debes estar en una llamada','err'); return; }
-  G.type = type; G.phase = 'idle';
-  G.myScore = 0; G.partnerScore = 0; G.lastHand = null;
-
-  const titles = { fruit:'🍉 Fruit Ninja', target:'🎯 Tiro al Blanco', basket:'🏀 Baloncesto' };
-  document.getElementById('game-title').textContent = titles[type] || '🎮';
-  document.getElementById('game-result').classList.remove('show');
-  document.getElementById('game-loading').style.display = 'flex';
-  document.getElementById('loading-text').textContent = 'Cargando IA de manos...';
-  document.getElementById('game-overlay').classList.add('active');
-
+  G.type = type;
+  G.myScore = 0;
+  G.partnerScore = 0;
+  G.iWentFirst = true;
+  _showOverlay(type);
   if (app.socket) app.socket.emit('game_invite', { type, from: app.user?.name });
-
-  // Setup canvas
-  G.canvas = document.getElementById('game-canvas');
-  G.handVideo = document.getElementById('hand-video');
-  const wrap = G.canvas.parentElement;
-  G.canvas.width  = wrap.offsetWidth  || window.innerWidth;
-  G.canvas.height = wrap.offsetHeight || (window.innerHeight - 55);
-  G.ctx = G.canvas.getContext('2d');
-
-  // Get hand camera
-  try {
-    document.getElementById('loading-text').textContent = 'Activando cámara para manos...';
-    G.handStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'user', width:320, height:240 }, audio:false });
-    G.handVideo.srcObject = G.handStream;
-    await G.handVideo.play();
-  } catch(e) {
-    console.warn('Hand cam failed, using touch fallback:', e);
-    G.handStream = null;
-  }
-
-  // Load model
-  document.getElementById('loading-text').textContent = 'Cargando modelo IA...';
-  G.detector = await loadDetector();
-
-  document.getElementById('game-loading').style.display = 'none';
-
-  // Start hand detection loop
-  if (G.detector && G.handVideo.srcObject) {
-    G.detectionRunning = true;
-    runHandDetection();
-  }
-
-  startMyTurn();
+  _startMyTurn();
 }
 
-// ── Continuous hand detection (runs independently) ────────────────────────────
-async function runHandDetection() {
-  if (!G.detectionRunning || !G.detector) return;
-  try {
-    if (G.handVideo && G.handVideo.readyState >= 2) {
-      const hands = await G.detector.estimateHands(G.handVideo, { flipHorizontal: true });
-      G.lastHand = hands.length > 0 ? hands[0] : null;
-    }
-  } catch(e) {}
-  if (G.detectionRunning) {
-    // ~30fps detection
-    setTimeout(runHandDetection, 33);
-  }
-}
-
-// ── Get fingertip positions from last hand ────────────────────────────────────
-// Returns array of {x,y} screen coordinates for all visible fingertips
-function getFingerTips() {
-  if (!G.lastHand || !G.canvas) return [];
-  const kps = G.lastHand.keypoints;
-  const tips = [4, 8, 12, 16, 20]; // thumb, index, middle, ring, pinky
-  const cw = G.canvas.width, ch = G.canvas.height;
-  const vw = G.handVideo.videoWidth || 320, vh = G.handVideo.videoHeight || 240;
-  return tips.map(i => ({
-    x: (kps[i].x / vw) * cw,
-    y: (kps[i].y / vh) * ch,
-    id: i
-  })).filter(p => p.x >= 0 && p.y >= 0 && p.x <= cw && p.y <= ch);
-}
-
-// Get single index finger tip
-function getIndexTip() {
-  if (!G.lastHand || !G.canvas) return null;
-  const kps = G.lastHand.keypoints;
-  const cw = G.canvas.width, ch = G.canvas.height;
-  const vw = G.handVideo.videoWidth || 320, vh = G.handVideo.videoHeight || 240;
-  return {
-    x: (kps[8].x / vw) * cw,
-    y: (kps[8].y / vh) * ch
-  };
-}
-
-// ── Close game ────────────────────────────────────────────────────────────────
 function closeGame() {
-  stopGameLoop();
-  G.detectionRunning = false;
-  if (G.handStream) { G.handStream.getTracks().forEach(t => t.stop()); G.handStream = null; }
+  _stopAll();
   document.getElementById('game-overlay').classList.remove('active');
   if (app.socket) app.socket.emit('game_end', {});
-  G.type = null; G.phase = 'idle'; G.lastHand = null;
+  G.type = null; G.phase = 'idle';
 }
 
 function restartGame() {
+  G.myScore = 0; G.partnerScore = 0; G.iWentFirst = true;
   document.getElementById('game-result').classList.remove('show');
-  G.myScore = 0; G.partnerScore = 0;
-  startMyTurn();
+  _startMyTurn();
 }
 
-function stopGameLoop() {
-  if (G.frameId) { cancelAnimationFrame(G.frameId); G.frameId = null; }
+// ── Internal helpers ────────────────────────────────────────────────────
+function _showOverlay(type) {
+  const t = { fruit:'🍉 Fruit Ninja', target:'🎯 Tiro al Blanco', basket:'🏀 Baloncesto' };
+  document.getElementById('game-title').textContent = t[type] || '🎮';
+  document.getElementById('game-result').classList.remove('show');
+  document.getElementById('game-overlay').classList.add('active');
+  _initCanvas();
+}
+
+function _initCanvas() {
+  G.canvas = document.getElementById('game-canvas');
+  const wrap = G.canvas.parentElement;
+  G.canvas.width  = wrap.offsetWidth  || window.innerWidth;
+  G.canvas.height = wrap.offsetHeight || (window.innerHeight - 56);
+  G.ctx = G.canvas.getContext('2d');
+}
+
+function _stopAll() {
+  if (G.frameId)  { cancelAnimationFrame(G.frameId); G.frameId = null; }
   if (G.timerInt) { clearInterval(G.timerInt); G.timerInt = null; }
-  // Remove stale canvas listeners by replacing
+  // Replace canvas to remove all listeners cleanly
   const old = document.getElementById('game-canvas');
   if (old && old.parentNode) {
     const fresh = old.cloneNode(false);
@@ -1477,389 +1356,350 @@ function stopGameLoop() {
   }
 }
 
-// ── Start my turn ─────────────────────────────────────────────────────────────
-function startMyTurn() {
-  stopGameLoop();
-  G.phase = 'my_turn'; G.timeLeft = 30;
+function _startMyTurn() {
+  _stopAll();
+  G.phase = 'my_turn';
+  G.timeLeft = GAME_DURATION;
+  const labels = { fruit:'🍉 ¡Corta frutas!', target:'🎯 ¡Apunta!', basket:'🏀 ¡Encesta!' };
+  document.getElementById('game-status').textContent = labels[G.type] + ' — 30s';
   document.getElementById('game-result').classList.remove('show');
-  const labels = { fruit:'🍉 ¡Corta con los dedos! — 30s', target:'🎯 ¡Toca los blancos! — 30s', basket:'🏀 ¡Agarra y lanza! — 30s' };
-  document.getElementById('game-status').textContent = labels[G.type] || 'Tu turno — 30s';
 
-  if (G.type === 'fruit')  runFruitNinja();
-  else if (G.type === 'target') runTargetGame();
-  else if (G.type === 'basket') runBasketGame();
+  if      (G.type === 'fruit')  _runFruit();
+  else if (G.type === 'target') _runTarget();
+  else if (G.type === 'basket') _runBasket();
 
   G.timerInt = setInterval(() => {
     if (G.phase !== 'my_turn') return;
     G.timeLeft--;
     const icons = { fruit:'🍉', target:'🎯', basket:'🏀' };
-    document.getElementById('game-status').textContent = `${icons[G.type]} Tu turno — ${G.timeLeft}s`;
-    if (G.timeLeft <= 0) finishMyTurn();
+    document.getElementById('game-status').textContent =
+      `${icons[G.type] || '🎮'} Tu turno — ${G.timeLeft}s`;
+    if (G.timeLeft <= 0) _finishMyTurn();
   }, 1000);
 }
 
-function finishMyTurn() {
-  stopGameLoop();
+function _finishMyTurn() {
   if (G.phase !== 'my_turn') return;
+  _stopAll();
   G.phase = 'waiting';
-  document.getElementById('game-status').textContent = `⌛ Turno de tu compañero... (Tú: ${G.myScore} pts)`;
+  document.getElementById('game-status').textContent =
+    `⌛ Turno de tu compañero… (Tú: ${G.myScore} pts)`;
+  // Send score to partner
   if (app.socket) app.socket.emit('game_score', { score: G.myScore, type: G.type });
-  // Draw waiting on canvas
+  // Draw waiting screen
+  _drawWaiting();
+}
+
+function _drawWaiting() {
   const c = G.canvas, x = G.ctx;
   if (!c || !x) return;
   x.clearRect(0, 0, c.width, c.height);
-  x.fillStyle = 'rgba(8,0,16,0.8)';
-  roundRect(x, c.width/2-160, c.height/2-48, 320, 96, 18); x.fill();
+  x.fillStyle = 'rgba(8,0,16,0.82)';
+  _rr(x, c.width/2-165, c.height/2-55, 330, 110, 18); x.fill();
   x.fillStyle = '#fff'; x.font = 'bold 22px Poppins,sans-serif'; x.textAlign = 'center';
-  x.fillText('Tu puntuación: ' + G.myScore + ' pts', c.width/2, c.height/2 - 6);
-  x.fillStyle = '#C8A8E0'; x.font = '14px Inter,sans-serif';
-  x.fillText('Esperando a tu compañero...', c.width/2, c.height/2 + 24);
+  x.fillText('Tu puntuación: ' + G.myScore + ' pts', c.width/2, c.height/2 - 8);
+  x.fillStyle = '#C8A8E0'; x.font = '15px Inter,sans-serif';
+  x.fillText('⌛ Esperando a tu compañero…', c.width/2, c.height/2 + 26);
 }
 
-// ── HUD ───────────────────────────────────────────────────────────────────────
-function showHUD(score) {
-  const c = G.canvas, x = G.ctx;
-  // Score
-  x.fillStyle = 'rgba(8,0,16,0.72)';
-  roundRect(x, 10, 10, 115, 44, 10); x.fill();
-  x.fillStyle = '#fff'; x.font = 'bold 21px Poppins,sans-serif'; x.textAlign = 'left';
-  const icons = { fruit:'🍉', target:'🎯', basket:'🏀' };
-  x.fillText((icons[G.type]||'') + ' ' + score, 18, 36);
-  // Timer arc
-  const pct = G.timeLeft / 30;
-  const cx = c.width - 38, cy = 38;
-  x.strokeStyle = 'rgba(160,32,240,0.25)'; x.lineWidth = 6;
-  x.beginPath(); x.arc(cx, cy, 26, 0, Math.PI*2); x.stroke();
-  x.strokeStyle = pct > 0.4 ? '#A020F0' : '#EF4444'; x.lineWidth = 6;
-  x.beginPath(); x.arc(cx, cy, 26, -Math.PI/2, -Math.PI/2 + pct*Math.PI*2); x.stroke();
-  x.fillStyle = '#fff'; x.font = 'bold 15px Poppins,sans-serif'; x.textAlign = 'center';
-  x.fillText(G.timeLeft, cx, cy + 6);
-  // Hand indicator
-  const hasTF = !!G.lastHand;
-  x.fillStyle = hasTF ? 'rgba(34,197,94,0.8)' : 'rgba(239,68,68,0.8)';
-  roundRect(x, c.width/2-40, 6, 80, 22, 8); x.fill();
-  x.fillStyle = '#fff'; x.font = '11px Inter,sans-serif'; x.textAlign = 'center';
-  x.fillText(hasTF ? '✋ Detectada' : '✋ Levanta mano', c.width/2, 21);
+function _showResult() {
+  _stopAll();
+  G.phase = 'result';
+  const my = G.myScore, their = G.partnerScore;
+  const won = my > their, tied = my === their;
+  document.getElementById('result-emoji').textContent   = tied ? '🤝' : won ? '🏆' : '😅';
+  document.getElementById('result-winner').textContent  = tied ? '¡Empate!' : won ? '🎉 ¡GANASTE!' : '¡Ganó tu compañero!';
+  document.getElementById('result-winner').style.color  = tied ? '#F59E0B' : won ? '#A020F0' : '#EF4444';
+  document.getElementById('result-score').textContent   = `Tú: ${my} pts — Compañero: ${their} pts`;
+  document.getElementById('game-result').classList.add('show');
 }
 
-function drawFingerDots() {
-  const pts = getFingerTips();
-  const x = G.ctx;
-  pts.forEach(p => {
-    x.beginPath(); x.arc(p.x, p.y, 12, 0, Math.PI*2);
-    x.fillStyle = 'rgba(192,96,255,0.55)'; x.fill();
-    x.strokeStyle = 'rgba(255,255,255,0.9)'; x.lineWidth = 2; x.stroke();
-  });
-}
-
-function roundRect(ctx, x, y, w, h, r) {
+// Rounded rect helper
+function _rr(ctx, x, y, w, h, r) {
   ctx.beginPath();
-  ctx.moveTo(x+r, y);
-  ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
-  ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
-  ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
-  ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
   ctx.closePath();
 }
 
-// ═══════════════════════════ FRUIT NINJA ═══════════════════════════════════
-function runFruitNinja() {
+// HUD (score + timer arc)
+function _hud(score) {
   const c = G.canvas, x = G.ctx;
-  const items = [], particles = [];
-  const trail = []; // {x,y,t}
-  let score = 0, lives = 3, spawnTick = 0, lastTs = performance.now();
+  // Score badge
+  x.fillStyle = 'rgba(8,0,16,0.75)';
+  _rr(x,10,10,118,44,10); x.fill();
+  const icons = { fruit:'🍉', target:'🎯', basket:'🏀' };
+  x.fillStyle = '#fff'; x.font = 'bold 21px Poppins,sans-serif'; x.textAlign = 'left';
+  x.fillText((icons[G.type]||'') + ' ' + score, 18, 36);
+  // Timer arc
+  const pct = G.timeLeft / GAME_DURATION;
+  const cx = c.width - 38, cy = 38;
+  x.strokeStyle = 'rgba(160,32,240,.22)'; x.lineWidth = 6;
+  x.beginPath(); x.arc(cx,cy,26,0,Math.PI*2); x.stroke();
+  x.strokeStyle = pct > 0.4 ? '#A020F0' : '#EF4444'; x.lineWidth = 6;
+  x.beginPath(); x.arc(cx,cy,26,-Math.PI/2,-Math.PI/2+pct*Math.PI*2); x.stroke();
+  x.fillStyle = '#fff'; x.font = 'bold 15px Poppins,sans-serif'; x.textAlign = 'center';
+  x.fillText(G.timeLeft, cx, cy+6);
+}
+
+// ═══════════════════════════ 🍉 FRUIT NINJA ════════════════════════════
+function _runFruit() {
+  const c = G.canvas, x = G.ctx;
+  const items = [], particles = [], trail = [];
+  let score = 0, lives = 3, spawnTick = 0, lastTs = 0;
 
   function spawn() {
     const bomb = Math.random() < 0.1;
     items.push({
-      x: 60 + Math.random()*(c.width-120),
+      x: 55 + Math.random()*(c.width-110),
       y: c.height + 55,
-      vx: (Math.random()-0.5)*6,
-      vy: -(c.height*0.025 + Math.random()*5),
-      rot:0, rotV:(Math.random()-0.5)*7,
-      emoji: bomb?'💣':FRUITS_EMOJIS[Math.floor(Math.random()*FRUITS_EMOJIS.length)],
-      bomb, size:50, dead:false
+      vx: (Math.random()-0.5) * 5.5,
+      vy: -(c.height * 0.024 + Math.random()*5),
+      rot: 0, rotV: (Math.random()-0.5)*7,
+      emoji: bomb ? '💣' : FRUITS_EMOJIS[Math.floor(Math.random()*FRUITS_EMOJIS.length)],
+      bomb, size: 48, dead: false
     });
+  }
+
+  function loop(ts) {
+    if (G.phase !== 'my_turn') return;
+    const dt = Math.min((ts - lastTs) / 16, 2.5); lastTs = ts;
+    x.clearRect(0, 0, c.width, c.height);
+
+    // Trail
+    const now = Date.now();
+    for (let i = 1; i < trail.length; i++) {
+      const age = (now - trail[i].t) / 220;
+      if (age >= 1) continue;
+      x.globalAlpha = 1 - age;
+      x.strokeStyle = `hsl(${275+i*3},100%,${58+age*22}%)`;
+      x.lineWidth = Math.max(1, 6 - age*5); x.lineCap = 'round';
+      x.beginPath(); x.moveTo(trail[i-1].x, trail[i-1].y);
+      x.lineTo(trail[i].x, trail[i].y); x.stroke();
+    }
+    x.globalAlpha = 1;
+    while (trail.length && (now - trail[0].t) > 260) trail.shift();
+
+    // Particles
+    for (let i = particles.length-1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 0.3*dt; p.life -= dt*0.045;
+      if (p.life <= 0) { particles.splice(i,1); continue; }
+      x.globalAlpha = p.life; x.fillStyle = p.color;
+      x.beginPath(); x.arc(p.x, p.y, p.r*p.life, 0, Math.PI*2); x.fill();
+      x.globalAlpha = 1;
+    }
+
+    // Spawn
+    spawnTick += dt;
+    if (spawnTick > 28) { spawn(); spawnTick = 0; }
+
+    // Fruits
+    for (let i = items.length-1; i >= 0; i--) {
+      const f = items[i];
+      if (f.dead) { items.splice(i,1); continue; }
+      f.x += f.vx*dt; f.y += f.vy*dt; f.vy += 0.45*dt; f.rot += f.rotV*dt;
+      if (f.y > c.height + 80) {
+        items.splice(i,1);
+        if (!f.bomb) { lives--; if (lives <= 0) { _finishMyTurn(); return; } }
+        continue;
+      }
+      x.save(); x.translate(f.x, f.y); x.rotate(f.rot * Math.PI/180);
+      x.shadowColor = f.bomb ? 'rgba(255,80,0,.8)' : 'rgba(255,200,50,.5)';
+      x.shadowBlur = 12;
+      x.font = f.size + 'px serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText(f.emoji, 0, 0); x.restore();
+    }
+
+    // Lives
+    x.shadowBlur = 0;
+    for (let i = 0; i < 3; i++) {
+      x.font = '18px serif'; x.textAlign = 'left';
+      x.fillText(i < lives ? '❤️' : '🖤', 12 + i*24, c.height - 12);
+    }
+
+    _hud(score);
+    G.frameId = requestAnimationFrame(loop);
+  }
+
+  function onMove(e) {
+    e.preventDefault();
+    const rect = c.getBoundingClientRect();
+    const pts = e.touches ? Array.from(e.touches) : [e];
+    pts.forEach(t => {
+      const px = (t.clientX - rect.left) * (c.width  / rect.width);
+      const py = (t.clientY - rect.top)  * (c.height / rect.height);
+      trail.push({ x:px, y:py, t:Date.now() });
+      for (let i = items.length-1; i >= 0; i--) {
+        const f = items[i]; if (f.dead) continue;
+        const dx = px-f.x, dy = py-f.y;
+        if (Math.sqrt(dx*dx+dy*dy) < f.size*0.58) {
+          f.dead = true;
+          if (f.bomb) { _finishMyTurn(); return; }
+          score++; G.myScore = score;
+          for (let k = 0; k < 10; k++) {
+            const a = Math.random()*Math.PI*2, sp = 2+Math.random()*5;
+            particles.push({ x:f.x, y:f.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-2,
+              r:5+Math.random()*4, life:1,
+              color:`hsl(${Math.random()*60+10},100%,${50+Math.random()*20}%)` });
+          }
+        }
+      }
+    });
+  }
+
+  c.addEventListener('touchstart', onMove, {passive:false});
+  c.addEventListener('touchmove',  onMove, {passive:false});
+  c.addEventListener('mousemove',  e => { if (e.buttons) onMove(e); });
+  spawn(); spawn();
+  lastTs = performance.now();
+  G.frameId = requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════ 🎯 TIRO AL BLANCO ═══════════════════════════
+function _runTarget() {
+  const c = G.canvas, x = G.ctx;
+  const targets = [];
+  let score = 0, spawnTick = 0, lastTs = 0;
+
+  function spawn() {
+    const r = 26 + Math.random()*28;
+    targets.push({
+      x: r + Math.random()*(c.width-r*2),
+      y: 65 + Math.random()*(c.height-115),
+      r, born: performance.now(),
+      maxLife: 1.8 + Math.random()*2,
+      life: 1, hit: false, hitAnim: 0,
+      color: TARGET_COLORS[Math.floor(Math.random()*TARGET_COLORS.length)]
+    });
+  }
+
+  function drawT(t) {
+    [t.r, t.r*0.65, t.r*0.35].forEach((r,i) => {
+      x.beginPath(); x.arc(0,0,r,0,Math.PI*2);
+      x.fillStyle = i%2===0 ? t.color : '#fff';
+      x.shadowColor = t.color; x.shadowBlur = i===0 ? 12 : 0; x.fill();
+    });
+    x.shadowBlur = 0;
+    x.beginPath(); x.arc(0,0,5,0,Math.PI*2); x.fillStyle = t.color; x.fill();
   }
 
   function loop(ts) {
     if (G.phase !== 'my_turn') return;
     const dt = Math.min((ts-lastTs)/16, 2.5); lastTs = ts;
     x.clearRect(0,0,c.width,c.height);
+    spawnTick += dt;
+    if (spawnTick > 30 && targets.length < 7) { spawn(); spawnTick = 0; }
+    if (!targets.length) { spawn(); spawn(); }
 
-    // Draw trailing slice marks
-    const now = Date.now();
-    if (trail.length > 1) {
-      for (let i=1;i<trail.length;i++) {
-        const age = (now-trail[i].t)/200;
-        if (age>=1) continue;
-        x.globalAlpha = 1-age;
-        x.strokeStyle = `hsl(${270+i*3},100%,${55+age*25}%)`;
-        x.lineWidth = Math.max(1, 6-age*5); x.lineCap='round';
-        x.beginPath(); x.moveTo(trail[i-1].x,trail[i-1].y); x.lineTo(trail[i].x,trail[i].y); x.stroke();
+    for (let i = targets.length-1; i >= 0; i--) {
+      const t = targets[i];
+      const age = (performance.now()-t.born)/1000;
+      t.life = Math.max(0, 1-age/t.maxLife);
+      if (t.hit) {
+        t.hitAnim += dt*0.07;
+        if (t.hitAnim >= 1) { targets.splice(i,1); continue; }
+        x.globalAlpha = 1-t.hitAnim;
+        x.save(); x.translate(t.x,t.y); x.scale(1+t.hitAnim*0.7,1+t.hitAnim*0.7);
+        drawT(t); x.restore(); x.globalAlpha=1; continue;
       }
-      x.globalAlpha=1;
-    }
-    while (trail.length && (now-trail[0].t)>250) trail.shift();
-
-    // Particles
-    for(let i=particles.length-1;i>=0;i--){
-      const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.3*dt; p.life-=dt*0.04;
-      if(p.life<=0){particles.splice(i,1);continue;}
-      x.globalAlpha=p.life; x.fillStyle=p.color;
-      x.beginPath(); x.arc(p.x,p.y,p.r*p.life,0,Math.PI*2); x.fill(); x.globalAlpha=1;
+      if (t.life <= 0) { targets.splice(i,1); continue; }
+      x.globalAlpha = t.life;
+      x.save(); x.translate(t.x,t.y);
+      const pulse = 1+Math.sin(age*5)*0.05; x.scale(pulse,pulse);
+      drawT(t); x.restore(); x.globalAlpha=1;
     }
 
-    // Spawn
-    spawnTick+=dt; if(spawnTick>26){spawn();spawnTick=0;}
-
-    // Fruits
-    for(let i=items.length-1;i>=0;i--){
-      const f=items[i];
-      if(f.dead){items.splice(i,1);continue;}
-      f.x+=f.vx*dt; f.y+=f.vy*dt; f.vy+=0.45*dt; f.rot+=f.rotV*dt;
-      if(f.y>c.height+80){
-        items.splice(i,1);
-        if(!f.bomb){lives--;if(lives<=0){finishMyTurn();return;}}
-        continue;
-      }
-      x.save(); x.translate(f.x,f.y); x.rotate(f.rot*Math.PI/180);
-      x.shadowColor=f.bomb?'rgba(255,80,0,.8)':'rgba(255,200,50,.5)'; x.shadowBlur=12;
-      x.font=f.size+'px serif'; x.textAlign='center'; x.textBaseline='middle';
-      x.fillText(f.emoji,0,0); x.restore();
-    }
-
-    // Lives
-    for(let i=0;i<3;i++){x.font='18px serif';x.textAlign='left';x.fillText(i<lives?'❤️':'🖤',12+i*24,c.height-12);}
-
-    // ── Finger detection ──────────────────────────────────────────────────
-    const tips = getFingerTips();
-    tips.forEach(tip => {
-      // Draw finger dot
-      x.beginPath(); x.arc(tip.x,tip.y,14,0,Math.PI*2);
-      x.fillStyle='rgba(192,96,255,.4)'; x.fill();
-      x.strokeStyle='rgba(255,255,255,.85)'; x.lineWidth=2.5; x.stroke();
-      trail.push({x:tip.x,y:tip.y,t:Date.now()});
-      // Check slice
-      items.forEach(f=>{
-        if(f.dead)return;
-        const dx=tip.x-f.x,dy=tip.y-f.y;
-        if(Math.sqrt(dx*dx+dy*dy)<f.size*0.58){
-          f.dead=true;
-          if(f.bomb){finishMyTurn();return;}
-          score++; G.myScore=score;
-          for(let k=0;k<10;k++){
-            const a=Math.random()*Math.PI*2,sp=2+Math.random()*5;
-            particles.push({x:f.x,y:f.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,r:5+Math.random()*4,life:1,color:`hsl(${Math.random()*60+10},100%,${50+Math.random()*20}%)`});
-          }
-        }
-      });
-    });
-
-    // Touch fallback (if no hand detected)
-    if (!G.lastHand) {
-      x.fillStyle='rgba(239,68,68,0.12)'; x.fillRect(0,0,c.width,c.height);
-      x.fillStyle='rgba(255,255,255,0.6)'; x.font='14px Poppins,sans-serif'; x.textAlign='center';
-      x.fillText('✋ Muestra tu mano a la cámara', c.width/2, c.height/2);
-    }
-
-    showHUD(score);
+    _hud(score);
     G.frameId = requestAnimationFrame(loop);
   }
 
-  // Touch fallback for no-hand mode
-  function onTouch(e) {
-    if (G.lastHand) return; // TF handles it
-    const rect=c.getBoundingClientRect();
-    const pts=e.touches?Array.from(e.touches):[e];
-    pts.forEach(t=>{
-      const px=(t.clientX-rect.left)*(c.width/rect.width);
-      const py=(t.clientY-rect.top)*(c.height/rect.height);
-      trail.push({x:px,y:py,t:Date.now()});
-      items.forEach(f=>{
-        if(f.dead)return;
-        const dx=px-f.x,dy=py-f.y;
-        if(Math.sqrt(dx*dx+dy*dy)<f.size*0.6){
-          f.dead=true;
-          if(f.bomb){finishMyTurn();return;}
-          score++; G.myScore=score;
+  function onTap(e) {
+    e.preventDefault();
+    const rect = c.getBoundingClientRect();
+    const pts = e.touches ? [e.touches[0]] : [e];
+    pts.forEach(t => {
+      const px = (t.clientX-rect.left)*(c.width/rect.width);
+      const py = (t.clientY-rect.top)*(c.height/rect.height);
+      for (let i = targets.length-1; i >= 0; i--) {
+        const tg = targets[i]; if (tg.hit) continue;
+        const dx=px-tg.x, dy=py-tg.y;
+        if (Math.sqrt(dx*dx+dy*dy) < tg.r) {
+          tg.hit = true; score++; G.myScore = score; break;
         }
-      });
+      }
     });
   }
-  c.addEventListener('touchmove',onTouch,{passive:true});
-  c.addEventListener('mousemove',e=>{if(e.buttons)onTouch(e);});
 
+  c.addEventListener('touchstart', onTap, {passive:false});
+  c.addEventListener('click', onTap);
+  spawn(); spawn(); spawn();
+  lastTs = performance.now();
   G.frameId = requestAnimationFrame(loop);
 }
 
-// ═══════════════════════════ TIRO AL BLANCO ════════════════════════════════
-function runTargetGame() {
-  const c=G.canvas, x=G.ctx;
-  const targets=[];
-  let score=0, spawnTick=0, lastTs=performance.now();
-  const COLORS=['#EF4444','#3B82F6','#22C55E','#F59E0B','#A020F0','#EC4899'];
-  let lastTipX=-1, lastTipY=-1, tapCooldown=0;
+// ═══════════════════════════ 🏀 BALONCESTO ═══════════════════════════════
+function _runBasket() {
+  const c = G.canvas, x = G.ctx;
+  let score = 0, lastTs = 0;
+  const particles = [];
 
-  function spawn(){
-    const r=26+Math.random()*28;
-    targets.push({x:r+Math.random()*(c.width-r*2),y:65+Math.random()*(c.height-110),r,life:1,maxLife:1.8+Math.random()*2,born:performance.now(),hit:false,hitAnim:0,color:COLORS[Math.floor(Math.random()*COLORS.length)]});
+  // Hoop
+  const hX = c.width/2, hY = 90, hW = 90;
+
+  // Ball state
+  let ball = null;
+  function newBall() {
+    return {
+      x: 60 + Math.random()*(c.width-120),
+      y: c.height - 100,
+      r: 28, vx:0, vy:0,
+      state: 'idle', // idle | held | flying | bouncing
+      scored: false
+    };
   }
+  ball = newBall();
 
-  function drawTarget(t){
-    [t.r,t.r*.65,t.r*.35].forEach((r,i)=>{
-      x.beginPath();x.arc(0,0,r,0,Math.PI*2);
-      x.fillStyle=i%2===0?t.color:'#fff'; x.shadowColor=t.color; x.shadowBlur=i===0?10:0; x.fill();
-    });
-    x.shadowBlur=0;
-    x.beginPath();x.arc(0,0,5,0,Math.PI*2);x.fillStyle=t.color;x.fill();
-  }
+  // Drag tracking
+  let drag = null; // { startX, startY, startTime }
+  let netAnim = 0;
 
-  function loop(ts){
-    if(G.phase!=='my_turn')return;
-    const dt=Math.min((ts-lastTs)/16,2.5);lastTs=ts;
-    x.clearRect(0,0,c.width,c.height);
-    spawnTick+=dt; if(spawnTick>30&&targets.length<7){spawn();spawnTick=0;}
-    if(!targets.length)spawn();
-    tapCooldown=Math.max(0,tapCooldown-dt);
-
-    // ── Index finger pointer ──────────────────────────────────────────────
-    const tip=getIndexTip();
-    if(tip){
-      // Draw pointer cursor
-      x.strokeStyle='rgba(255,255,255,.9)';x.lineWidth=2;
-      x.beginPath();x.moveTo(tip.x-12,tip.y);x.lineTo(tip.x+12,tip.y);x.stroke();
-      x.beginPath();x.moveTo(tip.x,tip.y-12);x.lineTo(tip.x,tip.y+12);x.stroke();
-      x.beginPath();x.arc(tip.x,tip.y,18,0,Math.PI*2);
-      x.strokeStyle='rgba(192,96,255,.8)';x.lineWidth=3;x.stroke();
-
-      // Auto-hit when stable on target
-      if(tapCooldown<=0 && Math.abs(tip.x-lastTipX)<8 && Math.abs(tip.y-lastTipY)<8){
-        targets.forEach(t=>{
-          if(t.hit)return;
-          const dx=tip.x-t.x,dy=tip.y-t.y;
-          if(Math.sqrt(dx*dx+dy*dy)<t.r){
-            t.hit=true; score++; G.myScore=score;
-            tapCooldown=20;
-          }
-        });
-      }
-      lastTipX=tip.x; lastTipY=tip.y;
-    }
-
-    // Draw targets
-    for(let i=targets.length-1;i>=0;i--){
-      const t=targets[i];
-      const age=(performance.now()-t.born)/1000;
-      t.life=Math.max(0,1-age/t.maxLife);
-      if(t.hit){
-        t.hitAnim+=dt*0.07;
-        if(t.hitAnim>=1){targets.splice(i,1);continue;}
-        x.globalAlpha=1-t.hitAnim;
-        x.save();x.translate(t.x,t.y);x.scale(1+t.hitAnim*.7,1+t.hitAnim*.7);
-        drawTarget(t);x.restore();x.globalAlpha=1;continue;
-      }
-      if(t.life<=0){targets.splice(i,1);continue;}
-      x.globalAlpha=t.life;
-      x.save();x.translate(t.x,t.y);
-      const pulse=1+Math.sin(age*5)*.05;x.scale(pulse,pulse);
-      drawTarget(t);x.restore();x.globalAlpha=1;
-    }
-
-    if(!G.lastHand){
-      x.fillStyle='rgba(255,255,255,0.55)';x.font='14px Poppins,sans-serif';x.textAlign='center';
-      x.fillText('✋ Apunta con el índice',c.width/2,c.height-20);
-    }
-    showHUD(score);
-    G.frameId=requestAnimationFrame(loop);
-  }
-
-  // Touch fallback
-  c.addEventListener('click',e=>{
-    if(G.lastHand)return;
-    const rect=c.getBoundingClientRect();
-    const px=(e.clientX-rect.left)*(c.width/rect.width);
-    const py=(e.clientY-rect.top)*(c.height/rect.height);
-    targets.forEach(t=>{
-      if(t.hit)return;
-      const dx=px-t.x,dy=py-t.y;
-      if(Math.sqrt(dx*dx+dy*dy)<t.r){t.hit=true;score++;G.myScore=score;}
-    });
-  });
-  c.addEventListener('touchstart',e=>{
-    if(G.lastHand)return;
-    e.preventDefault();
-    const rect=c.getBoundingClientRect(),t=e.touches[0];
-    const px=(t.clientX-rect.left)*(c.width/rect.width);
-    const py=(t.clientY-rect.top)*(c.height/rect.height);
-    targets.forEach(tg=>{
-      if(tg.hit)return;
-      const dx=px-tg.x,dy=py-tg.y;
-      if(Math.sqrt(dx*dx+dy*dy)<tg.r){tg.hit=true;score++;G.myScore=score;}
-    });
-  },{passive:false});
-
-  spawn();spawn();
-  G.frameId=requestAnimationFrame(loop);
-}
-
-// ═══════════════════════════ BALONCESTO ════════════════════════════════════
-function runBasketGame() {
-  const c=G.canvas,x=G.ctx;
-  let score=0, lastTs=performance.now();
-  // Hoop position
-  const hoopX=c.width/2, hoopY=80, hoopW=80, hoopH=10;
-  // Ball
-  let ball={x:c.width/2,y:c.height-120,r:28,vx:0,vy:0,held:false,launched:false,scored:false};
-  let lastBallX=ball.x, lastBallY=ball.y;
-  let launchTimeout=null;
-  let netAnim=0; // net wobble after score
-  const particles=[];
-
-  // track previous tip to compute velocity
-  let prevTip=null, tipVx=0, tipVy=0;
-
-  function spawnBall(){
-    ball={x:50+Math.random()*(c.width-100),y:c.height-120,r:28,vx:0,vy:0,held:false,launched:false,scored:false};
-    prevTip=null; tipVx=0; tipVy=0;
-  }
-
-  function drawHoop(){
+  function drawHoop() {
     // Backboard
-    x.fillStyle='rgba(255,255,255,0.85)';
-    x.fillRect(hoopX-55,hoopY-45,110,60);
-    x.strokeStyle='rgba(200,200,200,1)'; x.lineWidth=3;
-    x.strokeRect(hoopX-55,hoopY-45,110,60);
-    // Square on backboard
-    x.strokeStyle='rgba(255,50,50,0.8)'; x.lineWidth=2;
-    x.strokeRect(hoopX-22,hoopY-30,44,30);
+    x.fillStyle = 'rgba(255,255,255,0.9)';
+    x.fillRect(hX-58, hY-48, 116, 62);
+    x.strokeStyle = 'rgba(180,180,180,1)'; x.lineWidth = 3;
+    x.strokeRect(hX-58, hY-48, 116, 62);
+    x.strokeStyle = 'rgba(255,50,50,0.9)'; x.lineWidth = 2;
+    x.strokeRect(hX-24, hY-32, 48, 32);
     // Rim
-    x.strokeStyle='#FF6B00'; x.lineWidth=6; x.lineCap='round';
-    x.beginPath(); x.moveTo(hoopX-hoopW/2,hoopY); x.lineTo(hoopX+hoopW/2,hoopY); x.stroke();
-    // Net (10 lines)
-    x.strokeStyle='rgba(255,255,255,0.6)'; x.lineWidth=1.5;
-    const wobble=Math.sin(netAnim*10)*4;
-    for(let i=0;i<=5;i++){
-      const lx=hoopX-hoopW/2+i*(hoopW/5);
-      x.beginPath(); x.moveTo(lx,hoopY);
-      x.lineTo(hoopX-hoopW/4+i*(hoopW/10)+wobble/2,hoopY+35);
-      x.stroke();
+    x.strokeStyle = '#FF6B00'; x.lineWidth = 7; x.lineCap = 'round';
+    x.beginPath(); x.moveTo(hX-hW/2, hY); x.lineTo(hX+hW/2, hY); x.stroke();
+    // Net
+    const wobble = Math.sin(netAnim*8)*5;
+    x.strokeStyle = 'rgba(255,255,255,0.65)'; x.lineWidth = 1.5;
+    for (let i=0; i<=5; i++) {
+      const lx = hX - hW/2 + i*(hW/5);
+      const bx = hX - hW/4 + i*(hW/10) + wobble/2;
+      x.beginPath(); x.moveTo(lx,hY); x.lineTo(bx, hY+38); x.stroke();
     }
-    x.beginPath(); x.moveTo(hoopX-hoopW/4,hoopY+35); x.lineTo(hoopX+hoopW/4,hoopY+35); x.stroke();
-    if(netAnim>0) netAnim-=0.05;
+    x.beginPath(); x.moveTo(hX-hW/4+wobble/2, hY+38); x.lineTo(hX+hW/4+wobble/2, hY+38); x.stroke();
+    if (netAnim > 0) netAnim = Math.max(0, netAnim - 0.06);
   }
 
-  function drawBall(bx,by,br){
-    x.save(); x.translate(bx,by);
+  function drawBall(bx, by, br) {
+    x.save(); x.translate(bx, by);
     // Shadow
-    x.beginPath(); x.ellipse(0,br*0.8,br*0.7,br*0.2,0,0,Math.PI*2);
-    x.fillStyle='rgba(0,0,0,0.2)'; x.fill();
-    // Ball body
-    const grad=x.createRadialGradient(-br*0.3,-br*0.35,br*0.1,0,0,br);
-    grad.addColorStop(0,'#FF9500'); grad.addColorStop(0.5,'#E65C00'); grad.addColorStop(1,'#B84500');
-    x.beginPath(); x.arc(0,0,br,0,Math.PI*2); x.fillStyle=grad; x.fill();
+    x.beginPath(); x.ellipse(0, br*0.85, br*0.7, br*0.18, 0, 0, Math.PI*2);
+    x.fillStyle = 'rgba(0,0,0,0.18)'; x.fill();
+    // Body
+    const g = x.createRadialGradient(-br*0.3,-br*0.35,br*0.08,0,0,br);
+    g.addColorStop(0,'#FF9500'); g.addColorStop(0.55,'#E65C00'); g.addColorStop(1,'#B34500');
+    x.beginPath(); x.arc(0,0,br,0,Math.PI*2); x.fillStyle=g; x.fill();
     // Lines
-    x.strokeStyle='rgba(0,0,0,0.35)'; x.lineWidth=2;
+    x.strokeStyle='rgba(0,0,0,0.3)'; x.lineWidth=2;
     x.beginPath(); x.moveTo(-br,0); x.lineTo(br,0); x.stroke();
     x.beginPath(); x.moveTo(0,-br); x.lineTo(0,br); x.stroke();
     x.beginPath(); x.arc(br*0.35,0,br*0.85,Math.PI*0.15,Math.PI*0.85); x.stroke();
@@ -1867,149 +1707,226 @@ function runBasketGame() {
     x.restore();
   }
 
-  function loop(ts){
-    if(G.phase!=='my_turn')return;
-    const dt=Math.min((ts-lastTs)/16,2.5); lastTs=ts;
+  function loop(ts) {
+    if (G.phase !== 'my_turn') return;
+    const dt = Math.min((ts-lastTs)/16, 2.5); lastTs = ts;
     x.clearRect(0,0,c.width,c.height);
 
     // Physics
-    if(ball.launched && !ball.held){
-      ball.x+=ball.vx*dt; ball.y+=ball.vy*dt;
-      ball.vy+=0.5*dt; // gravity
-      ball.vx*=0.995; // air resistance
-      // Bounce off walls
-      if(ball.x-ball.r<0){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*0.6;}
-      if(ball.x+ball.r>c.width){ball.x=c.width-ball.r;ball.vx=-Math.abs(ball.vx)*0.6;}
+    if (ball.state === 'flying' || ball.state === 'bouncing') {
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+      ball.vy += 0.52 * dt;
+      ball.vx *= 0.997;
+
+      // Walls
+      if (ball.x - ball.r < 0)          { ball.x = ball.r;         ball.vx = Math.abs(ball.vx)*0.55; }
+      if (ball.x + ball.r > c.width)    { ball.x = c.width-ball.r; ball.vx = -Math.abs(ball.vx)*0.55; }
+
       // Floor
-      if(ball.y+ball.r>c.height-10){
-        ball.y=c.height-10-ball.r;ball.vy*=-0.4;ball.vx*=0.7;
-        if(Math.abs(ball.vy)<1){ball.vy=0;}
-        if(Math.abs(ball.vy)<0.5&&Math.abs(ball.vx)<0.5){spawnBall();}
-      }
-      // Score check — ball passes through hoop
-      if(!ball.scored && ball.vy>0 &&
-         ball.y>hoopY && ball.y<hoopY+40 &&
-         ball.x>hoopX-hoopW/2+ball.r*0.3 && ball.x<hoopX+hoopW/2-ball.r*0.3){
-        ball.scored=true; score++; G.myScore=score;
-        netAnim=1;
-        // Burst particles
-        for(let i=0;i<15;i++){
-          const a=Math.random()*Math.PI*2,sp=3+Math.random()*6;
-          particles.push({x:hoopX,y:hoopY,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-4,r:5+Math.random()*5,life:1,color:`hsl(${40+Math.random()*20},100%,60%)`});
+      if (ball.y + ball.r > c.height - 8) {
+        ball.y = c.height - 8 - ball.r;
+        ball.vy *= -0.38; ball.vx *= 0.72;
+        ball.state = 'bouncing';
+        if (Math.abs(ball.vy) < 1.5) {
+          // Respawn
+          setTimeout(() => { ball = newBall(); }, 800);
+          ball.state = 'dead';
         }
-        setTimeout(spawnBall,1200);
+      }
+
+      // Score — ball passes through hoop
+      if (!ball.scored && ball.vy > 0 &&
+          ball.y > hY - 5 && ball.y < hY + 35 &&
+          ball.x > hX - hW/2 + ball.r*0.4 && ball.x < hX + hW/2 - ball.r*0.4) {
+        ball.scored = true; score++; G.myScore = score; netAnim = 1.2;
+        for (let k=0; k<14; k++) {
+          const a=Math.random()*Math.PI*2, sp=3+Math.random()*6;
+          particles.push({x:hX, y:hY, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-4,
+            r:5+Math.random()*5, life:1, color:`hsl(${38+Math.random()*20},100%,60%)`});
+        }
+        setTimeout(() => { ball = newBall(); }, 1100);
+        ball.state = 'dead';
       }
     }
 
-    // ── Hand controls ─────────────────────────────────────────────────────
-    const tip=getIndexTip();
-    if(tip){
-      // Compute velocity
-      if(prevTip){
-        tipVx=tip.x-prevTip.x; tipVy=tip.y-prevTip.y;
+    // Trajectory guide
+    if (ball.state === 'held' && drag) {
+      const vx0 = (drag.startX - ball.x) * -0.08;
+      const vy0 = (drag.startY - ball.y) * -0.12;
+      x.setLineDash([6,5]); x.strokeStyle='rgba(255,255,255,0.35)'; x.lineWidth=2;
+      x.beginPath(); let px=ball.x, py=ball.y, pvx=vx0, pvy=vy0;
+      x.moveTo(px, py);
+      for (let s=0; s<18; s++) {
+        px+=pvx*2; py+=pvy*2; pvy+=0.52*2;
+        x.lineTo(px,py);
+        if (py > c.height) break;
       }
-      prevTip={x:tip.x,y:tip.y};
-
-      const dx=tip.x-ball.x, dy=tip.y-ball.y;
-      const dist=Math.sqrt(dx*dx+dy*dy);
-
-      if(!ball.launched){
-        if(dist<ball.r*1.5){
-          // Grab
-          ball.held=true; ball.x=tip.x; ball.y=tip.y;
-        }
-      }
-      if(ball.held){
-        ball.x=tip.x; ball.y=tip.y;
-      }
-
-      // Draw finger
-      x.beginPath(); x.arc(tip.x,tip.y,16,0,Math.PI*2);
-      x.fillStyle='rgba(192,96,255,.4)'; x.fill();
-      x.strokeStyle='#fff'; x.lineWidth=2.5; x.stroke();
-    } else {
-      // Finger lifted — launch ball if held
-      if(ball.held){
-        ball.held=false; ball.launched=true;
-        ball.vx=tipVx*0.8; ball.vy=tipVy*0.8;
-        prevTip=null; tipVx=0; tipVy=0;
-      }
+      x.stroke(); x.setLineDash([]);
     }
-
-    // Touch fallback
-    // (handled by touchstart/end events below)
 
     // Particles
-    for(let i=particles.length-1;i>=0;i--){
-      const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.25*dt; p.life-=dt*0.04;
-      if(p.life<=0){particles.splice(i,1);continue;}
+    for (let i=particles.length-1; i>=0; i--) {
+      const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.28*dt; p.life-=dt*0.04;
+      if (p.life<=0) { particles.splice(i,1); continue; }
       x.globalAlpha=p.life; x.fillStyle=p.color;
       x.beginPath(); x.arc(p.x,p.y,p.r,0,Math.PI*2); x.fill(); x.globalAlpha=1;
     }
 
-    // Launch guide arrow when ball is held
-    if(ball.held && G.lastHand){
-      const tx=hoopX-ball.x, ty=hoopY-ball.y;
-      const dist2=Math.sqrt(tx*tx+ty*ty);
-      x.setLineDash([8,6]);
-      x.strokeStyle='rgba(255,255,255,0.35)'; x.lineWidth=2;
-      x.beginPath(); x.moveTo(ball.x,ball.y);
-      x.lineTo(ball.x+tx/dist2*80,ball.y+ty/dist2*80); x.stroke();
-      x.setLineDash([]);
-    }
-
     drawHoop();
-    if(!ball.launched || ball.held) drawBall(ball.x, ball.y, ball.r);
-    else drawBall(ball.x, ball.y, ball.r);
+    if (ball.state !== 'dead') drawBall(ball.x, ball.y, ball.r);
 
-    if(!G.lastHand){
-      x.fillStyle='rgba(255,255,255,0.6)'; x.font='14px Poppins,sans-serif'; x.textAlign='center';
-      x.fillText('✋ Agarra la pelota con el índice',c.width/2,c.height-20);
+    // Instructions
+    if (ball.state === 'idle' || ball.state === 'held') {
+      x.fillStyle = 'rgba(8,0,16,0.65)';
+      _rr(x, c.width/2-130, c.height-48, 260, 34, 10); x.fill();
+      x.fillStyle='rgba(255,255,255,0.75)'; x.font='13px Inter,sans-serif'; x.textAlign='center';
+      x.fillText(ball.state==='idle'?'Toca la pelota y arrastra para lanzar':'¡Suelta para lanzar! 🏀', c.width/2, c.height-25);
     }
-    showHUD(score);
-    G.frameId=requestAnimationFrame(loop);
+
+    _hud(score);
+    G.frameId = requestAnimationFrame(loop);
   }
 
-  // Touch fallback
-  let touchHeld=false;
-  c.addEventListener('touchstart',e=>{
-    if(G.lastHand)return; e.preventDefault();
-    const rect=c.getBoundingClientRect(),t=e.touches[0];
+  // Touch events
+  c.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (ball.state === 'dead') return;
+    const rect=c.getBoundingClientRect(), t=e.touches[0];
     const px=(t.clientX-rect.left)*(c.width/rect.width);
     const py=(t.clientY-rect.top)*(c.height/rect.height);
-    const dx=px-ball.x,dy=py-ball.y;
-    if(Math.sqrt(dx*dx+dy*dy)<ball.r*1.8){ball.held=true;ball.launched=false;touchHeld=true;lastBallX=px;lastBallY=py;}
-  },{passive:false});
-  c.addEventListener('touchmove',e=>{
-    if(!touchHeld||G.lastHand)return; e.preventDefault();
-    const rect=c.getBoundingClientRect(),t=e.touches[0];
-    const px=(t.clientX-rect.left)*(c.width/rect.width);
-    const py=(t.clientY-rect.top)*(c.height/rect.height);
-    tipVx=px-ball.x; tipVy=py-ball.y;
-    ball.x=px; ball.y=py;
-    lastBallX=px; lastBallY=py;
-  },{passive:false});
-  c.addEventListener('touchend',e=>{
-    if(!touchHeld||G.lastHand)return;
-    ball.held=false; ball.launched=true;
-    ball.vx=tipVx*0.5; ball.vy=tipVy*0.5;
-    touchHeld=false;
+    const dx=px-ball.x, dy=py-ball.y;
+    if (Math.sqrt(dx*dx+dy*dy)<ball.r*1.8) {
+      ball.state='held'; ball.vx=0; ball.vy=0;
+      drag={startX:px, startY:py};
+    }
+  }, {passive:false});
+
+  c.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (ball.state !== 'held') return;
+    const rect=c.getBoundingClientRect(), t=e.touches[0];
+    ball.x = (t.clientX-rect.left)*(c.width/rect.width);
+    ball.y = (t.clientY-rect.top)*(c.height/rect.height);
+  }, {passive:false});
+
+  c.addEventListener('touchend', e => {
+    if (ball.state !== 'held' || !drag) return;
+    const rect=c.getBoundingClientRect();
+    const t = e.changedTouches[0];
+    const ex=(t.clientX-rect.left)*(c.width/rect.width);
+    const ey=(t.clientY-rect.top)*(c.height/rect.height);
+    ball.vx = (ex - drag.startX) * -0.14;
+    ball.vy = (ey - drag.startY) * -0.18;
+    ball.vy = Math.min(ball.vy, -3); // minimum upward force
+    ball.state = 'flying';
+    ball.scored = false;
+    drag = null;
   });
 
-  G.frameId=requestAnimationFrame(loop);
-}
+  // Mouse fallback
+  c.addEventListener('mousedown', e => {
+    if (ball.state==='dead') return;
+    const rect=c.getBoundingClientRect();
+    const px=(e.clientX-rect.left)*(c.width/rect.width);
+    const py=(e.clientY-rect.top)*(c.height/rect.height);
+    const dx=px-ball.x, dy=py-ball.y;
+    if (Math.sqrt(dx*dx+dy*dy)<ball.r*1.8) { ball.state='held'; drag={startX:px,startY:py}; }
+  });
+  c.addEventListener('mousemove', e => {
+    if (ball.state!=='held') return;
+    const rect=c.getBoundingClientRect();
+    ball.x=(e.clientX-rect.left)*(c.width/rect.width);
+    ball.y=(e.clientY-rect.top)*(c.height/rect.height);
+  });
+  c.addEventListener('mouseup', e => {
+    if (ball.state!=='held'||!drag) return;
+    const rect=c.getBoundingClientRect();
+    const ex=(e.clientX-rect.left)*(c.width/rect.width);
+    const ey=(e.clientY-rect.top)*(c.height/rect.height);
+    ball.vx=(ex-drag.startX)*-0.14;
+    ball.vy=(ey-drag.startY)*-0.18;
+    ball.vy=Math.min(ball.vy,-3);
+    ball.state='flying'; ball.scored=false; drag=null;
+  });
 
-// ══════════════════════════ GAME RESULT ════════════════════════════════════
-function showGameResult(myScore, partnerScore) {
-  const won = myScore>partnerScore, tied = myScore===partnerScore;
-  document.getElementById('result-emoji').textContent = tied?'🤝':won?'🏆':'😅';
-  document.getElementById('result-winner').textContent = tied?'¡Empate!':won?'🎉 ¡GANASTE!':'Tu compañero ganó';
-  document.getElementById('result-winner').style.color = tied?'#F59E0B':won?'#A020F0':'#EF4444';
-  document.getElementById('result-score').textContent = `Tú: ${myScore} pts — Compañero: ${partnerScore} pts`;
-  document.getElementById('game-result').classList.add('show');
+  lastTs = performance.now();
+  G.frameId = requestAnimationFrame(loop);
 }
 
 // ─ Auto-login ────────────────────────────────────────────────────────────────
+// ── Game socket handlers ─────────────────────────────────────────────────────
+function onGameInvite(type, fromName) {
+  // Partner opened a game — show it and wait for their score
+  G.type = type;
+  G.myScore = 0; G.partnerScore = 0;
+  G.phase = 'waiting_partner'; // waiting for partner's score before my turn
+  const titles = {fruit:'🍉 Fruit Ninja', target:'🎯 Tiro al Blanco', basket:'🏀 Baloncesto'};
+  document.getElementById('game-title').textContent = titles[type] || '🎮';
+  document.getElementById('game-result').classList.remove('show');
+  document.getElementById('game-overlay').classList.add('active');
+  _initCanvas();
+  _drawWaiting2('🎮 ' + (fromName||'Tu compañero') + ' está jugando...
+⌛ Tu turno llegará pronto');
+  document.getElementById('game-status').textContent = 'Turno de tu compañero...';
+  if (app.socket) app.socket.emit('game_invite_ack', { type });
+}
+
+function _drawWaiting2(text) {
+  const c = G.canvas, x = G.ctx;
+  if (!c || !x) return;
+  x.clearRect(0, 0, c.width, c.height);
+  x.fillStyle = 'rgba(8,0,16,0.88)'; x.fillRect(0, 0, c.width, c.height);
+  const lines = text.split('\n');
+  x.textAlign = 'center';
+  lines.forEach((line, i) => {
+    x.font = `bold ${i===0?20:15}px ${i===0?'Poppins':'Inter'},sans-serif`;
+    x.fillStyle = i===0 ? '#fff' : '#C8A8E0';
+    x.fillText(line, c.width/2, c.height/2 - 10 + i * 34);
+  });
+}
+
+function onGameScore(score, type) {
+  G.partnerScore = score;
+  if (G.type) type = G.type;
+  else G.type = type;
+
+  if (G.phase === 'waiting') {
+    // I already played — show result
+    _showResult();
+  } else {
+    // Partner finished — now it's MY turn
+    G.phase = 'idle';
+    if (!document.getElementById('game-overlay').classList.contains('active')) {
+      document.getElementById('game-overlay').classList.add('active');
+      _initCanvas();
+    }
+    // Show "YOUR TURN" announcement then start
+    const c = G.canvas, x = G.ctx;
+    x.clearRect(0, 0, c.width, c.height);
+    x.fillStyle = 'rgba(8,0,16,0.9)'; x.fillRect(0, 0, c.width, c.height);
+    x.fillStyle = '#A020F0'; x.shadowColor = '#A020F0'; x.shadowBlur = 28;
+    x.font = `bold ${Math.min(54, c.width/6)}px Poppins,sans-serif`;
+    x.textAlign = 'center';
+    x.fillText('¡TU TURNO!', c.width/2, c.height/2 - 20);
+    x.shadowBlur = 0;
+    x.fillStyle = 'rgba(255,255,255,0.55)'; x.font = '16px Inter,sans-serif';
+    x.fillText('¡Prepárate!', c.width/2, c.height/2 + 26);
+    document.getElementById('game-status').textContent = '¡TU TURNO! Comenzando...';
+    document.getElementById('game-result').classList.remove('show');
+    setTimeout(() => {
+      if (G.type) _startMyTurn();
+    }, 1600);
+  }
+}
+
+function onGameEnd() {
+  _stopAll();
+  G.type = null; G.phase = 'idle';
+  document.getElementById('game-overlay').classList.remove('active');
+  toast('Tu compañero cerró el juego', 'info');
+}
+
 // ── Auto-login ────────────────────────────────────────────────────────────────
 (async()=>{
   const t=localStorage.getItem('rd_token');
