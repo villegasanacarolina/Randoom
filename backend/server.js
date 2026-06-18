@@ -614,16 +614,23 @@ app.get('/api/profile/:email', authUser, async (req, res) => {
 app.get('/api/profile/me/full', authUser, async (req, res) => {
   try {
     const email = req.user.email;
-    const [user, profile, friends, pendingReqs] = await Promise.all([
+    const [user, friends, pendingReqs] = await Promise.all([
       pool.query('SELECT * FROM users WHERE email=$1', [email]),
-      pool.query('SELECT * FROM profiles WHERE email=$1', [email]),
       pool.query('SELECT COUNT(*) FROM friends WHERE email1=$1 OR email2=$1', [email]),
       pool.query("SELECT * FROM friend_requests WHERE to_email=$1 AND status='pending'", [email])
     ]);
     if (!user.rows.length) return res.status(404).json({ error: 'No encontrado' });
     const u = user.rows[0];
+    // Auto-create profile row for users who don't have one yet
+    const profile = await pool.query(
+      `INSERT INTO profiles(email, display_name, zodiac)
+       VALUES($1,$2,$3)
+       ON CONFLICT(email) DO UPDATE SET updated_at=NOW()
+       RETURNING *`,
+      [email, u.name, '']
+    );
     res.json({
-      email, name: u.name, age: u.age, gender: u.gender,
+      email, name: u.name, username: u.username, age: u.age, gender: u.gender,
       country: u.country, isPremium: u.is_premium,
       ...profile.rows[0],
       friendCount: parseInt(friends.rows[0].count),
@@ -650,11 +657,18 @@ app.put('/api/profile', authUser, uploadAvatar.single('avatar'), async (req, res
     await pool.query(
       `INSERT INTO profiles(email,bio,interests,zodiac,display_name,avatar_url,updated_at)
        VALUES($1,$2,$3,$4,$5,$6,NOW())
-       ON CONFLICT(email) DO UPDATE SET bio=$2,interests=$3,zodiac=$4,display_name=$5,
-       avatar_url=CASE WHEN $6='' THEN profiles.avatar_url ELSE $6 END, updated_at=NOW()`,
+       ON CONFLICT(email) DO UPDATE SET
+         bio = EXCLUDED.bio,
+         interests = EXCLUDED.interests,
+         zodiac = EXCLUDED.zodiac,
+         display_name = EXCLUDED.display_name,
+         avatar_url = CASE WHEN EXCLUDED.avatar_url='' THEN profiles.avatar_url ELSE EXCLUDED.avatar_url END,
+         updated_at = NOW()`,
       [req.user.email, updates.bio, updates.interests, updates.zodiac, updates.display_name, updates.avatar_url||'']
     );
-    res.json({ ok: true });
+    // Return updated profile so frontend can confirm
+    const updated = await pool.query('SELECT * FROM profiles WHERE email=$1', [req.user.email]);
+    res.json({ ok: true, profile: updated.rows[0] });
   } catch(e) { console.error(e); res.status(500).json({ error: 'Error' }); }
 });
 
@@ -719,13 +733,13 @@ app.get('/api/friends/list', authUser, async (req, res) => {
     const r = await pool.query(
       `SELECT u.email, u.name, u.age, u.country, p.avatar_url, p.zodiac
        FROM friends f
-       JOIN users u ON (CASE WHEN f.email1=$1 THEN f.email2 ELSE f.email1 END)=u.email
-       LEFT JOIN profiles p ON u.email=p.email
-       WHERE f.email1=$1 OR f.email2=$1`,
+       JOIN users u ON u.email = CASE WHEN f.email1=$1 THEN f.email2 ELSE f.email1 END
+       LEFT JOIN profiles p ON p.email = u.email
+       WHERE (f.email1=$1 OR f.email2=$1) AND u.email != $1`,
       [req.user.email]
     );
     res.json(r.rows);
-  } catch(e) { res.status(500).json({ error: 'Error' }); }
+  } catch(e) { console.error('friends/list error:', e.message); res.status(500).json({ error: 'Error' }); }
 });
 
 // ── Username search ───────────────────────────────────────────────────────────
@@ -794,18 +808,19 @@ app.post('/api/calls/respond', authUser, async (req, res) => {
 // ── Online friends ────────────────────────────────────────────────────────────
 app.get('/api/friends/online', authUser, async (req, res) => {
   try {
+    // Use UNION to handle both directions of friendship cleanly
     const r = await pool.query(
-      `SELECT u.email, u.name, u.username, p.avatar_url
+      `SELECT u.email, u.name, u.username, p.avatar_url, p.zodiac
        FROM friends f
-       JOIN users u ON (CASE WHEN f.email1=$1 THEN f.email2 ELSE f.email1 END)=u.email
-       LEFT JOIN profiles p ON u.email=p.email
-       WHERE f.email1=$1 OR f.email2=$1`,
+       JOIN users u ON u.email = CASE WHEN f.email1=$1 THEN f.email2 ELSE f.email1 END
+       LEFT JOIN profiles p ON p.email = u.email
+       WHERE (f.email1=$1 OR f.email2=$1) AND u.email != $1`,
       [req.user.email]
     );
     const onlineEmails = new Set(Object.values(activeSockets).map(s => s.email));
     const friends = r.rows.map(f => ({ ...f, online: onlineEmails.has(f.email) }));
     res.json(friends);
-  } catch(e) { res.status(500).json({ error: 'Error' }); }
+  } catch(e) { console.error('friends/online error:', e.message); res.status(500).json({ error: 'Error' }); }
 });
 
 // ── LIVES ────────────────────────────────────────────────────────────────────

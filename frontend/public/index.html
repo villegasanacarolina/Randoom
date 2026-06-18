@@ -1587,26 +1587,33 @@ async function loadMyProfile() {
   try {
     const p = await api('/api/profile/me/full','GET');
     myProfile = p;
+    // Header info
     document.getElementById('profile-name-display').textContent = p.display_name||p.name||'—';
-    document.getElementById('profile-zodiac-display').textContent = ZODIAC[p.zodiac]||'';
+    const ZODIAC_MAP = {aries:'♈ Aries',tauro:'♉ Tauro',geminis:'♊ Géminis',cancer:'♋ Cáncer',leo:'♌ Leo',virgo:'♍ Virgo',libra:'♎ Libra',escorpio:'♏ Escorpio',sagitario:'♐ Sagitario',capricornio:'♑ Capricornio',acuario:'♒ Acuario',piscis:'♓ Piscis'};
+    document.getElementById('profile-zodiac-display').textContent = ZODIAC_MAP[p.zodiac]||'';
     document.getElementById('profile-bio-display').textContent = p.bio||'';
     document.getElementById('profile-friends-count').textContent = p.friendCount||0;
     document.getElementById('profile-requests-count').textContent = (p.pendingRequests||[]).length;
+    // Avatar
     if(p.avatar_url) {
       const av=document.getElementById('profile-avatar-display');
       av.innerHTML=`<img src="${SERVER}${p.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`;
     }
-    // Pre-fill edit form
+    // Pre-fill edit form with saved values
     document.getElementById('edit-name').value = p.display_name||p.name||'';
     document.getElementById('edit-bio').value = p.bio||'';
-    document.getElementById('edit-interests').value = (p.interests||[]).join(', ');
+    const interestList = Array.isArray(p.interests) ? p.interests.filter(Boolean) : [];
+    document.getElementById('edit-interests').value = interestList.join(', ');
     document.getElementById('edit-zodiac').value = p.zodiac||'';
-    // Show interests
-    if(p.interests&&p.interests.length) {
-      document.getElementById('interests-display').style.display='block';
-      document.getElementById('interests-tags').innerHTML = p.interests.map(i=>`<span class="interest-tag">${i}</span>`).join('');
+    // Show interest tags
+    const intEl = document.getElementById('interests-display');
+    if(interestList.length) {
+      intEl.style.display='block';
+      document.getElementById('interests-tags').innerHTML = interestList.map(i=>`<span class="interest-tag">${i}</span>`).join('');
+    } else {
+      intEl.style.display='none';
     }
-  } catch(e) { console.error(e); }
+  } catch(e) { console.error('loadMyProfile error:', e); toast('Error cargando perfil','err'); }
 }
 
 async function saveProfile() {
@@ -1614,14 +1621,24 @@ async function saveProfile() {
   const bio = document.getElementById('edit-bio').value.trim();
   const interests = document.getElementById('edit-interests').value;
   const zodiac = document.getElementById('edit-zodiac').value;
+  if (!name) { toast('El nombre no puede estar vacío','err'); return; }
   try {
     const fd = new FormData();
-    fd.append('display_name',name);fd.append('bio',bio);
-    fd.append('interests',interests);fd.append('zodiac',zodiac);
+    fd.append('display_name',name);
+    fd.append('bio',bio);
+    fd.append('interests',interests);
+    fd.append('zodiac',zodiac);
     const r = await fetch(SERVER+'/api/profile',{method:'PUT',headers:{'Authorization':'Bearer '+app.token},body:fd});
-    const d = await r.json();if(!r.ok)throw new Error(d.error||'Error');
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error||'Error');
     toast('✅ Perfil actualizado','ok');
-    loadMyProfile();
+    // Update display immediately without reload
+    document.getElementById('profile-name-display').textContent = name;
+    document.getElementById('profile-bio-display').textContent = bio;
+    const ZODIAC_MAP = {aries:'♈ Aries',tauro:'♉ Tauro',geminis:'♊ Géminis',cancer:'♋ Cáncer',leo:'♌ Leo',virgo:'♍ Virgo',libra:'♎ Libra',escorpio:'♏ Escorpio',sagitario:'♐ Sagitario',capricornio:'♑ Capricornio',acuario:'♒ Acuario',piscis:'♓ Piscis'};
+    document.getElementById('profile-zodiac-display').textContent = ZODIAC_MAP[zodiac]||'';
+    // Also reload full profile to confirm saved
+    setTimeout(loadMyProfile, 500);
   } catch(e) { toast(e.message,'err'); }
 }
 
@@ -1792,6 +1809,7 @@ function onGameInvite(type, fromName) {
   document.getElementById('game-status').textContent = '👁 ' + fromName + ' está jugando — 30s';
   document.getElementById('game-result').classList.remove('show');
   // Start rendering partner's game (data comes via game_state)
+  GS.alive = true; // ensure loop runs
   _startSpectatorLoop();
 }
 
@@ -1945,22 +1963,21 @@ function _beginMyTurn() {
 
 function _endMyTurn(reason) {
   if (GS.phase!=='my_turn') return;
-  _kill();
+  // Stop game loops but keep RAF for spectator
+  if (GS.timerID)  { clearInterval(GS.timerID);     GS.timerID=null; }
+  if (GS.stateInt) { clearInterval(GS.stateInt);    GS.stateInt=null; }
+  if (GS.rafID)    { cancelAnimationFrame(GS.rafID); GS.rafID=null; }
+  // Remove listeners by cloning canvas
+  const old=_gc();
+  if(old&&old.parentNode){const neo=old.cloneNode(false);neo.width=old.width;neo.height=old.height;old.parentNode.replaceChild(neo,old);}
+  GS.alive=false;
   GS.myScore = MY.score;
   GS.phase = 'waiting';
   if (app.socket) app.socket.emit('game_score',{score:GS.myScore,type:GS.type});
   document.getElementById('game-status').textContent = `⌛ Compañero jugando... (Tú: ${GS.myScore} pts)`;
-  // Draw waiting screen
-  _size();
-  const c=_gc(), x=_gx(); if(c&&x){
-    x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(8,0,16,.9)'; x.fillRect(0,0,c.width,c.height);
-    x.textAlign='center';
-    x.font=`bold ${Math.min(36,c.width/8)}px Poppins,sans-serif`; x.fillStyle='#A020F0';
-    x.fillText('✅ Tu puntuación: '+GS.myScore+' pts', c.width/2, c.height/2-14);
-    x.font='16px Inter,sans-serif'; x.fillStyle='#C8A8E0';
-    x.fillText(reason||'⌛ Esperando a tu compañero...', c.width/2, c.height/2+24);
-  }
+  document.getElementById('game-result').classList.remove('show');
+  // NOW start spectator loop so I watch partner play
+  _startSpectatorLoop();
 }
 
 // ─── Spectator loop (when partner is playing, render PT state) ───────────────
@@ -1969,7 +1986,7 @@ function _startSpectatorLoop() {
   let lastTs = performance.now();
 
   function specFrame(now) {
-    if (!GS.alive || GS.phase!=='partner_turn') return;
+    if (!GS.alive || (GS.phase!=='partner_turn' && GS.phase!=='waiting')) return;
     const dt = Math.min((now-lastTs)/16, 2.5); lastTs=now;
     const c=_gc(), x=_gx(); if(!c||!x) return;
     x.clearRect(0,0,c.width,c.height);
@@ -1979,9 +1996,9 @@ function _startSpectatorLoop() {
     if (GS.type==='fruit') {
       PT.items.forEach(f=>{
         x.save(); x.translate(f.x,f.y);
-        x.shadowColor='rgba(255,200,50,.6)'; x.shadowBlur=12;
+        x.shadowColor='rgba(255,230,80,1)'; x.shadowBlur=18;
         x.font=f.sz+'px serif'; x.textAlign='center'; x.textBaseline='middle';
-        x.fillText(f.e,0,0); x.restore();
+        x.fillText(f.e,0,0); x.shadowBlur=9; x.fillText(f.e,0,0); x.restore();
       });
     } else if (GS.type==='target') {
       PT.tgts.forEach(t=>{
@@ -2003,9 +2020,9 @@ function _startSpectatorLoop() {
       x.restore();
     }
 
-    // Both HUDs — MY score left, PARTNER score right
-    _drawHUD(x, c.width, GS.myScore, GS.myTimeLeft, true);
-    _drawHUD(x, c.width, PT.score, GS.ptTimeLeft, false);
+    // Both HUDs during spectating
+    _drawHUD(x, c.width, GS.myScore, 0, true);   // my final score (time=0 = done)
+    _drawHUD(x, c.width, PT.score, GS.ptTimeLeft, false); // partner live
 
     GS.rafID = requestAnimationFrame(specFrame);
   }
@@ -2087,9 +2104,15 @@ function _fruit() {
       f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=.45*dt;f.rot+=f.rv*dt;
       if(f.y>c.height+80){MY.items.splice(i,1);if(!f.bomb){MY.lives--;if(MY.lives<0)MY.lives=0;}continue;}
       x.save();x.translate(f.x,f.y);x.rotate(f.rot*Math.PI/180);
-      x.shadowColor=f.bomb?'rgba(255,80,0,.8)':'rgba(255,200,50,.6)';x.shadowBlur=12;
+      // Always bright glow so fruits are always clearly visible
+      x.shadowColor=f.bomb?'rgba(255,100,0,1)':'rgba(255,230,80,1)';
+      x.shadowBlur=f.bomb?20:18;
       x.font=f.sz+'px serif';x.textAlign='center';x.textBaseline='middle';
-      x.fillText(f.e,0,0);x.restore();
+      x.fillText(f.e,0,0);
+      // Draw twice for extra brightness on desktop
+      x.shadowBlur=f.bomb?10:9;
+      x.fillText(f.e,0,0);
+      x.restore();
     }
 
     // Draw PARTNER fruits (PT) — smaller, top-right quadrant
@@ -2103,8 +2126,9 @@ function _fruit() {
       PT.items.forEach(f=>{
         const px=offX+f.x*scl, py=offY+f.y*scl;
         if(px<offX||py<0||px>c.width||py>c.height*0.3) return;
+        x.shadowColor='rgba(255,230,80,1)'; x.shadowBlur=8;
         x.font=Math.round(f.sz*scl)+'px serif';x.textAlign='center';x.textBaseline='middle';
-        x.fillText(f.e,px,py);
+        x.fillText(f.e,px,py); x.shadowBlur=0;
       });
       x.restore();
       // Partner label
