@@ -302,6 +302,38 @@ textarea.fc{resize:vertical;min-height:70px}
 
 
 
+<!-- Username picker modal (for existing users without username) -->
+<div class="modal-bg" id="username-modal" style="z-index:300">
+  <div class="modal">
+    <div style="font-size:44px;text-align:center;margin-bottom:10px">👤</div>
+    <h3>Elige tu @usuario</h3>
+    <p>Es la primera vez que usas esta función. Elige un nombre de usuario único.</p>
+    <div class="fg" style="margin-bottom:14px">
+      <label>Nombre de usuario</label>
+      <div style="position:relative">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gray-l);font-size:15px">@</span>
+        <input class="fc" id="modal-username" type="text" placeholder="tu_usuario" maxlength="20" style="padding-left:28px" oninput="checkUsernameModal(this.value)"/>
+      </div>
+      <span id="modal-username-msg" style="font-size:11px;margin-top:3px"></span>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="saveUsername()">✅ Guardar</button>
+  </div>
+</div>
+
+<!-- Call invite modal -->
+<div class="modal-bg" id="call-invite-modal">
+  <div class="modal" style="text-align:center">
+    <div style="font-size:52px;margin-bottom:10px">📞</div>
+    <h3>Llamada entrante</h3>
+    <p id="call-invite-from" style="color:var(--pu-l);font-size:16px;font-weight:700;margin-bottom:6px"></p>
+    <p style="color:var(--gray-l);font-size:13px">quiere hacer una videollamada contigo</p>
+    <div class="modal-btns" style="margin-top:20px">
+      <button class="btn btn-success" id="call-accept-btn" onclick="">✅ Aceptar</button>
+      <button class="btn btn-danger" id="call-reject-btn" onclick="">❌ Rechazar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Report modal -->
 <div class="modal-bg" id="report-modal">
   <div class="modal">
@@ -329,8 +361,10 @@ textarea.fc{resize:vertical;min-height:70px}
   <nav class="nav">
     <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
     <div class="nav-actions">
+      <button class="btn btn-ghost btn-sm" onclick="showSearch()" id="nav-search-btn" style="display:none">🔍</button>
       <button class="btn btn-outline btn-sm" onclick="showPremium()">⭐ Premium</button>
-      <button class="btn btn-primary btn-sm" onclick="showAuth()">Entrar</button>
+      <button class="btn btn-primary btn-sm" onclick="showAuth()" id="nav-login-btn">Entrar</button>
+      <span class="btn btn-ghost btn-sm" id="nav-user-btn" style="display:none;cursor:pointer" onclick="showProfile()">👤</span>
     </div>
   </nav>
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 12px 28px;width:100%;overflow:hidden">
@@ -385,6 +419,14 @@ textarea.fc{resize:vertical;min-height:70px}
       <div id="register-form" class="card hidden">
         <div class="auth-form">
           <div class="fg"><label>Nombre o apodo</label><input class="fc" id="r-name" type="text" placeholder="¿Cómo te llaman?" maxlength="30" autocomplete="nickname"/></div>
+          <div class="fg">
+            <label>Nombre de usuario <span style="color:var(--pu-l)">@</span></label>
+            <div style="position:relative">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gray-l);font-size:15px">@</span>
+              <input class="fc" id="r-username" type="text" placeholder="tu_usuario" maxlength="20" style="padding-left:28px" autocomplete="off" oninput="checkUsername(this.value)"/>
+            </div>
+            <span id="username-msg" style="font-size:11px;margin-top:2px"></span>
+          </div>
           <div class="fg"><label>Correo electrónico</label><input class="fc" id="r-email" type="email" placeholder="tu@correo.com" autocomplete="email"/></div>
           <div class="fg"><label>Contraseña</label><input class="fc" id="r-pass" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password"/></div>
           <div class="row2">
@@ -481,7 +523,7 @@ textarea.fc{resize:vertical;min-height:70px}
     <div id="timer-bar" style="display:none">
       <span id="timer-disp"></span><span id="timer-fill"></span><span id="timer-type"></span>
     </div>
-    <div class="chat-ctrls">
+    <div class="chat-ctrls" style="justify-content:center;flex-wrap:wrap">
       <button class="ctrl-btn mic" id="btn-mic" onclick="toggleMic()">🎤</button>
       <button class="ctrl-btn cam" id="btn-cam" onclick="toggleCam()">📷</button>
       <button class="ctrl-btn next" onclick="findPartner()">⏭</button>
@@ -661,6 +703,24 @@ textarea.fc{resize:vertical;min-height:70px}
   </div>
 </div>
 
+<!-- ═══ SEARCH SCREEN ═══ -->
+<div id="s-search" class="screen">
+  <nav class="nav">
+    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <button class="btn btn-ghost btn-sm" onclick="showScreen('s-landing')">← Volver</button>
+  </nav>
+  <div style="flex:1;padding:16px 14px;overflow-y:auto;display:flex;flex-direction:column;align-items:center">
+    <div style="width:100%;max-width:500px">
+      <h2 style="font-family:'Poppins',sans-serif;font-weight:800;font-size:22px;margin-bottom:14px">🔍 Buscar usuarios</h2>
+      <div style="position:relative;margin-bottom:16px">
+        <input class="fc" id="search-input" type="text" placeholder="Busca por @usuario o nombre..." oninput="searchUsers(this.value)" style="padding-left:40px"/>
+        <span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:18px">🔍</span>
+      </div>
+      <div id="search-results"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ PROFILE SCREEN ═══ -->
 <div id="s-profile" class="screen">
   <nav class="nav">
@@ -836,6 +896,7 @@ async function doLogin(){
 let pendingEmail=null;
 async function doRegister(){
   const name=document.getElementById('r-name').value.trim();
+  const username=document.getElementById('r-username').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
   const email=document.getElementById('r-email').value.trim();
   const pass=document.getElementById('r-pass').value;
   const age=document.getElementById('r-age').value;
@@ -844,11 +905,12 @@ async function doRegister(){
   const zodiac=document.getElementById('r-zodiac').value||'';
   const terms=document.getElementById('terms-check')?.checked;
   if(!name||!email||!pass||!age||!gender){toast('Completa todos los campos','err');return;}
+  if(!username||username.length<3){toast('El nombre de usuario debe tener al menos 3 caracteres','err');return;}
   if(pass.length<6){toast('Contraseña mínimo 6 caracteres','err');return;}
   if(parseInt(age)<18){toast('Debes tener al menos 18 años','err');return;}
   if(!terms){toast('Debes aceptar los Términos de Uso para continuar','err');return;}
   try{
-    await api('/api/auth/register','POST',{email,password:pass,name,age,gender,country,zodiac});
+    await api('/api/auth/register','POST',{email,password:pass,name,username,age,gender,country,zodiac});
     pendingEmail=email;
     document.getElementById('verify-email-display').textContent=email;
     document.getElementById('register-form').classList.add('hidden');
@@ -969,6 +1031,25 @@ function initSocket(){
   app.socket.on('friend_accepted',({name})=>{
     toast(`✅ ${name} aceptó tu solicitud de amistad`,'ok');
   });
+  app.socket.on('call_invite',({from,name,inviteId})=>{
+    document.getElementById('call-invite-from').textContent = name||from;
+    document.getElementById('call-accept-btn').onclick = () => respondCallInvite(inviteId,true,from);
+    document.getElementById('call-reject-btn').onclick = () => respondCallInvite(inviteId,false,from);
+    document.getElementById('call-invite-modal').classList.add('open');
+    _playSound('score'); // ring sound
+  });
+  app.socket.on('call_accepted',({from})=>{
+    toast('✅ ¡Tu amigo aceptó la llamada!','ok');
+    goToChat();
+  });
+  app.socket.on('call_rejected',({from})=>{
+    toast('Tu amigo rechazó la llamada','info');
+  });
+  app.socket.on('friend_online',({email,online})=>{
+    // Update online dot in friends list if visible
+    const dot = document.querySelector(`[data-friend-email="${email}"] .friend-dot`);
+    if (dot) dot.style.background = online ? 'var(--ok)' : 'var(--gray)';
+  });
 }
 
 // ── WebRTC ────────────────────────────────────────────────────────────────────
@@ -1079,6 +1160,121 @@ function addMsg(txt,who){
 function addSys(txt){
   ['msgs','msgs-d'].forEach(id=>{const a=document.getElementById(id);if(!a)return;const d=document.createElement('div');d.className='msg sys';d.textContent=txt;a.appendChild(d);a.scrollTop=a.scrollHeight;});
 }
+// ── User Search ──────────────────────────────────────────────────────────────
+let searchTimer = null;
+function showUsernameModal() {
+  document.getElementById('username-modal').classList.add('open');
+  document.getElementById('modal-username').value = '';
+  document.getElementById('modal-username-msg').textContent = '';
+}
+
+let _uModalOk = false;
+async function checkUsernameModal(val) {
+  val = val.toLowerCase().replace(/[^a-z0-9_]/g,'');
+  document.getElementById('modal-username').value = val;
+  const msg = document.getElementById('modal-username-msg');
+  _uModalOk = false;
+  if (val.length < 3) { msg.textContent='Mínimo 3 caracteres'; msg.style.color='var(--gray-l)'; return; }
+  try {
+    const r = await fetch(SERVER+'/api/users/check-username?username='+val);
+    const d = await r.json();
+    _uModalOk = d.available;
+    msg.textContent = d.available ? '✅ Disponible' : '❌ Ya en uso';
+    msg.style.color = d.available ? 'var(--ok)' : 'var(--err)';
+  } catch(e) {}
+}
+
+async function saveUsername() {
+  const val = document.getElementById('modal-username').value.trim();
+  if (!val || val.length < 3) { toast('Mínimo 3 caracteres','err'); return; }
+  if (!_uModalOk) { toast('Ese nombre ya está en uso','err'); return; }
+  try {
+    await api('/api/profile','PUT',{username: val});
+    app.user.username = val;
+    document.getElementById('username-modal').classList.remove('open');
+    toast('✅ ¡Usuario @'+val+' guardado!','ok');
+    goToChat();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+function showSearch() {
+  if (!app.token) { showAuth(); return; }
+  showScreen('s-search');
+  document.getElementById('search-input').value='';
+  document.getElementById('search-results').innerHTML='';
+}
+
+function searchUsers(q) {
+  clearTimeout(searchTimer);
+  if (q.startsWith('@')) q = q.slice(1);
+  if (!q || q.length < 2) { document.getElementById('search-results').innerHTML=''; return; }
+  searchTimer = setTimeout(async () => {
+    try {
+      const r = await api('/api/users/search?q='+encodeURIComponent(q),'GET');
+      const el = document.getElementById('search-results');
+      if (!r.length) { el.innerHTML='<div class="empty" style="padding:20px"><div class="ei">🔍</div><p>Sin resultados</p></div>'; return; }
+      el.innerHTML = r.map(u => `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border:1px solid var(--bd);border-radius:12px;margin-bottom:8px">
+          <div style="width:42px;height:42px;border-radius:50%;background:var(--pu-g);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">
+            ${u.avatar_url?`<img src="${SERVER}${u.avatar_url}" style="width:42px;height:42px;border-radius:50%;object-fit:cover"/>`:'👤'}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:14px">${u.name}</div>
+            <div style="font-size:12px;color:var(--pu-l)">@${u.username||'—'}</div>
+          </div>
+          ${u.is_friend
+            ? '<span style="font-size:11px;color:var(--ok);font-weight:600">✅ Amigos</span>'
+            : `<button class="btn btn-ghost btn-sm" onclick="sendFriendReqByEmail('${u.email}')">➕ Añadir</button>`
+          }
+        </div>
+      `).join('');
+    } catch(e) { console.error(e); }
+  }, 400);
+}
+
+async function sendFriendReqByEmail(email) {
+  try {
+    await api('/api/friends/request','POST',{toEmail:email});
+    toast('✅ Solicitud enviada','ok');
+    searchUsers(document.getElementById('search-input').value);
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// ── Friend video calls ────────────────────────────────────────────────────────
+async function inviteFriendCall(email) {
+  try {
+    await api('/api/calls/invite','POST',{toEmail:email});
+    toast('📞 Invitación enviada','ok');
+  } catch(e) { toast(e.message,'err'); }
+}
+
+async function respondCallInvite(inviteId, accept, fromEmail) {
+  try {
+    await api('/api/calls/respond','POST',{inviteId,accept});
+    if (accept) {
+      // Both go to chat and find each other
+      toast('📞 Conectando...','ok');
+      goToChat();
+    } else {
+      toast('Llamada rechazada','info');
+    }
+    closeModal('call-invite-modal');
+  } catch(e) { toast(e.message,'err'); }
+}
+
+async function checkUsername(val) {
+  val = val.toLowerCase().replace(/[^a-z0-9_]/g,'');
+  document.getElementById('r-username').value = val;
+  const msg = document.getElementById('username-msg');
+  if (val.length < 3) { msg.textContent='Mínimo 3 caracteres'; msg.style.color='var(--gray-l)'; return; }
+  try {
+    const r = await fetch(SERVER+'/api/users/check-username?username='+val);
+    const d = await r.json();
+    msg.textContent = d.available ? '✅ Disponible' : '❌ Ya en uso';
+    msg.style.color = d.available ? 'var(--ok)' : 'var(--err)';
+  } catch(e) {}
+}
+
 function sendMsg(){const i=document.getElementById('chat-in');const t=i.value.trim();if(!t||!app.socket)return;app.socket.emit('chat_message',{text:t});addMsg(t,'me');i.value='';}
 function sendMsgDesk(){const i=document.getElementById('chat-in-d');const t=i.value.trim();if(!t||!app.socket)return;app.socket.emit('chat_message',{text:t});addMsg(t,'me');i.value='';}
 
@@ -1274,18 +1470,22 @@ async function respondReq(id, accept) {
 
 async function loadFriends() {
   try {
-    const friends = await api('/api/friends/list','GET');
+    const friends = await api('/api/friends/online','GET');
     const el = document.getElementById('friends-list');
     if(!friends.length) {el.innerHTML='<div class="empty"><div class="ei">👥</div><p style="font-size:13px">Aún no tienes amigos</p></div>';return;}
     el.innerHTML = friends.map(f=>`
-      <div class="req-item">
+      <div class="req-item" data-friend-email="${f.email}">
         <div class="req-info">
-          <div class="req-avatar">${f.avatar_url?`<img src="${SERVER}${f.avatar_url}" style="width:40px;height:40px;border-radius:50%;object-fit:cover"/>`:' 👤'}</div>
+          <div style="position:relative;flex-shrink:0">
+            <div class="req-avatar">${f.avatar_url?`<img src="${SERVER}${f.avatar_url}" style="width:40px;height:40px;border-radius:50%;object-fit:cover"/>`:' 👤'}</div>
+            <div class="friend-dot" style="position:absolute;bottom:1px;right:1px;width:10px;height:10px;border-radius:50%;border:2px solid var(--dk2);background:${f.online?'var(--ok)':'var(--gray)'}"></div>
+          </div>
           <div>
-            <div style="font-weight:600;font-size:14px">${f.name}</div>
-            <div style="font-size:11px;color:var(--gray-l)">${ZODIAC[f.zodiac]||''} ${f.country||''}</div>
+            <div style="font-weight:600;font-size:14px">${f.name} ${f.username?'<span style="color:var(--pu-l);font-size:11px">@'+f.username+'</span>':''}</div>
+            <div style="font-size:11px;color:${f.online?'var(--ok)':'var(--gray-l)'}"> ${f.online?'🟢 En línea':'⚫ Fuera de línea'}</div>
           </div>
         </div>
+        ${f.online?`<button class="btn btn-primary btn-sm" onclick="inviteFriendCall('${f.email}')">📞 Llamar</button>`:''}
       </div>
     `).join('');
   } catch(e) { console.error(e); }

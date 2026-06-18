@@ -38,6 +38,7 @@ async function initDB() {
       ine_status    TEXT DEFAULT 'none',
       ine_verified  BOOLEAN DEFAULT FALSE,
       email_verified BOOLEAN DEFAULT FALSE,
+      username      TEXT UNIQUE,
       total_sessions INT DEFAULT 0,
       total_minutes  INT DEFAULT 0,
       created_at    TIMESTAMPTZ DEFAULT NOW(),
@@ -291,7 +292,7 @@ function authUser(req, res, next) {
 function rowToUser(r) {
   if (!r) return null;
   return {
-    email: r.email, name: r.name, age: r.age, gender: r.gender,
+    email: r.email, name: r.name, username: r.username, age: r.age, gender: r.gender,
     country: r.country, isPremium: r.is_premium, banned: r.banned,
     banReason: r.ban_reason, approved: r.approved, ineStatus: r.ine_status,
     ineVerified: r.ine_verified, emailVerified: r.email_verified,
@@ -304,18 +305,20 @@ function rowToUser(r) {
 // AUTH
 // ══════════════════════════════════════════════════════════════════════════════
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password, name, age, gender, country, zodiac } = req.body;
-  if (!email||!password||!name||!age||!gender) return res.status(400).json({ error: 'Todos los campos son requeridos' });
+  const { email, password, name, age, gender, country, zodiac, username } = req.body;
+  if (!email||!password||!name||!age||!gender||!username) return res.status(400).json({ error: 'Todos los campos son requeridos' });
   if (parseInt(age) < 18) return res.status(400).json({ error: 'Debes tener al menos 18 años' });
   try {
     const exists = await pool.query('SELECT email FROM users WHERE email=$1', [email]);
+    const uExists = await pool.query('SELECT email FROM users WHERE username=$1', [username]);
+    if (uExists.rows.length) return res.status(409).json({ error: 'Ese nombre de usuario ya está en uso' });
     if (exists.rows.length) return res.status(409).json({ error: 'El correo ya está registrado' });
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const passwordHash = await bcrypt.hash(password, 10);
     await pool.query(
       `INSERT INTO pending_codes(email,code,expires_at,data) VALUES($1,$2,$3,$4)
        ON CONFLICT(email) DO UPDATE SET code=$2, expires_at=$3, data=$4`,
-      [email, code, Date.now() + 15*60*1000, JSON.stringify({ email, passwordHash, name, age: parseInt(age), gender, country: country||'MX', zodiac: zodiac||'' })]
+      [email, code, Date.now() + 15*60*1000, JSON.stringify({ email, passwordHash, name, username: username.toLowerCase().trim(), age: parseInt(age), gender, country: country||'MX', zodiac: zodiac||'' })]
     );
     try { await sendVerificationEmail(email, name, code); } catch(e) { console.error('Email error:', e.message); }
     res.json({ ok: true });
@@ -335,10 +338,10 @@ app.post('/api/auth/verify', async (req, res) => {
     if (pending.code !== code.trim()) return res.status(401).json({ error: 'Código incorrecto' });
     const d = pending.data;
     await pool.query(
-      `INSERT INTO users(email,password_hash,name,age,gender,country,email_verified,approved)
-       VALUES($1,$2,$3,$4,$5,$6,true,true)
+      `INSERT INTO users(email,password_hash,name,username,age,gender,country,email_verified,approved)
+       VALUES($1,$2,$3,$4,$5,$6,$7,true,true)
        ON CONFLICT(email) DO NOTHING`,
-      [d.email, d.passwordHash || d.password_hash, d.name, d.age, d.gender, d.country]
+      [d.email, d.passwordHash || d.password_hash, d.name, d.username||null, d.age, d.gender, d.country]
     );
     // Create profile with zodiac
     await pool.query(
@@ -627,9 +630,18 @@ app.get('/api/profile/me/full', authUser, async (req, res) => {
 
 app.put('/api/profile', authUser, uploadAvatar.single('avatar'), async (req, res) => {
   try {
-    const { bio, interests, zodiac, display_name } = req.body;
+    const { bio, interests, zodiac, display_name, username } = req.body;
+    // Update username on users table if provided
+    if (username) {
+      const uname = username.toLowerCase().trim().replace(/[^a-z0-9_]/g,'');
+      if (uname.length >= 3) {
+        const exists = await pool.query('SELECT email FROM users WHERE username=$1 AND email!=$2', [uname, req.user.email]);
+        if (exists.rows.length) return res.status(409).json({ error: 'Ese nombre ya está en uso' });
+        await pool.query('UPDATE users SET username=$1 WHERE email=$2', [uname, req.user.email]);
+      }
+    }
     const interestsArr = interests ? (Array.isArray(interests) ? interests : interests.split(',').map(s=>s.trim())) : [];
-    const updates = { bio: bio||'', interests: interestsArr, zodiac: zodiac||'', display_name: display_name||'', updated_at: new Date() };
+    const updates = { bio: bio||'', interests: interestsArr, zodiac: zodiac||'', display_name: display_name||'' };
     if (req.file) updates.avatar_url = `/uploads/avatars/${req.file.filename}`;
     await pool.query(
       `INSERT INTO profiles(email,bio,interests,zodiac,display_name,avatar_url,updated_at)
@@ -712,6 +724,86 @@ app.get('/api/friends/list', authUser, async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
 
+// ── Username search ───────────────────────────────────────────────────────────
+app.get('/api/users/search', authUser, async (req, res) => {
+  const { q } = req.query;
+  if (!q || q.length < 2) return res.json([]);
+  try {
+    const r = await pool.query(
+      `SELECT u.email, u.name, u.username, p.avatar_url, p.zodiac,
+              (CASE WHEN f.id IS NOT NULL THEN true ELSE false END) as is_friend
+       FROM users u
+       LEFT JOIN profiles p ON u.email=p.email
+       LEFT JOIN friends f ON (f.email1=$2 AND f.email2=u.email) OR (f.email2=$2 AND f.email1=u.email)
+       WHERE (u.username ILIKE $1 OR u.name ILIKE $1) AND u.email != $2 AND u.banned=false
+       LIMIT 10`,
+      ['%'+q+'%', req.user.email]
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.get('/api/users/check-username', async (req, res) => {
+  const { username } = req.query;
+  if (!username) return res.json({ available: false });
+  try {
+    const r = await pool.query('SELECT email FROM users WHERE username=$1', [username.toLowerCase().trim()]);
+    res.json({ available: r.rows.length === 0 });
+  } catch(e) { res.json({ available: false }); }
+});
+
+// ── Call invites ──────────────────────────────────────────────────────────────
+app.post('/api/calls/invite', authUser, async (req, res) => {
+  const { toEmail } = req.body;
+  try {
+    const id = uuidv4();
+    await pool.query('INSERT INTO call_invites(id,from_email,to_email) VALUES($1,$2,$3)', [id, req.user.email, toEmail]);
+    // Send via socket if online
+    const sock = Object.entries(activeSockets).find(([,s]) => s.email === toEmail);
+    if (sock) {
+      const me = await pool.query('SELECT name,username FROM users WHERE email=$1', [req.user.email]);
+      io.to(sock[0]).emit('call_invite', { from: req.user.email, name: me.rows[0]?.name, inviteId: id });
+    }
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.post('/api/calls/respond', authUser, async (req, res) => {
+  const { inviteId, accept } = req.body;
+  try {
+    const r = await pool.query('SELECT * FROM call_invites WHERE id=$1 AND to_email=$2', [inviteId, req.user.email]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Invitación no encontrada' });
+    await pool.query('UPDATE call_invites SET status=$1 WHERE id=$2', [accept?'accepted':'rejected', inviteId]);
+    const inv = r.rows[0];
+    const sock = Object.entries(activeSockets).find(([,s]) => s.email === inv.from_email);
+    if (sock) {
+      if (accept) {
+        io.to(sock[0]).emit('call_accepted', { from: req.user.email });
+      } else {
+        io.to(sock[0]).emit('call_rejected', { from: req.user.email });
+      }
+    }
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+// ── Online friends ────────────────────────────────────────────────────────────
+app.get('/api/friends/online', authUser, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT u.email, u.name, u.username, p.avatar_url
+       FROM friends f
+       JOIN users u ON (CASE WHEN f.email1=$1 THEN f.email2 ELSE f.email1 END)=u.email
+       LEFT JOIN profiles p ON u.email=p.email
+       WHERE f.email1=$1 OR f.email2=$1`,
+      [req.user.email]
+    );
+    const onlineEmails = new Set(Object.values(activeSockets).map(s => s.email));
+    const friends = r.rows.map(f => ({ ...f, online: onlineEmails.has(f.email) }));
+    res.json(friends);
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
 app.get('/api/health', (req, res) =>
   res.json({ status: 'ok', online: Object.keys(activeSockets).length }));
 
@@ -756,6 +848,13 @@ io.on('connection', socket => {
       };
       await pool.query('UPDATE users SET total_sessions=total_sessions+1, last_seen=NOW() WHERE email=$1', [d.email]);
       socket.emit('joined', { isPremium: u.is_premium, ineVerified: u.ine_verified, ineStatus: u.ine_status, approved: u.approved });
+      // Broadcast online status to friends
+      const friendsR = await pool.query('SELECT email1,email2 FROM friends WHERE email1=$1 OR email2=$1',[u.email]);
+      friendsR.rows.forEach(row => {
+        const friendEmail = row.email1 === u.email ? row.email2 : row.email1;
+        const fSock = Object.entries(activeSockets).find(([,s]) => s.email === friendEmail);
+        if (fSock) io.to(fSock[0]).emit('friend_online', { email: u.email, online: true });
+      });
     } catch(e) { socket.emit('error', { message: 'Token inválido' }); }
   });
 
@@ -787,6 +886,10 @@ io.on('connection', socket => {
   socket.on('game_score',  d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_score',  d); });
   socket.on('game_end',    d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_end',    d); });
   socket.on('game_state',  d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_state',  d); });
+  socket.on('call_accept', d => {
+    const target = Object.entries(activeSockets).find(([,s]) => s.email === d.toEmail);
+    if (target) io.to(target[0]).emit('call_accepted_direct', { from: activeSockets[socket.id]?.email });
+  });
   socket.on('set_mode',    d => { const u=activeSockets[socket.id]; if(u?.partnerId && u.isPremium) u.mode=d.mode; });
 
   socket.on('disconnect', async () => {
