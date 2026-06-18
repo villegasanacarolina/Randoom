@@ -842,6 +842,15 @@ app.get('/api/health', (req, res) =>
 function matchesFilters(a, b) {
   const s = activeSockets[a], c = activeSockets[b];
   if (!s||!c) return false;
+
+  // Premium mood: both must be premium AND same mood
+  if (s.isPremium && c.isPremium) {
+    if (s.mode && c.mode && s.mode !== c.mode) return false;
+  }
+  // If one is premium and has a mood, only match with same-mood premium
+  if (s.isPremium && s.mode && !c.isPremium) return false;
+  if (c.isPremium && c.mode && !s.isPremium) return false;
+
   const check = (f, t) => {
     if (!f) return true;
     if (f.gender  && f.gender  !== 'any' && t.gender  !== f.gender)  return false;
@@ -940,6 +949,9 @@ io.on('connection', socket => {
     });
     socket.join(`live:${liveId}`);
     socket.emit('live_started', { liveId });
+    // Notify videocall partner that host started live
+    const partnerSock = activeSockets[socket.id]?.partnerId;
+    if (partnerSock) io.to(partnerSock).emit('partner_live_started', { liveId, hostName: u.name });
     // Broadcast updated list
     io.emit('lives_updated');
     console.log(`Live started: ${liveId} by ${u.email}`);
@@ -977,9 +989,14 @@ io.on('connection', socket => {
   socket.on('live_comment', ({ liveId, text }) => {
     const u = activeSockets[socket.id]; if (!u || !text) return;
     const live = activeLives.get(liveId); if (!live) return;
-    io.to(`live:${liveId}`).emit('live_comment', {
-      from: u.name || 'Anónimo', text: text.slice(0, 200), ts: Date.now()
-    });
+    const payload = { from: u.name || 'Anónimo', text: text.slice(0, 200), ts: Date.now() };
+    io.to(`live:${liveId}`).emit('live_comment', payload);
+    // Also relay to videocall partner of host (so both see comments in chat)
+    const hostSock = Object.entries(activeSockets).find(([,s]) => s.email === live.hostEmail);
+    if (hostSock) {
+      const partnerId = activeSockets[hostSock[0]]?.partnerId;
+      if (partnerId) io.to(partnerId).emit('live_comment', payload);
+    }
   });
 
   // Live WebRTC: viewer requests offer from host

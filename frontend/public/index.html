@@ -291,11 +291,10 @@ textarea.fc{resize:vertical;min-height:70px}
 .mode-card p{color:var(--gray-l);font-size:13px}
 
 /* LIVES LIST */
-#s-lives{align-items:flex-start;padding:0;overflow-y:auto}
+#s-lives{align-items:flex-start;padding:0;overflow-y:auto;display:flex;flex-direction:column}
 .lives-header{padding:16px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd);flex-shrink:0}
 .lives-header h2{font-family:'Poppins',sans-serif;font-weight:800;font-size:20px}
-.lives-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px}
-@media(min-width:600px){.lives-grid{grid-template-columns:repeat(3,1fr)}}
+.lives-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;width:100%;box-sizing:border-box}
 .live-card{background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .2s;position:relative}
 .live-card:hover{border-color:var(--pu);transform:scale(1.02)}
 .live-thumb{width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,rgba(160,32,240,.3),rgba(8,0,16,.8));display:flex;align-items:center;justify-content:center;font-size:32px;position:relative}
@@ -546,6 +545,10 @@ textarea.fc{resize:vertical;min-height:70px}
       <video id="localVid" autoplay playsinline muted></video>
       <button onclick="swapCameras()" style="position:absolute;top:8px;left:8px;z-index:15;background:rgba(8,0,16,.7);border:1px solid var(--bd);color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px)">⇄ Cámara</button>
       <div id="live-cam-badge" style="position:absolute;top:8px;right:8px;z-index:15;background:rgba(239,68,68,.92);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;display:none;align-items:center;gap:5px"><span style="width:7px;height:7px;background:#fff;border-radius:50%;display:inline-block;animation:pulse 1s infinite"></span> LIVE</div>
+      <!-- Viewer count badge — visible on vid-area during live -->
+      <div id="live-viewer-badge" style="position:absolute;bottom:12px;left:12px;z-index:15;background:rgba(0,0,0,.75);color:#fff;font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;display:none;align-items:center;gap:6px;backdrop-filter:blur(4px)">
+        👁 <span id="live-viewer-count">0</span> viendo
+      </div>
       <div class="vid-overlay" id="ov-idle">
         <div style="font-size:44px">🔮</div>
         <h3>¡Listo para conectar!</h3>
@@ -762,7 +765,7 @@ textarea.fc{resize:vertical;min-height:70px}
   </div>
 </div>
 
-<!-- ═══ MODE SELECT ═══ -->
+<!-- ═══ START MODE SELECT ═══ -->
 <div id="s-mode" class="screen">
   <nav class="nav">
     <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
@@ -780,6 +783,38 @@ textarea.fc{resize:vertical;min-height:70px}
         <div class="mc-icon">🎲</div>
         <h3>Videollamada aleatoria</h3>
         <p>Conéctate con alguien al azar</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MOOD SELECT (premium only) ═══ -->
+<div id="s-mood" class="screen">
+  <nav class="nav">
+    <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
+    <button class="btn btn-ghost btn-sm" onclick="showScreen('s-mode')">← Volver</button>
+  </nav>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:20px 16px">
+    <div class="mode-choice">
+      <div style="text-align:center;margin-bottom:4px">
+        <span style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px">⭐ PREMIUM</span>
+      </div>
+      <h2>¿Cómo quieres conectar?</h2>
+      <p style="text-align:center;color:var(--gray-l);font-size:13px;margin-top:-8px;margin-bottom:8px">Solo te conectarás con usuarios premium en el mismo mood</p>
+      <div class="mode-card" onclick="_enterChat('pareja')">
+        <div class="mc-icon">💕</div>
+        <h3>Buscar pareja</h3>
+        <p>Conecta con alguien especial</p>
+      </div>
+      <div class="mode-card" onclick="_enterChat('amigos')">
+        <div class="mc-icon">👋</div>
+        <h3>Hacer amigos</h3>
+        <p>Conoce gente nueva para chatear</p>
+      </div>
+      <div class="mode-card" onclick="_enterChat('negocios')">
+        <div class="mc-icon">💼</div>
+        <h3>Negocios</h3>
+        <p>Networking profesional</p>
       </div>
     </div>
   </div>
@@ -1166,6 +1201,9 @@ function initSocket(){
     if (btn) { btn.style.background='rgba(239,68,68,.7)'; btn.style.color='#fff'; btn.innerHTML='⏹ DETENER'; }
     const badge = document.getElementById('live-cam-badge');
     if (badge) badge.style.display='flex';
+    const vbadge = document.getElementById('live-viewer-badge');
+    if (vbadge) vbadge.style.display='flex';
+    addSys('📡 ¡Live iniciado! Los viewers pueden verte ahora.');
     toast('📡 ¡Live iniciado! Ya pueden verte.','ok');
   });
 
@@ -1180,17 +1218,32 @@ function initSocket(){
       toast('El live terminó','info');
     }
   });
+  app.socket.on('partner_live_started', ({ liveId, hostName }) => {
+    // Partner started a live — show badge on their video too
+    const badge = document.getElementById('live-cam-badge');
+    if (badge) { badge.style.display='flex'; }
+    addSys(`📡 ${hostName} inició un live. ¡Están en vivo!`);
+    toast(`📡 ${hostName} inició un live`,'info');
+  });
 
   app.socket.on('live_viewer_count', ({ count }) => {
+    // Update live viewer screen counters
     ['lv-viewers','lv-viewers2'].forEach(id => {
       const el = document.getElementById(id); if(el) el.textContent = count;
     });
+    // Update badge on video area (host sees this)
+    const vc = document.getElementById('live-viewer-count');
+    if (vc) vc.textContent = count;
+    // Notify in chat
+    if (app_liveId) addSys(`👁 ${count} ${count===1?'persona viendo':'personas viendo'} el live`);
   });
 
   app.socket.on('live_joined', ({ viewerCount, hostName, title }) => {
     ['lv-viewers','lv-viewers2'].forEach(id => {
       const el = document.getElementById(id); if(el) el.textContent = viewerCount;
     });
+    const vc = document.getElementById('live-viewer-count');
+    if (vc) vc.textContent = viewerCount;
   });
 
   app.socket.on('live_comment', ({ from, text }) => {
@@ -1473,8 +1526,19 @@ async function checkUsername(val) {
   } catch(e) {}
 }
 
-function sendMsg(){const i=document.getElementById('chat-in');const t=i.value.trim();if(!t||!app.socket)return;app.socket.emit('chat_message',{text:t});addMsg(t,'me');i.value='';}
-function sendMsgDesk(){const i=document.getElementById('chat-in-d');const t=i.value.trim();if(!t||!app.socket)return;app.socket.emit('chat_message',{text:t});addMsg(t,'me');i.value='';}
+function sendMsg(){
+  const i=document.getElementById('chat-in');const t=i.value.trim();if(!t||!app.socket)return;
+  app.socket.emit('chat_message',{text:t});
+  // If hosting a live, also send to live viewers
+  if(app_liveId) app.socket.emit('live_comment',{liveId:app_liveId,text:t});
+  addMsg(t,'me');i.value='';
+}
+function sendMsgDesk(){
+  const i=document.getElementById('chat-in-d');const t=i.value.trim();if(!t||!app.socket)return;
+  app.socket.emit('chat_message',{text:t});
+  if(app_liveId) app.socket.emit('live_comment',{liveId:app_liveId,text:t});
+  addMsg(t,'me');i.value='';
+}
 
 // ── Filters ───────────────────────────────────────────────────────────────────
 function getFilters(){
@@ -1719,22 +1783,22 @@ let _AC = null;
 function _ac() { if (!_AC) _AC = new (window.AudioContext||window.webkitAudioContext)(); return _AC; }
 function _snd(type) {
   try {
-    const ac = _ac(), g = ac.createGain(); g.connect(ac.destination);
-    const play = (freq, dur, vol=0.3, wave='sine', delay=0) => {
-      const o = ac.createOscillator(), gi = ac.createGain();
+    const ac = _ac();
+    const play = (freq, dur, vol, wave='sine', delay=0) => {
+      const o = ac.createOscillator(), g = ac.createGain();
       o.type = wave; o.frequency.value = freq;
-      gi.gain.setValueAtTime(vol, ac.currentTime+delay);
-      gi.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+delay+dur);
-      o.connect(gi); gi.connect(ac.destination);
+      g.gain.setValueAtTime(vol, ac.currentTime+delay);
+      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+delay+dur);
+      o.connect(g); g.connect(ac.destination);
       o.start(ac.currentTime+delay); o.stop(ac.currentTime+delay+dur);
     };
-    if (type==='slice')  { play(600,0.08,0.2,'sawtooth'); play(300,0.1,0.1,'sawtooth',0.05); }
-    if (type==='bomb')   { play(80,0.5,0.6,'sine'); play(50,0.4,0.4,'sine',0.1); }
-    if (type==='hit')    { play(800,0.06,0.25,'square'); play(400,0.08,0.15,'square',0.04); }
-    if (type==='basket') { [440,554,659].forEach((f,i)=>play(f,0.3,0.3,'sine',i*0.06)); }
-    if (type==='tick')   { play(880,0.05,0.15,'sine'); }
-    if (type==='win')    { [523,659,784,1047].forEach((f,i)=>play(f,0.35,0.35,'sine',i*0.12)); }
-    if (type==='lose')   { [400,300,200].forEach((f,i)=>play(f,0.3,0.3,'sawtooth',i*0.15)); }
+    if (type==='slice')  { play(1200,0.06,0.12,'sine'); }
+    if (type==='bomb')   { play(120,0.3,0.18,'sine'); play(60,0.25,0.12,'sine',0.08); }
+    if (type==='hit')    { play(900,0.05,0.12,'sine'); }
+    if (type==='basket') { play(523,0.12,0.15,'sine'); play(659,0.12,0.15,'sine',0.1); }
+    if (type==='tick')   { play(1000,0.04,0.08,'sine'); }
+    if (type==='win')    { [523,659,784].forEach((f,i)=>play(f,0.2,0.15,'sine',i*0.1)); }
+    if (type==='lose')   { [400,300].forEach((f,i)=>play(f,0.18,0.12,'sine',i*0.12)); }
   } catch(e) {}
 }
 
@@ -1996,9 +2060,12 @@ function _startSpectatorLoop() {
     if (GS.type==='fruit') {
       PT.items.forEach(f=>{
         x.save(); x.translate(f.x,f.y);
-        x.shadowColor='rgba(255,230,80,1)'; x.shadowBlur=18;
         x.font=f.sz+'px serif'; x.textAlign='center'; x.textBaseline='middle';
-        x.fillText(f.e,0,0); x.shadowBlur=9; x.fillText(f.e,0,0); x.restore();
+        x.shadowColor='rgba(255,220,0,1)';
+        x.shadowBlur=30; x.fillText(f.e,0,0);
+        x.shadowBlur=16; x.fillText(f.e,0,0);
+        x.shadowBlur=0;  x.fillText(f.e,0,0);
+        x.restore();
       });
     } else if (GS.type==='target') {
       PT.tgts.forEach(t=>{
@@ -2104,14 +2171,12 @@ function _fruit() {
       f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=.45*dt;f.rot+=f.rv*dt;
       if(f.y>c.height+80){MY.items.splice(i,1);if(!f.bomb){MY.lives--;if(MY.lives<0)MY.lives=0;}continue;}
       x.save();x.translate(f.x,f.y);x.rotate(f.rot*Math.PI/180);
-      // Always bright glow so fruits are always clearly visible
-      x.shadowColor=f.bomb?'rgba(255,100,0,1)':'rgba(255,230,80,1)';
-      x.shadowBlur=f.bomb?20:18;
       x.font=f.sz+'px serif';x.textAlign='center';x.textBaseline='middle';
-      x.fillText(f.e,0,0);
-      // Draw twice for extra brightness on desktop
-      x.shadowBlur=f.bomb?10:9;
-      x.fillText(f.e,0,0);
+      // Triple draw: glow layers ensure always visible on any background
+      x.shadowColor=f.bomb?'rgba(255,80,0,1)':'rgba(255,220,0,1)';
+      x.shadowBlur=30; x.fillText(f.e,0,0);
+      x.shadowBlur=16; x.fillText(f.e,0,0);
+      x.shadowBlur=0;  x.fillText(f.e,0,0);
       x.restore();
     }
 
@@ -2126,9 +2191,9 @@ function _fruit() {
       PT.items.forEach(f=>{
         const px=offX+f.x*scl, py=offY+f.y*scl;
         if(px<offX||py<0||px>c.width||py>c.height*0.3) return;
-        x.shadowColor='rgba(255,230,80,1)'; x.shadowBlur=8;
+        x.shadowColor='rgba(255,220,0,1)'; x.shadowBlur=14;
         x.font=Math.round(f.sz*scl)+'px serif';x.textAlign='center';x.textBaseline='middle';
-        x.fillText(f.e,px,py); x.shadowBlur=0;
+        x.fillText(f.e,px,py); x.shadowBlur=7; x.fillText(f.e,px,py); x.shadowBlur=0;
       });
       x.restore();
       // Partner label
@@ -2323,6 +2388,7 @@ function handleStart() {
   if (!app.token) { showAuth(); return; }
   showScreen('s-mode');
 }
+function showMoodSelect() { showScreen('s-mood'); }
 
 function showLives() {
   showScreen('s-lives');
@@ -2378,6 +2444,9 @@ function stopLive() {
   if (btn) { btn.style.background='rgba(239,68,68,.15)'; btn.style.color='#EF4444'; btn.innerHTML='📡 LIVE'; }
   const badge = document.getElementById('live-cam-badge');
   if (badge) badge.style.display='none';
+  const vbadge = document.getElementById('live-viewer-badge');
+  if (vbadge) vbadge.style.display='none';
+  addSys('📡 Live terminado.');
   app_liveViewers.forEach(pc => pc.close());
   app_liveViewers.clear();
 }
@@ -2410,21 +2479,36 @@ function leaveLive() {
 function sendLiveComment() {
   const inp = document.getElementById('live-comment-in');
   const text = inp.value.trim();
-  if (!text || !app.socket || !app_watchLiveId) return;
-  app.socket.emit('live_comment', { liveId: app_watchLiveId, text });
+  if (!text || !app.socket) return;
+  const liveId = app_watchLiveId || app_liveId;
+  if (!liveId) return;
+  app.socket.emit('live_comment', { liveId, text });
+  // Show immediately in local live-comments
+  const el = document.getElementById('live-comments');
+  if (el) {
+    const d = document.createElement('div');
+    d.className = 'live-comment';
+    d.innerHTML = `<strong>Tú:</strong> ${text}`;
+    el.appendChild(d); el.scrollTop = el.scrollHeight;
+  }
+  // Also show in main chat (if host is in video call)
+  addSys(`📡 Tú: ${text}`);
   inp.value = '';
 }
 
 function addLiveComment(from, text) {
+  // Add to MAIN chat (visible to host + partner in videocall)
+  addSys(`📡 ${from}: ${text}`);
+  // Also add to live-comments panel if viewer is watching from live screen
   const el = document.getElementById('live-comments');
-  if (!el) return;
-  const d = document.createElement('div');
-  d.className = 'live-comment';
-  d.innerHTML = `<strong>${from}:</strong> ${text}`;
-  el.appendChild(d);
-  el.scrollTop = el.scrollHeight;
-  // Keep only last 100 comments
-  while (el.children.length > 100) el.removeChild(el.firstChild);
+  if (el) {
+    const d = document.createElement('div');
+    d.className = 'live-comment';
+    d.innerHTML = `<strong>${from}:</strong> ${text}`;
+    el.appendChild(d);
+    el.scrollTop = el.scrollHeight;
+    while (el.children.length > 100) el.removeChild(el.firstChild);
+  }
 }
 
 // ── Camera swap ───────────────────────────────────────────────────────────────
