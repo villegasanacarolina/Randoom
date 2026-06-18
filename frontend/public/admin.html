@@ -174,6 +174,7 @@ tr:hover td{background:rgba(160,32,240,.04)}
 
       <button class="nav-item" data-page="users" onclick="goPage('users')"><span class="icon">👥</span> Usuarios</button>
       <button class="nav-item" data-page="reports" onclick="goPage('reports')"><span class="icon">🚨</span> Reportes <span class="nav-badge" id="badge-reports" style="display:none">0</span></button>
+      <button class="nav-item" data-page="analytics" onclick="goPage('analytics');loadAnalytics()"><span class="icon">📈</span> Analíticas</button>
     </nav>
     <div class="sb-footer">
       <button class="logout-btn" onclick="doLogout()">🚪 Cerrar sesión</button>
@@ -237,7 +238,10 @@ tr:hover td{background:rgba(160,32,240,.04)}
       <!-- ANALYTICS -->
       <div class="page" id="page-analytics">
         <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-          <h2>📈 Visitantes de Randoom</h2>
+          <div>
+            <h2 style="margin:0 0 2px">📈 Visitantes de Randoom</h2>
+            <div style="font-size:11px;color:var(--gray-l)">Datos desde el inicio del sitio</div>
+          </div>
           <button class="btn btn-ghost btn-sm" onclick="loadAnalytics()">🔄 Actualizar</button>
         </div>
 
@@ -592,7 +596,7 @@ async function loadAnalytics() {
     document.getElementById('an-today').textContent  = (d.today||0).toLocaleString();
     document.getElementById('an-week').textContent   = (d.week||0).toLocaleString();
     document.getElementById('an-month').textContent  = (d.month||0).toLocaleString();
-    document.getElementById('an-unique').textContent = (d.uniqueIPs||d.uniqueTotal||0).toLocaleString();
+    document.getElementById('an-unique').textContent = (d.uniqueIPs||0).toLocaleString();
     const avgVal = Math.round((d.month||0) / 30);
     document.getElementById('an-avg').textContent    = avgVal.toLocaleString();
 

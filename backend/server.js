@@ -926,47 +926,34 @@ app.post('/api/track/visit', async (req, res) => {
 // ── Analytics for admin ───────────────────────────────────────────────────────
 app.get('/api/admin/analytics', authAdmin, async (req, res) => {
   try {
-    const [
-      totalVisits,
-      todayVisits,
-      weekVisits,
-      monthVisits,
-      byDevice,
-      byDay,
-      uniqueIPs,
-      uniqueToday
-    ] = await Promise.all([
-      pool.query('SELECT COUNT(*) FROM page_visits'),
-      pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '1 day'"),
-      pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '7 days'"),
-      pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '30 days'"),
-      pool.query("SELECT device, COUNT(*) as count FROM page_visits GROUP BY device ORDER BY count DESC"),
-      pool.query(`SELECT DATE(visited_at) as day, COUNT(*) as visits 
-                  FROM page_visits 
-                  WHERE visited_at >= NOW() - INTERVAL '30 days'
-                  GROUP BY DATE(visited_at) 
-                  ORDER BY day ASC`),
-      pool.query('SELECT COUNT(DISTINCT ip) FROM page_visits'),
-      pool.query(`SELECT DATE(visited_at) as day, COUNT(*) as visits, COUNT(DISTINCT ip) as unique_visits
-                  FROM page_visits WHERE visited_at >= NOW() - INTERVAL '30 days'
-                  GROUP BY DATE(visited_at) ORDER BY day ASC`),
-      pool.query(`SELECT EXTRACT(HOUR FROM visited_at) as hour, COUNT(*) as visits
-                  FROM page_visits WHERE visited_at >= NOW() - INTERVAL '7 days'
-                  GROUP BY hour ORDER BY hour ASC`),
-      pool.query("SELECT COUNT(DISTINCT ip) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '1 day'"),
-    ]);
-
+    const [total, today, week, month, byDevice, dailyChart, uniqueIPs, hourlyChart, uniqueToday] =
+      await Promise.all([
+        pool.query('SELECT COUNT(*) FROM page_visits'),
+        pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '1 day'"),
+        pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '7 days'"),
+        pool.query("SELECT COUNT(*) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '30 days'"),
+        pool.query("SELECT device, COUNT(*) as count FROM page_visits GROUP BY device ORDER BY count DESC"),
+        pool.query(`SELECT DATE(visited_at) as day, COUNT(*) as visits, COUNT(DISTINCT ip) as unique_visits
+                    FROM page_visits WHERE visited_at >= NOW() - INTERVAL '30 days'
+                    GROUP BY DATE(visited_at) ORDER BY day ASC`),
+        pool.query('SELECT COUNT(DISTINCT ip) FROM page_visits'),
+        pool.query(`SELECT EXTRACT(HOUR FROM visited_at)::int as hour, COUNT(*) as visits
+                    FROM page_visits WHERE visited_at >= NOW() - INTERVAL '7 days'
+                    GROUP BY hour ORDER BY hour ASC`),
+        pool.query("SELECT COUNT(DISTINCT ip) FROM page_visits WHERE visited_at >= NOW() - INTERVAL '1 day'"),
+      ]);
     res.json({
-      total:        parseInt(totalVisits.rows[0].count),
-      today:        parseInt(todayVisits.rows[0].count),
-      week:         parseInt(weekVisits.rows[0].count),
-      month:        parseInt(monthVisits.rows[0].count),
-      uniqueTotal:  parseInt(uniqueIPs.rows[0].count),
-      uniqueToday:  parseInt(uniqueToday.rows[0].count),
-      byDevice:     byDevice.rows,
-      byDay:        byDay.rows,
+      total:       parseInt(total.rows[0].count),
+      today:       parseInt(today.rows[0].count),
+      week:        parseInt(week.rows[0].count),
+      month:       parseInt(month.rows[0].count),
+      uniqueIPs:   parseInt(uniqueIPs.rows[0].count),
+      uniqueToday: parseInt(uniqueToday.rows[0].count),
+      byDevice:    byDevice.rows,
+      dailyChart:  dailyChart.rows,
+      hourlyChart: hourlyChart.rows,
     });
-  } catch(e) { console.error('Analytics error:', e.message); res.status(500).json({ error: 'Error' }); }
+  } catch(e) { console.error('Analytics error:', e.message); res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/health', (req, res) =>
