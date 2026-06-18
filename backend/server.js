@@ -78,6 +78,34 @@ async function initDB() {
       data        JSONB NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS profiles (
+      email         TEXT PRIMARY KEY REFERENCES users(email) ON DELETE CASCADE,
+      display_name  TEXT,
+      bio           TEXT DEFAULT '',
+      avatar_url    TEXT DEFAULT '',
+      zodiac        TEXT DEFAULT '',
+      interests     TEXT[] DEFAULT '{}',
+      created_at    TIMESTAMPTZ DEFAULT NOW(),
+      updated_at    TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id            TEXT PRIMARY KEY,
+      from_email    TEXT NOT NULL,
+      to_email      TEXT NOT NULL,
+      status        TEXT DEFAULT 'pending',
+      created_at    TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(from_email, to_email)
+    );
+
+    CREATE TABLE IF NOT EXISTS friends (
+      id            TEXT PRIMARY KEY,
+      email1        TEXT NOT NULL,
+      email2        TEXT NOT NULL,
+      created_at    TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(email1, email2)
+    );
+
     CREATE TABLE IF NOT EXISTS recordings (
       id              TEXT PRIMARY KEY,
       report_id       TEXT NOT NULL,
@@ -95,10 +123,11 @@ async function initDB() {
 }
 
 // ── Upload dirs ────────────────────────────────────────────────────────────────
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-const INE_DIR     = path.join(__dirname, 'uploads', 'ine');
-const REC_DIR     = path.join(__dirname, 'uploads', 'recordings');
-[UPLOADS_DIR, INE_DIR, REC_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+const UPLOADS_DIR   = path.join(__dirname, 'uploads');
+const INE_DIR       = path.join(__dirname, 'uploads', 'ine');
+const REC_DIR       = path.join(__dirname, 'uploads', 'recordings');
+const AVATAR_DIR    = path.join(__dirname, 'uploads', 'avatars');
+[UPLOADS_DIR, INE_DIR, REC_DIR, AVATAR_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
 const makeStorage = dest => multer.diskStorage({
   destination: (req, file, cb) => cb(null, dest),
@@ -109,7 +138,8 @@ const imgFilter = (req, file, cb) =>
 
 const uploadINE = multer({ storage: makeStorage(INE_DIR), limits: { fileSize: 8*1024*1024 }, fileFilter: imgFilter });
 const recFilter = (req, file, cb) => cb(null, /webm|mp4|ogg/.test(path.extname(file.originalname).toLowerCase()) || file.mimetype.startsWith('video/'));
-const uploadRec = multer({ storage: makeStorage(REC_DIR), limits: { fileSize: 200*1024*1024 }, fileFilter: recFilter });
+const uploadRec    = multer({ storage: makeStorage(REC_DIR),    limits: { fileSize: 200*1024*1024 }, fileFilter: recFilter });
+const uploadAvatar = multer({ storage: makeStorage(AVATAR_DIR), limits: { fileSize: 5*1024*1024 },   fileFilter: imgFilter });
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 const ADMIN_EMAIL    = 'admin@randoom.com';
@@ -274,7 +304,7 @@ function rowToUser(r) {
 // AUTH
 // ══════════════════════════════════════════════════════════════════════════════
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password, name, age, gender, country } = req.body;
+  const { email, password, name, age, gender, country, zodiac } = req.body;
   if (!email||!password||!name||!age||!gender) return res.status(400).json({ error: 'Todos los campos son requeridos' });
   if (parseInt(age) < 18) return res.status(400).json({ error: 'Debes tener al menos 18 años' });
   try {
@@ -285,7 +315,7 @@ app.post('/api/auth/register', async (req, res) => {
     await pool.query(
       `INSERT INTO pending_codes(email,code,expires_at,data) VALUES($1,$2,$3,$4)
        ON CONFLICT(email) DO UPDATE SET code=$2, expires_at=$3, data=$4`,
-      [email, code, Date.now() + 15*60*1000, JSON.stringify({ email, passwordHash, name, age: parseInt(age), gender, country: country||'MX' })]
+      [email, code, Date.now() + 15*60*1000, JSON.stringify({ email, passwordHash, name, age: parseInt(age), gender, country: country||'MX', zodiac: zodiac||'' })]
     );
     try { await sendVerificationEmail(email, name, code); } catch(e) { console.error('Email error:', e.message); }
     res.json({ ok: true });
@@ -309,6 +339,11 @@ app.post('/api/auth/verify', async (req, res) => {
        VALUES($1,$2,$3,$4,$5,$6,true,true)
        ON CONFLICT(email) DO NOTHING`,
       [d.email, d.passwordHash || d.password_hash, d.name, d.age, d.gender, d.country]
+    );
+    // Create profile with zodiac
+    await pool.query(
+      `INSERT INTO profiles(email,display_name,zodiac) VALUES($1,$2,$3) ON CONFLICT(email) DO NOTHING`,
+      [d.email, d.name, d.zodiac||'']
     );
     await pool.query('DELETE FROM pending_codes WHERE email=$1', [email]);
     const user = rowToUser((await pool.query('SELECT * FROM users WHERE email=$1', [email])).rows[0]);
@@ -546,6 +581,137 @@ app.get('/api/admin/recordings/:reportId', authAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
 
+// ── PROFILES ─────────────────────────────────────────────────────────────────
+app.get('/api/profile/:email', authUser, async (req, res) => {
+  try {
+    const email = decodeURIComponent(req.params.email);
+    const [user, profile, friends] = await Promise.all([
+      pool.query('SELECT name,age,gender,country,is_premium FROM users WHERE email=$1', [email]),
+      pool.query('SELECT * FROM profiles WHERE email=$1', [email]),
+      pool.query('SELECT COUNT(*) FROM friends WHERE email1=$1 OR email2=$1', [email])
+    ]);
+    if (!user.rows.length) return res.status(404).json({ error: 'No encontrado' });
+    res.json({
+      email,
+      name: user.rows[0].name,
+      age: user.rows[0].age,
+      gender: user.rows[0].gender,
+      country: user.rows[0].country,
+      isPremium: user.rows[0].is_premium,
+      ...profile.rows[0],
+      friendCount: parseInt(friends.rows[0].count)
+    });
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.get('/api/profile/me/full', authUser, async (req, res) => {
+  try {
+    const email = req.user.email;
+    const [user, profile, friends, pendingReqs] = await Promise.all([
+      pool.query('SELECT * FROM users WHERE email=$1', [email]),
+      pool.query('SELECT * FROM profiles WHERE email=$1', [email]),
+      pool.query('SELECT COUNT(*) FROM friends WHERE email1=$1 OR email2=$1', [email]),
+      pool.query("SELECT * FROM friend_requests WHERE to_email=$1 AND status='pending'", [email])
+    ]);
+    if (!user.rows.length) return res.status(404).json({ error: 'No encontrado' });
+    const u = user.rows[0];
+    res.json({
+      email, name: u.name, age: u.age, gender: u.gender,
+      country: u.country, isPremium: u.is_premium,
+      ...profile.rows[0],
+      friendCount: parseInt(friends.rows[0].count),
+      pendingRequests: pendingReqs.rows
+    });
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.put('/api/profile', authUser, uploadAvatar.single('avatar'), async (req, res) => {
+  try {
+    const { bio, interests, zodiac, display_name } = req.body;
+    const interestsArr = interests ? (Array.isArray(interests) ? interests : interests.split(',').map(s=>s.trim())) : [];
+    const updates = { bio: bio||'', interests: interestsArr, zodiac: zodiac||'', display_name: display_name||'', updated_at: new Date() };
+    if (req.file) updates.avatar_url = `/uploads/avatars/${req.file.filename}`;
+    await pool.query(
+      `INSERT INTO profiles(email,bio,interests,zodiac,display_name,avatar_url,updated_at)
+       VALUES($1,$2,$3,$4,$5,$6,NOW())
+       ON CONFLICT(email) DO UPDATE SET bio=$2,interests=$3,zodiac=$4,display_name=$5,
+       avatar_url=CASE WHEN $6='' THEN profiles.avatar_url ELSE $6 END, updated_at=NOW()`,
+      [req.user.email, updates.bio, updates.interests, updates.zodiac, updates.display_name, updates.avatar_url||'']
+    );
+    res.json({ ok: true });
+  } catch(e) { console.error(e); res.status(500).json({ error: 'Error' }); }
+});
+
+// ── FRIEND REQUESTS ───────────────────────────────────────────────────────────
+app.post('/api/friends/request', authUser, async (req, res) => {
+  const { toEmail } = req.body;
+  if (!toEmail || toEmail === req.user.email) return res.status(400).json({ error: 'Email inválido' });
+  try {
+    // Check already friends
+    const already = await pool.query(
+      'SELECT id FROM friends WHERE (email1=$1 AND email2=$2) OR (email1=$2 AND email2=$1)',
+      [req.user.email, toEmail]
+    );
+    if (already.rows.length) return res.status(409).json({ error: 'Ya son amigos' });
+    await pool.query(
+      `INSERT INTO friend_requests(id,from_email,to_email) VALUES($1,$2,$3)
+       ON CONFLICT(from_email,to_email) DO NOTHING`,
+      [uuidv4(), req.user.email, toEmail]
+    );
+    // Notify via socket
+    const sock = Object.entries(activeSockets).find(([,s]) => s.email === toEmail);
+    if (sock) {
+      const fromUser = await pool.query('SELECT name FROM users WHERE email=$1', [req.user.email]);
+      io.to(sock[0]).emit('friend_request', { fromEmail: req.user.email, fromName: fromUser.rows[0]?.name });
+    }
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.get('/api/friends/requests', authUser, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT fr.*, u.name as from_name FROM friend_requests fr
+       JOIN users u ON fr.from_email=u.email
+       WHERE fr.to_email=$1 AND fr.status='pending' ORDER BY fr.created_at DESC`,
+      [req.user.email]
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.post('/api/friends/respond', authUser, async (req, res) => {
+  const { requestId, accept } = req.body;
+  try {
+    const r = await pool.query('SELECT * FROM friend_requests WHERE id=$1 AND to_email=$2', [requestId, req.user.email]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Solicitud no encontrada' });
+    const req2 = r.rows[0];
+    await pool.query("UPDATE friend_requests SET status=$1 WHERE id=$2", [accept ? 'accepted' : 'rejected', requestId]);
+    if (accept) {
+      await pool.query('INSERT INTO friends(id,email1,email2) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
+        [uuidv4(), req2.from_email, req2.to_email]);
+      // Notify requester
+      const sock = Object.entries(activeSockets).find(([,s]) => s.email === req2.from_email);
+      if (sock) io.to(sock[0]).emit('friend_accepted', { email: req.user.email, name: req.user.name });
+    }
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.get('/api/friends/list', authUser, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT u.email, u.name, u.age, u.country, p.avatar_url, p.zodiac
+       FROM friends f
+       JOIN users u ON (CASE WHEN f.email1=$1 THEN f.email2 ELSE f.email1 END)=u.email
+       LEFT JOIN profiles p ON u.email=p.email
+       WHERE f.email1=$1 OR f.email2=$1`,
+      [req.user.email]
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
 app.get('/api/health', (req, res) =>
   res.json({ status: 'ok', online: Object.keys(activeSockets).length }));
 
@@ -586,7 +752,7 @@ io.on('connection', socket => {
       activeSockets[socket.id] = {
         socketId: socket.id, email: d.email, name: u.name, age: u.age,
         gender: u.gender, country: u.country, isPremium: u.is_premium,
-        filters: {}, partnerId: null, sessionStart: null
+        filters: {}, mode: 'pareja', partnerId: null, sessionStart: null
       };
       await pool.query('UPDATE users SET total_sessions=total_sessions+1, last_seen=NOW() WHERE email=$1', [d.email]);
       socket.emit('joined', { isPremium: u.is_premium, ineVerified: u.ine_verified, ineStatus: u.ine_status, approved: u.approved });
@@ -594,6 +760,7 @@ io.on('connection', socket => {
   });
 
   socket.on('set_filters', f => { if (activeSockets[socket.id]?.isPremium) activeSockets[socket.id].filters = f; });
+  socket.on('set_mode', ({mode}) => { if (activeSockets[socket.id]?.isPremium) activeSockets[socket.id].mode = mode; });
 
   socket.on('find_partner', () => {
     const u = activeSockets[socket.id]; if (!u) return;
