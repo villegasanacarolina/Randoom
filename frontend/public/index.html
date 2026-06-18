@@ -127,7 +127,8 @@ textarea.fc{resize:vertical;min-height:70px}
 .timer-track{flex:1;height:3px;background:rgba(160,32,240,.15);border-radius:2px;overflow:hidden}
 .timer-fill{height:100%;background:linear-gradient(90deg,var(--pu),var(--pu-l));transition:width 1s linear}
 .timer-lbl{font-size:10px;color:var(--gray-l);font-weight:500}
-.chat-ctrls{background:rgba(5,0,8,.97);border-top:1px solid var(--bd);padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:10px;flex-shrink:0}
+.chat-ctrls{background:rgba(5,0,8,.97);border-top:1px solid var(--bd);padding:10px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.chat-ctrls::-webkit-scrollbar{display:none}
 .ctrl-btn{width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .2s;flex-shrink:0}
 .ctrl-btn.mic,.ctrl-btn.cam{background:rgba(160,32,240,.12);border:1px solid var(--bd)}
 .ctrl-btn.off{background:rgba(239,68,68,.2);border:1px solid #EF4444}
@@ -738,6 +739,9 @@ textarea.fc{resize:vertical;min-height:70px}
   </div>
   <div class="game-canvas-wrap">
     <canvas id="game-canvas"></canvas>
+    <!-- Spectator: opponent game shown in corner -->
+    <canvas id="spec-canvas" style="position:absolute;bottom:80px;right:8px;width:130px;height:100px;border-radius:10px;border:2px solid rgba(160,32,240,.6);background:rgba(5,0,12,.8);display:none;pointer-events:none;z-index:20"></canvas>
+    <div id="spec-label" style="position:absolute;bottom:74px;right:8px;width:130px;text-align:center;font-size:10px;color:var(--pu-l);font-weight:700;font-family:Poppins,sans-serif;display:none;z-index:21;pointer-events:none">👁 Compañero</div>
     <div class="game-result" id="game-result">
       <div style="font-size:60px;margin-bottom:10px" id="result-emoji">🏆</div>
       <div class="result-winner" id="result-winner">¡Ganaste!</div>
@@ -948,6 +952,13 @@ function initSocket(){
   });
   app.socket.on('game_score', (d) => {
     onGameScore(d.score, d.type);
+  });
+  app.socket.on('game_state', (d) => {
+    // Update spectator view with partner's live game data
+    if (d.items) _specItems = d.items;
+    _specScore = d.score || 0;
+    // Play subtle sound so partner hears partner's slices
+    if (d.sliced) _playSound('slice');
   });
   app.socket.on('game_end', () => {
     onGameEnd();
@@ -1414,6 +1425,7 @@ function onGameInvite(type, fromName) {
   GS.phase = 'partner_turn';
   _msg(`⏳ ${fromName||'Tu compañero'} está jugando...`, '#C8A8E0');
   _setStatus('Turno de tu compañero...');
+  _showSpectator();
 }
 
 function onGameScore(partnerScore, type) {
@@ -1530,29 +1542,46 @@ function _hud(score) {
   x.fillText(GS.timeLeft, cx, cy + 5);
 }
 
+// Spectator: data received from partner
+let _specItems = [], _specScore = 0, _specRaf = null;
+
 function _showSpectator() {
-  const sc = document.getElementById('spectator-canvas');
-  const lb = document.getElementById('spectator-label');
-  if (sc) { sc.style.display = 'block'; _drawSpectator(0); }
+  const sc = document.getElementById('spec-canvas');
+  const lb = document.getElementById('spec-label');
+  if (sc) sc.style.display = 'block';
   if (lb) lb.style.display = 'block';
+  _specScore = 0; _specItems = [];
+  _specLoop();
 }
 function _hideSpectator() {
-  const sc = document.getElementById('spectator-canvas');
-  const lb = document.getElementById('spectator-label');
+  const sc = document.getElementById('spec-canvas');
+  const lb = document.getElementById('spec-label');
   if (sc) sc.style.display = 'none';
   if (lb) lb.style.display = 'none';
+  if (_specRaf) { cancelAnimationFrame(_specRaf); _specRaf = null; }
 }
-function _drawSpectator(partnerScore) {
-  const sc = document.getElementById('spectator-canvas'); if (!sc) return;
-  sc.width = 120; sc.height = 90;
+function _specLoop() {
+  const sc = document.getElementById('spec-canvas');
+  if (!sc || sc.style.display === 'none') return;
+  sc.width = 130; sc.height = 100;
   const x = sc.getContext('2d');
-  x.clearRect(0,0,120,90);
-  x.fillStyle='rgba(8,0,16,.7)'; x.fillRect(0,0,120,90);
-  x.fillStyle='#fff'; x.font='bold 11px Poppins,sans-serif'; x.textAlign='center';
+  x.clearRect(0,0,130,100);
+  x.fillStyle='rgba(5,0,12,.82)'; x.fillRect(0,0,130,100);
   const ic={fruit:'🍉',target:'🎯',basket:'🏀'};
-  x.fillText(`${ic[GS.type]||'🎮'} ${partnerScore} pts`, 60, 50);
-  x.fillStyle='#C8A8E0'; x.font='10px Inter,sans-serif';
-  x.fillText('Compañero jugando...', 60, 68);
+  // Draw mini items
+  _specItems.forEach(it => {
+    x.font = '16px serif'; x.textAlign='center'; x.textBaseline='middle';
+    x.fillText(it.e, it.x*0.18, it.y*0.18);
+  });
+  x.fillStyle='rgba(8,0,16,.5)'; x.fillRect(0,0,130,26);
+  x.fillStyle='#fff'; x.font='bold 12px Poppins,sans-serif'; x.textAlign='center'; x.textBaseline='alphabetic';
+  x.fillText(`${ic[GS.type]||'🎮'} ${_specScore} pts`, 65, 18);
+  _specRaf = requestAnimationFrame(_specLoop);
+}
+function _drawSpectator(score) {
+  _specScore = score;
+  const sc = document.getElementById('spec-canvas');
+  if (sc && sc.style.display !== 'none') return; // already animating
 }
 
 function _showResult() {
@@ -1635,6 +1664,7 @@ function _fruit() {
         f.dead = true;
         if (f.bomb) { score = Math.max(0, score - 3); GS.myScore = score; _playSound('bomb'); return; } // bomb = -3pts, don't end turn
         score++; GS.myScore = score; _playSound('slice');
+        if (app.socket) app.socket.emit('game_state', { score, sliced: true, items: [] });
         for (let k = 0; k < 10; k++) {
           const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 5;
           sparks.push({ x: f.x, y: f.y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp-2, r: 4+Math.random()*4, l: 1, c: `hsl(${Math.random()*60+10},100%,55%)` });
@@ -1703,6 +1733,10 @@ function _fruit() {
     // Lives
     for (let i = 0; i < 3; i++) { x.font = '18px serif'; x.textAlign = 'left'; x.fillText(i < lives ? '❤️' : '🖤', 10 + i*24, cv.height - 10); }
     _hud(score);
+    // Send state to partner spectator every ~20 frames
+    if (app.socket && Math.random() < 0.05) {
+      app.socket.emit('game_state', { score, items: items.slice(0,8).map(f=>({x:Math.round(f.x),y:Math.round(f.y),e:f.e,dead:f.dead})) });
+    }
     GS.rafID = requestAnimationFrame(frame);
   }
   GS.rafID = requestAnimationFrame(frame);
