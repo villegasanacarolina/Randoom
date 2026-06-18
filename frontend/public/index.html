@@ -6,6 +6,8 @@
 <title>Randoom – Conecta con el mundo</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -486,6 +488,7 @@ textarea.fc{resize:vertical;min-height:70px}
       <button class="ctrl-btn rpt" onclick="openReport()" id="btn-report" style="display:none">🚨</button>
       <button class="ctrl-btn" onclick="openGame('fruit')" id="btn-fruit" style="display:none;background:rgba(34,197,94,.15);border:1px solid #22C55E" title="Fruit Ninja">🍉</button>
       <button class="ctrl-btn" onclick="openGame('target')" id="btn-target" style="display:none;background:rgba(59,130,246,.15);border:1px solid #3B82F6" title="Tiro al blanco">🎯</button>
+      <button class="ctrl-btn" onclick="openGame('basket')" id="btn-basket" style="display:none;background:rgba(245,158,11,.15);border:1px solid #F59E0B" title="Baloncesto">🏀</button>
       <button class="ctrl-btn" onclick="sendFriendReq()" id="btn-addfriend" style="display:none;background:rgba(160,32,240,.15);border:1px solid var(--pu)" title="Agregar amigo">👤+</button>
     </div>
   </div>
@@ -727,20 +730,28 @@ textarea.fc{resize:vertical;min-height:70px}
 <!-- ═══ GAME OVERLAY ═══ -->
 <div class="game-overlay" id="game-overlay">
   <div class="game-header">
-    <h2 id="game-title">🍉 Fruit Ninja</h2>
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="font-family:'Poppins',sans-serif;font-weight:700;color:var(--pu-l)" id="game-status">Tu turno — 30s</div>
-      <button class="btn btn-ghost btn-sm" onclick="closeGame()">✕ Cerrar</button>
+    <h2 id="game-title">🎮 Juego</h2>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;color:var(--pu-l)" id="game-status">Cargando...</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeGame()">✕</button>
     </div>
   </div>
   <div class="game-canvas-wrap">
+    <!-- Hand cam feed (mirrored, behind game canvas) -->
+    <video id="hand-video" playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;pointer-events:none"></video>
     <canvas id="game-canvas"></canvas>
+    <!-- Loading state -->
+    <div id="game-loading" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,0,16,.9);gap:14px">
+      <div class="spinner"></div>
+      <div style="font-family:'Poppins',sans-serif;font-weight:700;font-size:16px;color:#fff" id="loading-text">Cargando IA de manos...</div>
+      <div style="font-size:12px;color:var(--gray-l)">Acepta el permiso de cámara</div>
+    </div>
     <div class="game-result" id="game-result">
-      <div style="font-size:56px;margin-bottom:10px" id="result-emoji">🏆</div>
+      <div style="font-size:60px;margin-bottom:10px" id="result-emoji">🏆</div>
       <div class="result-winner" id="result-winner">¡Ganaste!</div>
       <div class="result-score" id="result-score"></div>
       <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-        <button class="btn btn-primary" onclick="restartGame()">🔄 Jugar de nuevo</button>
+        <button class="btn btn-primary" onclick="restartGame()">🔄 De nuevo</button>
         <button class="btn btn-ghost" onclick="closeGame()">Cerrar</button>
       </div>
     </div>
@@ -892,6 +903,7 @@ function initSocket(){
     document.getElementById('btn-report').style.display='flex';
     document.getElementById('btn-fruit').style.display='flex';
     document.getElementById('btn-target').style.display='flex';
+    document.getElementById('btn-basket').style.display='flex';
     document.getElementById('btn-addfriend').style.display='flex';
     startTimer();
     try{
@@ -1303,65 +1315,161 @@ async function sendFriendReq() {
   } catch(e) {toast(e.message,'err');}
 }
 
-// ── GAMES ─────────────────────────────────────────────────────────────────────
-// Clean, bug-free, touch-only games (no TensorFlow)
+// ── GAMES — TensorFlow HandPose ──────────────────────────────────────────────
+// State
 let G = {
-  type: null,
-  phase: 'idle',      // idle | my_turn | waiting | result
-  myScore: 0,
-  partnerScore: 0,
-  timeLeft: 30,
-  frameId: null,
-  timerInterval: null,
-  canvas: null,
-  ctx: null
+  type: null, phase: 'idle',
+  myScore: 0, partnerScore: 0,
+  timeLeft: 30, frameId: null, timerInt: null,
+  canvas: null, ctx: null,
+  detector: null, handStream: null, handVideo: null,
+  lastHand: null, // cached hand landmarks
+  detectionRunning: false
 };
 
-const FRUITS = ['🍉','🍊','🍋','🍇','🍓','🥝','🍑','🍒'];
+const FRUITS_EMOJIS = ['🍉','🍊','🍋','🍇','🍓','🥝','🍑','🍒'];
 
-function openGame(type) {
-  if (!app.partnerEmail) { toast('Debes estar en una llamada','err'); return; }
-  G.type = type;
-  G.phase = 'idle';
-  G.myScore = 0;
-  G.partnerScore = 0;
-  document.getElementById('game-result').classList.remove('show');
-  document.getElementById('game-title').textContent = type === 'fruit' ? '🍉 Fruit Ninja' : '🎯 Tiro al Blanco';
-  document.getElementById('game-overlay').classList.add('active');
-  // Tell partner what game
-  if (app.socket) app.socket.emit('game_invite', { type, from: app.user?.name });
-  // Small delay so overlay renders
-  setTimeout(initGameCanvas, 100);
+// ── Load TF model once ────────────────────────────────────────────────────────
+let tfDetector = null;
+let tfLoading = false;
+
+async function loadDetector() {
+  if (tfDetector) return tfDetector;
+  if (tfLoading) {
+    // Wait
+    while (tfLoading) await new Promise(r => setTimeout(r, 100));
+    return tfDetector;
+  }
+  tfLoading = true;
+  try {
+    const model = handPoseDetection.SupportedModels.MediaPipeHands;
+    tfDetector = await handPoseDetection.createDetector(model, {
+      runtime: 'tfjs',
+      modelType: 'lite',
+      maxHands: 1
+    });
+    console.log('HandPose loaded ✅');
+  } catch(e) {
+    console.error('HandPose failed:', e);
+    tfDetector = null;
+  }
+  tfLoading = false;
+  return tfDetector;
 }
 
-function initGameCanvas() {
+// ── Open game ─────────────────────────────────────────────────────────────────
+async function openGame(type) {
+  if (!app.partnerEmail) { toast('Debes estar en una llamada','err'); return; }
+  G.type = type; G.phase = 'idle';
+  G.myScore = 0; G.partnerScore = 0; G.lastHand = null;
+
+  const titles = { fruit:'🍉 Fruit Ninja', target:'🎯 Tiro al Blanco', basket:'🏀 Baloncesto' };
+  document.getElementById('game-title').textContent = titles[type] || '🎮';
+  document.getElementById('game-result').classList.remove('show');
+  document.getElementById('game-loading').style.display = 'flex';
+  document.getElementById('loading-text').textContent = 'Cargando IA de manos...';
+  document.getElementById('game-overlay').classList.add('active');
+
+  if (app.socket) app.socket.emit('game_invite', { type, from: app.user?.name });
+
+  // Setup canvas
   G.canvas = document.getElementById('game-canvas');
+  G.handVideo = document.getElementById('hand-video');
   const wrap = G.canvas.parentElement;
   G.canvas.width  = wrap.offsetWidth  || window.innerWidth;
-  G.canvas.height = wrap.offsetHeight || window.innerHeight - 55;
+  G.canvas.height = wrap.offsetHeight || (window.innerHeight - 55);
   G.ctx = G.canvas.getContext('2d');
+
+  // Get hand camera
+  try {
+    document.getElementById('loading-text').textContent = 'Activando cámara para manos...';
+    G.handStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'user', width:320, height:240 }, audio:false });
+    G.handVideo.srcObject = G.handStream;
+    await G.handVideo.play();
+  } catch(e) {
+    console.warn('Hand cam failed, using touch fallback:', e);
+    G.handStream = null;
+  }
+
+  // Load model
+  document.getElementById('loading-text').textContent = 'Cargando modelo IA...';
+  G.detector = await loadDetector();
+
+  document.getElementById('game-loading').style.display = 'none';
+
+  // Start hand detection loop
+  if (G.detector && G.handVideo.srcObject) {
+    G.detectionRunning = true;
+    runHandDetection();
+  }
+
   startMyTurn();
 }
 
+// ── Continuous hand detection (runs independently) ────────────────────────────
+async function runHandDetection() {
+  if (!G.detectionRunning || !G.detector) return;
+  try {
+    if (G.handVideo && G.handVideo.readyState >= 2) {
+      const hands = await G.detector.estimateHands(G.handVideo, { flipHorizontal: true });
+      G.lastHand = hands.length > 0 ? hands[0] : null;
+    }
+  } catch(e) {}
+  if (G.detectionRunning) {
+    // ~30fps detection
+    setTimeout(runHandDetection, 33);
+  }
+}
+
+// ── Get fingertip positions from last hand ────────────────────────────────────
+// Returns array of {x,y} screen coordinates for all visible fingertips
+function getFingerTips() {
+  if (!G.lastHand || !G.canvas) return [];
+  const kps = G.lastHand.keypoints;
+  const tips = [4, 8, 12, 16, 20]; // thumb, index, middle, ring, pinky
+  const cw = G.canvas.width, ch = G.canvas.height;
+  const vw = G.handVideo.videoWidth || 320, vh = G.handVideo.videoHeight || 240;
+  return tips.map(i => ({
+    x: (kps[i].x / vw) * cw,
+    y: (kps[i].y / vh) * ch,
+    id: i
+  })).filter(p => p.x >= 0 && p.y >= 0 && p.x <= cw && p.y <= ch);
+}
+
+// Get single index finger tip
+function getIndexTip() {
+  if (!G.lastHand || !G.canvas) return null;
+  const kps = G.lastHand.keypoints;
+  const cw = G.canvas.width, ch = G.canvas.height;
+  const vw = G.handVideo.videoWidth || 320, vh = G.handVideo.videoHeight || 240;
+  return {
+    x: (kps[8].x / vw) * cw,
+    y: (kps[8].y / vh) * ch
+  };
+}
+
+// ── Close game ────────────────────────────────────────────────────────────────
 function closeGame() {
   stopGameLoop();
+  G.detectionRunning = false;
+  if (G.handStream) { G.handStream.getTracks().forEach(t => t.stop()); G.handStream = null; }
   document.getElementById('game-overlay').classList.remove('active');
   if (app.socket) app.socket.emit('game_end', {});
-  G.type = null; G.phase = 'idle';
+  G.type = null; G.phase = 'idle'; G.lastHand = null;
 }
 
 function restartGame() {
   document.getElementById('game-result').classList.remove('show');
   G.myScore = 0; G.partnerScore = 0;
-  setTimeout(initGameCanvas, 50);
+  startMyTurn();
 }
 
 function stopGameLoop() {
   if (G.frameId) { cancelAnimationFrame(G.frameId); G.frameId = null; }
-  if (G.timerInterval) { clearInterval(G.timerInterval); G.timerInterval = null; }
-  // Remove event listeners by replacing canvas
-  const old = G.canvas;
-  if (old) {
+  if (G.timerInt) { clearInterval(G.timerInt); G.timerInt = null; }
+  // Remove stale canvas listeners by replacing
+  const old = document.getElementById('game-canvas');
+  if (old && old.parentNode) {
     const fresh = old.cloneNode(false);
     old.parentNode.replaceChild(fresh, old);
     G.canvas = fresh;
@@ -1369,321 +1477,534 @@ function stopGameLoop() {
   }
 }
 
+// ── Start my turn ─────────────────────────────────────────────────────────────
 function startMyTurn() {
   stopGameLoop();
-  G.phase = 'my_turn';
-  G.timeLeft = 30;
-  G.canvas = document.getElementById('game-canvas');
-  G.ctx = G.canvas.getContext('2d');
-  document.getElementById('game-status').textContent = G.type === 'fruit' ? '🍉 ¡Corta frutas! — 30s' : '🎯 ¡Apunta! — 30s';
+  G.phase = 'my_turn'; G.timeLeft = 30;
   document.getElementById('game-result').classList.remove('show');
+  const labels = { fruit:'🍉 ¡Corta con los dedos! — 30s', target:'🎯 ¡Toca los blancos! — 30s', basket:'🏀 ¡Agarra y lanza! — 30s' };
+  document.getElementById('game-status').textContent = labels[G.type] || 'Tu turno — 30s';
 
-  if (G.type === 'fruit') runFruitNinja();
-  else runTargetGame();
+  if (G.type === 'fruit')  runFruitNinja();
+  else if (G.type === 'target') runTargetGame();
+  else if (G.type === 'basket') runBasketGame();
 
-  G.timerInterval = setInterval(() => {
+  G.timerInt = setInterval(() => {
+    if (G.phase !== 'my_turn') return;
     G.timeLeft--;
-    document.getElementById('game-status').textContent =
-      G.type === 'fruit' ? `🍉 Tu turno — ${G.timeLeft}s` : `🎯 Tu turno — ${G.timeLeft}s`;
+    const icons = { fruit:'🍉', target:'🎯', basket:'🏀' };
+    document.getElementById('game-status').textContent = `${icons[G.type]} Tu turno — ${G.timeLeft}s`;
     if (G.timeLeft <= 0) finishMyTurn();
   }, 1000);
 }
 
 function finishMyTurn() {
   stopGameLoop();
+  if (G.phase !== 'my_turn') return;
   G.phase = 'waiting';
   document.getElementById('game-status').textContent = `⌛ Turno de tu compañero... (Tú: ${G.myScore} pts)`;
-  // Send score to partner
   if (app.socket) app.socket.emit('game_score', { score: G.myScore, type: G.type });
-  // Draw waiting message on canvas
+  // Draw waiting on canvas
   const c = G.canvas, x = G.ctx;
+  if (!c || !x) return;
   x.clearRect(0, 0, c.width, c.height);
-  x.fillStyle = 'rgba(8,0,16,0.75)';
-  roundRect(x, c.width/2-160, c.height/2-50, 320, 100, 16);
-  x.fill();
+  x.fillStyle = 'rgba(8,0,16,0.8)';
+  roundRect(x, c.width/2-160, c.height/2-48, 320, 96, 18); x.fill();
   x.fillStyle = '#fff'; x.font = 'bold 22px Poppins,sans-serif'; x.textAlign = 'center';
-  x.fillText('Tu puntuación: ' + G.myScore + ' pts', c.width/2, c.height/2 - 8);
-  x.fillStyle = '#C8A8E0'; x.font = '15px Inter,sans-serif';
-  x.fillText('Esperando a tu compañero...', c.width/2, c.height/2 + 22);
+  x.fillText('Tu puntuación: ' + G.myScore + ' pts', c.width/2, c.height/2 - 6);
+  x.fillStyle = '#C8A8E0'; x.font = '14px Inter,sans-serif';
+  x.fillText('Esperando a tu compañero...', c.width/2, c.height/2 + 24);
+}
+
+// ── HUD ───────────────────────────────────────────────────────────────────────
+function showHUD(score) {
+  const c = G.canvas, x = G.ctx;
+  // Score
+  x.fillStyle = 'rgba(8,0,16,0.72)';
+  roundRect(x, 10, 10, 115, 44, 10); x.fill();
+  x.fillStyle = '#fff'; x.font = 'bold 21px Poppins,sans-serif'; x.textAlign = 'left';
+  const icons = { fruit:'🍉', target:'🎯', basket:'🏀' };
+  x.fillText((icons[G.type]||'') + ' ' + score, 18, 36);
+  // Timer arc
+  const pct = G.timeLeft / 30;
+  const cx = c.width - 38, cy = 38;
+  x.strokeStyle = 'rgba(160,32,240,0.25)'; x.lineWidth = 6;
+  x.beginPath(); x.arc(cx, cy, 26, 0, Math.PI*2); x.stroke();
+  x.strokeStyle = pct > 0.4 ? '#A020F0' : '#EF4444'; x.lineWidth = 6;
+  x.beginPath(); x.arc(cx, cy, 26, -Math.PI/2, -Math.PI/2 + pct*Math.PI*2); x.stroke();
+  x.fillStyle = '#fff'; x.font = 'bold 15px Poppins,sans-serif'; x.textAlign = 'center';
+  x.fillText(G.timeLeft, cx, cy + 6);
+  // Hand indicator
+  const hasTF = !!G.lastHand;
+  x.fillStyle = hasTF ? 'rgba(34,197,94,0.8)' : 'rgba(239,68,68,0.8)';
+  roundRect(x, c.width/2-40, 6, 80, 22, 8); x.fill();
+  x.fillStyle = '#fff'; x.font = '11px Inter,sans-serif'; x.textAlign = 'center';
+  x.fillText(hasTF ? '✋ Detectada' : '✋ Levanta mano', c.width/2, 21);
+}
+
+function drawFingerDots() {
+  const pts = getFingerTips();
+  const x = G.ctx;
+  pts.forEach(p => {
+    x.beginPath(); x.arc(p.x, p.y, 12, 0, Math.PI*2);
+    x.fillStyle = 'rgba(192,96,255,0.55)'; x.fill();
+    x.strokeStyle = 'rgba(255,255,255,0.9)'; x.lineWidth = 2; x.stroke();
+  });
 }
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x+r, y);
-  ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
-  ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
-  ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
-  ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x,y,x+r,y);
   ctx.closePath();
 }
 
-function showHUD(score, timeLeft) {
-  const c = G.canvas, x = G.ctx;
-  // Score badge
-  x.fillStyle = 'rgba(8,0,16,0.7)';
-  roundRect(x, 10, 10, 110, 42, 10); x.fill();
-  x.fillStyle = '#fff'; x.font = 'bold 20px Poppins,sans-serif'; x.textAlign = 'left';
-  x.fillText((G.type==='fruit'?'🍉 ':'🎯 ') + score, 18, 36);
-  // Timer arc
-  const pct = timeLeft / 30;
-  const cx2 = c.width - 36, cy2 = 36;
-  x.strokeStyle = 'rgba(160,32,240,0.25)'; x.lineWidth = 5;
-  x.beginPath(); x.arc(cx2, cy2, 24, 0, Math.PI*2); x.stroke();
-  x.strokeStyle = pct > 0.4 ? '#A020F0' : '#EF4444';
-  x.beginPath(); x.arc(cx2, cy2, 24, -Math.PI/2, -Math.PI/2 + pct * Math.PI*2); x.stroke();
-  x.fillStyle = '#fff'; x.font = 'bold 14px Poppins,sans-serif'; x.textAlign = 'center';
-  x.fillText(timeLeft, cx2, cy2 + 5);
-}
-
-// ──────────────────────────── FRUIT NINJA ────────────────────────────────────
+// ═══════════════════════════ FRUIT NINJA ═══════════════════════════════════
 function runFruitNinja() {
   const c = G.canvas, x = G.ctx;
-  const items = [];   // fruits + bombs
-  const trail = [];   // slice trail points
-  const particles = []; // slice particles
-  let score = 0, lives = 3;
-  let spawnTick = 0;
-  let lastTs = performance.now();
+  const items = [], particles = [];
+  const trail = []; // {x,y,t}
+  let score = 0, lives = 3, spawnTick = 0, lastTs = performance.now();
 
   function spawn() {
-    const bomb = Math.random() < 0.12;
+    const bomb = Math.random() < 0.1;
     items.push({
-      x: 50 + Math.random() * (c.width - 100),
-      y: c.height + 50,
-      vx: (Math.random() - 0.5) * 6,
-      vy: -(c.height * 0.024 + Math.random() * 5),
-      rot: 0, rotV: (Math.random() - 0.5) * 7,
-      emoji: bomb ? '💣' : FRUITS[Math.floor(Math.random() * FRUITS.length)],
-      bomb, size: 50, dead: false
+      x: 60 + Math.random()*(c.width-120),
+      y: c.height + 55,
+      vx: (Math.random()-0.5)*6,
+      vy: -(c.height*0.025 + Math.random()*5),
+      rot:0, rotV:(Math.random()-0.5)*7,
+      emoji: bomb?'💣':FRUITS_EMOJIS[Math.floor(Math.random()*FRUITS_EMOJIS.length)],
+      bomb, size:50, dead:false
     });
   }
 
   function loop(ts) {
     if (G.phase !== 'my_turn') return;
-    const dt = Math.min((ts - lastTs) / 16, 3); lastTs = ts;
-    x.clearRect(0, 0, c.width, c.height);
+    const dt = Math.min((ts-lastTs)/16, 2.5); lastTs = ts;
+    x.clearRect(0,0,c.width,c.height);
 
-    // Spawn
-    spawnTick += dt;
-    if (spawnTick > 28) { spawn(); spawnTick = 0; }
-
-    // Trail
+    // Draw trailing slice marks
     const now = Date.now();
     if (trail.length > 1) {
-      for (let i = 1; i < trail.length; i++) {
-        const age = (now - trail[i].t) / 180;
-        if (age >= 1) continue;
-        x.globalAlpha = 1 - age;
-        x.strokeStyle = `hsl(${270 + i * 4}, 100%, ${55 + age * 20}%)`;
-        x.lineWidth = Math.max(1, 6 - age * 5);
-        x.lineCap = 'round';
-        x.beginPath(); x.moveTo(trail[i-1].x, trail[i-1].y);
-        x.lineTo(trail[i].x, trail[i].y); x.stroke();
+      for (let i=1;i<trail.length;i++) {
+        const age = (now-trail[i].t)/200;
+        if (age>=1) continue;
+        x.globalAlpha = 1-age;
+        x.strokeStyle = `hsl(${270+i*3},100%,${55+age*25}%)`;
+        x.lineWidth = Math.max(1, 6-age*5); x.lineCap='round';
+        x.beginPath(); x.moveTo(trail[i-1].x,trail[i-1].y); x.lineTo(trail[i].x,trail[i].y); x.stroke();
       }
-      x.globalAlpha = 1;
-      // Remove old points
-      while (trail.length && (now - trail[0].t) > 200) trail.shift();
+      x.globalAlpha=1;
     }
+    while (trail.length && (now-trail[0].t)>250) trail.shift();
 
     // Particles
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 0.3 * dt;
-      p.life -= dt * 0.04;
-      if (p.life <= 0) { particles.splice(i, 1); continue; }
-      x.globalAlpha = p.life;
-      x.fillStyle = p.color;
-      x.beginPath(); x.arc(p.x, p.y, p.r * p.life, 0, Math.PI*2); x.fill();
-      x.globalAlpha = 1;
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.3*dt; p.life-=dt*0.04;
+      if(p.life<=0){particles.splice(i,1);continue;}
+      x.globalAlpha=p.life; x.fillStyle=p.color;
+      x.beginPath(); x.arc(p.x,p.y,p.r*p.life,0,Math.PI*2); x.fill(); x.globalAlpha=1;
     }
+
+    // Spawn
+    spawnTick+=dt; if(spawnTick>26){spawn();spawnTick=0;}
 
     // Fruits
-    for (let i = items.length - 1; i >= 0; i--) {
-      const f = items[i];
-      if (f.dead) { items.splice(i, 1); continue; }
-      f.x += f.vx * dt; f.y += f.vy * dt;
-      f.vy += 0.45 * dt; f.rot += f.rotV * dt;
-      if (f.y > c.height + 80) {
-        items.splice(i, 1);
-        if (!f.bomb) {
-          lives--;
-          // Show miss feedback
-          x.fillStyle = 'rgba(239,68,68,0.4)';
-          x.fillRect(0, 0, c.width, c.height);
-          if (lives <= 0) { finishMyTurn(); return; }
-        }
+    for(let i=items.length-1;i>=0;i--){
+      const f=items[i];
+      if(f.dead){items.splice(i,1);continue;}
+      f.x+=f.vx*dt; f.y+=f.vy*dt; f.vy+=0.45*dt; f.rot+=f.rotV*dt;
+      if(f.y>c.height+80){
+        items.splice(i,1);
+        if(!f.bomb){lives--;if(lives<=0){finishMyTurn();return;}}
         continue;
       }
-      x.save();
-      x.translate(f.x, f.y); x.rotate(f.rot * Math.PI / 180);
-      if (!f.bomb) { x.shadowColor = 'rgba(255,200,50,0.5)'; x.shadowBlur = 10; }
-      else { x.shadowColor = 'rgba(255,80,0,0.7)'; x.shadowBlur = 14; }
-      x.font = f.size + 'px serif';
-      x.textAlign = 'center'; x.textBaseline = 'middle';
-      x.fillText(f.emoji, 0, 0);
-      x.restore();
+      x.save(); x.translate(f.x,f.y); x.rotate(f.rot*Math.PI/180);
+      x.shadowColor=f.bomb?'rgba(255,80,0,.8)':'rgba(255,200,50,.5)'; x.shadowBlur=12;
+      x.font=f.size+'px serif'; x.textAlign='center'; x.textBaseline='middle';
+      x.fillText(f.emoji,0,0); x.restore();
     }
 
-    // Lives hearts
-    for (let i = 0; i < 3; i++) {
-      x.font = '18px serif'; x.textAlign = 'left';
-      x.fillText(i < lives ? '❤️' : '🖤', 12 + i * 24, c.height - 12);
-    }
+    // Lives
+    for(let i=0;i<3;i++){x.font='18px serif';x.textAlign='left';x.fillText(i<lives?'❤️':'🖤',12+i*24,c.height-12);}
 
-    showHUD(score, G.timeLeft);
-    G.frameId = requestAnimationFrame(loop);
-  }
-
-  // Slice detection
-  function onPointer(e) {
-    e.preventDefault();
-    const rect = c.getBoundingClientRect();
-    const pts = e.touches ? Array.from(e.touches) : [e];
-    pts.forEach(t => {
-      const px = (t.clientX - rect.left) * (c.width / rect.width);
-      const py = (t.clientY - rect.top) * (c.height / rect.height);
-      trail.push({ x: px, y: py, t: Date.now() });
-      items.forEach(f => {
-        if (f.dead) return;
-        const dx = px - f.x, dy = py - f.y;
-        if (Math.sqrt(dx*dx + dy*dy) < f.size * 0.55) {
-          f.dead = true;
-          if (f.bomb) { finishMyTurn(); return; }
-          score++;
-          G.myScore = score;
-          // Particles
-          for (let i = 0; i < 10; i++) {
-            const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 5;
-            particles.push({ x: f.x, y: f.y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - 2,
-              r: 5 + Math.random()*4, life: 1,
-              color: `hsl(${Math.random()*60+10},100%,${50+Math.random()*20}%)` });
+    // ── Finger detection ──────────────────────────────────────────────────
+    const tips = getFingerTips();
+    tips.forEach(tip => {
+      // Draw finger dot
+      x.beginPath(); x.arc(tip.x,tip.y,14,0,Math.PI*2);
+      x.fillStyle='rgba(192,96,255,.4)'; x.fill();
+      x.strokeStyle='rgba(255,255,255,.85)'; x.lineWidth=2.5; x.stroke();
+      trail.push({x:tip.x,y:tip.y,t:Date.now()});
+      // Check slice
+      items.forEach(f=>{
+        if(f.dead)return;
+        const dx=tip.x-f.x,dy=tip.y-f.y;
+        if(Math.sqrt(dx*dx+dy*dy)<f.size*0.58){
+          f.dead=true;
+          if(f.bomb){finishMyTurn();return;}
+          score++; G.myScore=score;
+          for(let k=0;k<10;k++){
+            const a=Math.random()*Math.PI*2,sp=2+Math.random()*5;
+            particles.push({x:f.x,y:f.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,r:5+Math.random()*4,life:1,color:`hsl(${Math.random()*60+10},100%,${50+Math.random()*20}%)`});
           }
         }
       });
     });
-  }
 
-  c.addEventListener('touchstart',  onPointer, { passive: false });
-  c.addEventListener('touchmove',   onPointer, { passive: false });
-  c.addEventListener('mousedown',   onPointer);
-  c.addEventListener('mousemove',   e => { if (e.buttons) onPointer(e); });
-
-  G.frameId = requestAnimationFrame(loop);
-}
-
-// ──────────────────────────── TIRO AL BLANCO ─────────────────────────────────
-function runTargetGame() {
-  const c = G.canvas, x = G.ctx;
-  const targets = [];
-  let score = 0;
-  let spawnTick = 0;
-  let lastTs = performance.now();
-  const COLORS = ['#EF4444','#3B82F6','#22C55E','#F59E0B','#A020F0','#EC4899'];
-
-  function spawn() {
-    const r = 28 + Math.random() * 28;
-    targets.push({
-      x: r + Math.random() * (c.width - r*2),
-      y: 70 + Math.random() * (c.height - 120),
-      r, maxLife: 1.5 + Math.random() * 2, life: 1,
-      color: COLORS[Math.floor(Math.random() * COLORS.length)],
-      born: performance.now(), hit: false, hitAnim: 0
-    });
-  }
-
-  function loop(ts) {
-    if (G.phase !== 'my_turn') return;
-    const dt = Math.min((ts - lastTs) / 16, 3); lastTs = ts;
-    x.clearRect(0, 0, c.width, c.height);
-
-    spawnTick += dt;
-    if (spawnTick > 32) { if (targets.length < 8) spawn(); spawnTick = 0; }
-    if (targets.length === 0) spawn();
-
-    for (let i = targets.length - 1; i >= 0; i--) {
-      const t = targets[i];
-      const age = (performance.now() - t.born) / 1000;
-      t.life = Math.max(0, 1 - age / t.maxLife);
-      if (t.hit) {
-        t.hitAnim += dt * 0.08;
-        if (t.hitAnim >= 1) { targets.splice(i, 1); continue; }
-        x.globalAlpha = 1 - t.hitAnim;
-        x.save(); x.translate(t.x, t.y);
-        const sc = 1 + t.hitAnim * 0.6;
-        x.scale(sc, sc);
-        drawTarget(x, t);
-        x.restore();
-        x.globalAlpha = 1;
-        continue;
-      }
-      if (t.life <= 0) { targets.splice(i, 1); continue; }
-      x.globalAlpha = t.life;
-      x.save(); x.translate(t.x, t.y);
-      const pulse = 1 + Math.sin(age * 4) * 0.05;
-      x.scale(pulse, pulse);
-      drawTarget(x, t);
-      x.restore();
-      x.globalAlpha = 1;
+    // Touch fallback (if no hand detected)
+    if (!G.lastHand) {
+      x.fillStyle='rgba(239,68,68,0.12)'; x.fillRect(0,0,c.width,c.height);
+      x.fillStyle='rgba(255,255,255,0.6)'; x.font='14px Poppins,sans-serif'; x.textAlign='center';
+      x.fillText('✋ Muestra tu mano a la cámara', c.width/2, c.height/2);
     }
 
-    showHUD(score, G.timeLeft);
+    showHUD(score);
     G.frameId = requestAnimationFrame(loop);
   }
 
-  function drawTarget(ctx, t) {
-    [t.r, t.r*0.66, t.r*0.36].forEach((r, i) => {
-      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2);
-      ctx.fillStyle = i % 2 === 0 ? t.color : '#fff';
-      ctx.shadowColor = t.color; ctx.shadowBlur = i === 0 ? 10 : 0;
-      ctx.fill();
-    });
-    ctx.shadowBlur = 0;
-    // Center dot
-    ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2);
-    ctx.fillStyle = t.color; ctx.fill();
-  }
-
-  function onTap(e) {
-    e.preventDefault();
-    const rect = c.getBoundingClientRect();
-    const pts = e.touches ? [e.touches[0]] : [e];
-    pts.forEach(t => {
-      const px = (t.clientX - rect.left) * (c.width / rect.width);
-      const py = (t.clientY - rect.top) * (c.height / rect.height);
-      let hit = false;
-      for (let i = targets.length - 1; i >= 0; i--) {
-        const tg = targets[i];
-        if (tg.hit) continue;
-        const dx = px - tg.x, dy = py - tg.y;
-        if (Math.sqrt(dx*dx + dy*dy) < tg.r) {
-          tg.hit = true; hit = true;
-          score++;
-          G.myScore = score;
-          break; // only hit 1 per tap
+  // Touch fallback for no-hand mode
+  function onTouch(e) {
+    if (G.lastHand) return; // TF handles it
+    const rect=c.getBoundingClientRect();
+    const pts=e.touches?Array.from(e.touches):[e];
+    pts.forEach(t=>{
+      const px=(t.clientX-rect.left)*(c.width/rect.width);
+      const py=(t.clientY-rect.top)*(c.height/rect.height);
+      trail.push({x:px,y:py,t:Date.now()});
+      items.forEach(f=>{
+        if(f.dead)return;
+        const dx=px-f.x,dy=py-f.y;
+        if(Math.sqrt(dx*dx+dy*dy)<f.size*0.6){
+          f.dead=true;
+          if(f.bomb){finishMyTurn();return;}
+          score++; G.myScore=score;
         }
-      }
-      // Miss flash
-      if (!hit) {
-        x.fillStyle = 'rgba(239,68,68,0.15)';
-        x.fillRect(0,0,c.width,c.height);
-      }
+      });
     });
   }
+  c.addEventListener('touchmove',onTouch,{passive:true});
+  c.addEventListener('mousemove',e=>{if(e.buttons)onTouch(e);});
 
-  c.addEventListener('touchstart', onTap, { passive: false });
-  c.addEventListener('click', onTap);
-
-  spawn(); spawn();
   G.frameId = requestAnimationFrame(loop);
 }
 
-// ──────────────────────────── RESULT ─────────────────────────────────────────
+// ═══════════════════════════ TIRO AL BLANCO ════════════════════════════════
+function runTargetGame() {
+  const c=G.canvas, x=G.ctx;
+  const targets=[];
+  let score=0, spawnTick=0, lastTs=performance.now();
+  const COLORS=['#EF4444','#3B82F6','#22C55E','#F59E0B','#A020F0','#EC4899'];
+  let lastTipX=-1, lastTipY=-1, tapCooldown=0;
+
+  function spawn(){
+    const r=26+Math.random()*28;
+    targets.push({x:r+Math.random()*(c.width-r*2),y:65+Math.random()*(c.height-110),r,life:1,maxLife:1.8+Math.random()*2,born:performance.now(),hit:false,hitAnim:0,color:COLORS[Math.floor(Math.random()*COLORS.length)]});
+  }
+
+  function drawTarget(t){
+    [t.r,t.r*.65,t.r*.35].forEach((r,i)=>{
+      x.beginPath();x.arc(0,0,r,0,Math.PI*2);
+      x.fillStyle=i%2===0?t.color:'#fff'; x.shadowColor=t.color; x.shadowBlur=i===0?10:0; x.fill();
+    });
+    x.shadowBlur=0;
+    x.beginPath();x.arc(0,0,5,0,Math.PI*2);x.fillStyle=t.color;x.fill();
+  }
+
+  function loop(ts){
+    if(G.phase!=='my_turn')return;
+    const dt=Math.min((ts-lastTs)/16,2.5);lastTs=ts;
+    x.clearRect(0,0,c.width,c.height);
+    spawnTick+=dt; if(spawnTick>30&&targets.length<7){spawn();spawnTick=0;}
+    if(!targets.length)spawn();
+    tapCooldown=Math.max(0,tapCooldown-dt);
+
+    // ── Index finger pointer ──────────────────────────────────────────────
+    const tip=getIndexTip();
+    if(tip){
+      // Draw pointer cursor
+      x.strokeStyle='rgba(255,255,255,.9)';x.lineWidth=2;
+      x.beginPath();x.moveTo(tip.x-12,tip.y);x.lineTo(tip.x+12,tip.y);x.stroke();
+      x.beginPath();x.moveTo(tip.x,tip.y-12);x.lineTo(tip.x,tip.y+12);x.stroke();
+      x.beginPath();x.arc(tip.x,tip.y,18,0,Math.PI*2);
+      x.strokeStyle='rgba(192,96,255,.8)';x.lineWidth=3;x.stroke();
+
+      // Auto-hit when stable on target
+      if(tapCooldown<=0 && Math.abs(tip.x-lastTipX)<8 && Math.abs(tip.y-lastTipY)<8){
+        targets.forEach(t=>{
+          if(t.hit)return;
+          const dx=tip.x-t.x,dy=tip.y-t.y;
+          if(Math.sqrt(dx*dx+dy*dy)<t.r){
+            t.hit=true; score++; G.myScore=score;
+            tapCooldown=20;
+          }
+        });
+      }
+      lastTipX=tip.x; lastTipY=tip.y;
+    }
+
+    // Draw targets
+    for(let i=targets.length-1;i>=0;i--){
+      const t=targets[i];
+      const age=(performance.now()-t.born)/1000;
+      t.life=Math.max(0,1-age/t.maxLife);
+      if(t.hit){
+        t.hitAnim+=dt*0.07;
+        if(t.hitAnim>=1){targets.splice(i,1);continue;}
+        x.globalAlpha=1-t.hitAnim;
+        x.save();x.translate(t.x,t.y);x.scale(1+t.hitAnim*.7,1+t.hitAnim*.7);
+        drawTarget(t);x.restore();x.globalAlpha=1;continue;
+      }
+      if(t.life<=0){targets.splice(i,1);continue;}
+      x.globalAlpha=t.life;
+      x.save();x.translate(t.x,t.y);
+      const pulse=1+Math.sin(age*5)*.05;x.scale(pulse,pulse);
+      drawTarget(t);x.restore();x.globalAlpha=1;
+    }
+
+    if(!G.lastHand){
+      x.fillStyle='rgba(255,255,255,0.55)';x.font='14px Poppins,sans-serif';x.textAlign='center';
+      x.fillText('✋ Apunta con el índice',c.width/2,c.height-20);
+    }
+    showHUD(score);
+    G.frameId=requestAnimationFrame(loop);
+  }
+
+  // Touch fallback
+  c.addEventListener('click',e=>{
+    if(G.lastHand)return;
+    const rect=c.getBoundingClientRect();
+    const px=(e.clientX-rect.left)*(c.width/rect.width);
+    const py=(e.clientY-rect.top)*(c.height/rect.height);
+    targets.forEach(t=>{
+      if(t.hit)return;
+      const dx=px-t.x,dy=py-t.y;
+      if(Math.sqrt(dx*dx+dy*dy)<t.r){t.hit=true;score++;G.myScore=score;}
+    });
+  });
+  c.addEventListener('touchstart',e=>{
+    if(G.lastHand)return;
+    e.preventDefault();
+    const rect=c.getBoundingClientRect(),t=e.touches[0];
+    const px=(t.clientX-rect.left)*(c.width/rect.width);
+    const py=(t.clientY-rect.top)*(c.height/rect.height);
+    targets.forEach(tg=>{
+      if(tg.hit)return;
+      const dx=px-tg.x,dy=py-tg.y;
+      if(Math.sqrt(dx*dx+dy*dy)<tg.r){tg.hit=true;score++;G.myScore=score;}
+    });
+  },{passive:false});
+
+  spawn();spawn();
+  G.frameId=requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════ BALONCESTO ════════════════════════════════════
+function runBasketGame() {
+  const c=G.canvas,x=G.ctx;
+  let score=0, lastTs=performance.now();
+  // Hoop position
+  const hoopX=c.width/2, hoopY=80, hoopW=80, hoopH=10;
+  // Ball
+  let ball={x:c.width/2,y:c.height-120,r:28,vx:0,vy:0,held:false,launched:false,scored:false};
+  let lastBallX=ball.x, lastBallY=ball.y;
+  let launchTimeout=null;
+  let netAnim=0; // net wobble after score
+  const particles=[];
+
+  // track previous tip to compute velocity
+  let prevTip=null, tipVx=0, tipVy=0;
+
+  function spawnBall(){
+    ball={x:50+Math.random()*(c.width-100),y:c.height-120,r:28,vx:0,vy:0,held:false,launched:false,scored:false};
+    prevTip=null; tipVx=0; tipVy=0;
+  }
+
+  function drawHoop(){
+    // Backboard
+    x.fillStyle='rgba(255,255,255,0.85)';
+    x.fillRect(hoopX-55,hoopY-45,110,60);
+    x.strokeStyle='rgba(200,200,200,1)'; x.lineWidth=3;
+    x.strokeRect(hoopX-55,hoopY-45,110,60);
+    // Square on backboard
+    x.strokeStyle='rgba(255,50,50,0.8)'; x.lineWidth=2;
+    x.strokeRect(hoopX-22,hoopY-30,44,30);
+    // Rim
+    x.strokeStyle='#FF6B00'; x.lineWidth=6; x.lineCap='round';
+    x.beginPath(); x.moveTo(hoopX-hoopW/2,hoopY); x.lineTo(hoopX+hoopW/2,hoopY); x.stroke();
+    // Net (10 lines)
+    x.strokeStyle='rgba(255,255,255,0.6)'; x.lineWidth=1.5;
+    const wobble=Math.sin(netAnim*10)*4;
+    for(let i=0;i<=5;i++){
+      const lx=hoopX-hoopW/2+i*(hoopW/5);
+      x.beginPath(); x.moveTo(lx,hoopY);
+      x.lineTo(hoopX-hoopW/4+i*(hoopW/10)+wobble/2,hoopY+35);
+      x.stroke();
+    }
+    x.beginPath(); x.moveTo(hoopX-hoopW/4,hoopY+35); x.lineTo(hoopX+hoopW/4,hoopY+35); x.stroke();
+    if(netAnim>0) netAnim-=0.05;
+  }
+
+  function drawBall(bx,by,br){
+    x.save(); x.translate(bx,by);
+    // Shadow
+    x.beginPath(); x.ellipse(0,br*0.8,br*0.7,br*0.2,0,0,Math.PI*2);
+    x.fillStyle='rgba(0,0,0,0.2)'; x.fill();
+    // Ball body
+    const grad=x.createRadialGradient(-br*0.3,-br*0.35,br*0.1,0,0,br);
+    grad.addColorStop(0,'#FF9500'); grad.addColorStop(0.5,'#E65C00'); grad.addColorStop(1,'#B84500');
+    x.beginPath(); x.arc(0,0,br,0,Math.PI*2); x.fillStyle=grad; x.fill();
+    // Lines
+    x.strokeStyle='rgba(0,0,0,0.35)'; x.lineWidth=2;
+    x.beginPath(); x.moveTo(-br,0); x.lineTo(br,0); x.stroke();
+    x.beginPath(); x.moveTo(0,-br); x.lineTo(0,br); x.stroke();
+    x.beginPath(); x.arc(br*0.35,0,br*0.85,Math.PI*0.15,Math.PI*0.85); x.stroke();
+    x.beginPath(); x.arc(-br*0.35,0,br*0.85,-Math.PI*0.85,-Math.PI*0.15); x.stroke();
+    x.restore();
+  }
+
+  function loop(ts){
+    if(G.phase!=='my_turn')return;
+    const dt=Math.min((ts-lastTs)/16,2.5); lastTs=ts;
+    x.clearRect(0,0,c.width,c.height);
+
+    // Physics
+    if(ball.launched && !ball.held){
+      ball.x+=ball.vx*dt; ball.y+=ball.vy*dt;
+      ball.vy+=0.5*dt; // gravity
+      ball.vx*=0.995; // air resistance
+      // Bounce off walls
+      if(ball.x-ball.r<0){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*0.6;}
+      if(ball.x+ball.r>c.width){ball.x=c.width-ball.r;ball.vx=-Math.abs(ball.vx)*0.6;}
+      // Floor
+      if(ball.y+ball.r>c.height-10){
+        ball.y=c.height-10-ball.r;ball.vy*=-0.4;ball.vx*=0.7;
+        if(Math.abs(ball.vy)<1){ball.vy=0;}
+        if(Math.abs(ball.vy)<0.5&&Math.abs(ball.vx)<0.5){spawnBall();}
+      }
+      // Score check — ball passes through hoop
+      if(!ball.scored && ball.vy>0 &&
+         ball.y>hoopY && ball.y<hoopY+40 &&
+         ball.x>hoopX-hoopW/2+ball.r*0.3 && ball.x<hoopX+hoopW/2-ball.r*0.3){
+        ball.scored=true; score++; G.myScore=score;
+        netAnim=1;
+        // Burst particles
+        for(let i=0;i<15;i++){
+          const a=Math.random()*Math.PI*2,sp=3+Math.random()*6;
+          particles.push({x:hoopX,y:hoopY,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-4,r:5+Math.random()*5,life:1,color:`hsl(${40+Math.random()*20},100%,60%)`});
+        }
+        setTimeout(spawnBall,1200);
+      }
+    }
+
+    // ── Hand controls ─────────────────────────────────────────────────────
+    const tip=getIndexTip();
+    if(tip){
+      // Compute velocity
+      if(prevTip){
+        tipVx=tip.x-prevTip.x; tipVy=tip.y-prevTip.y;
+      }
+      prevTip={x:tip.x,y:tip.y};
+
+      const dx=tip.x-ball.x, dy=tip.y-ball.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+
+      if(!ball.launched){
+        if(dist<ball.r*1.5){
+          // Grab
+          ball.held=true; ball.x=tip.x; ball.y=tip.y;
+        }
+      }
+      if(ball.held){
+        ball.x=tip.x; ball.y=tip.y;
+      }
+
+      // Draw finger
+      x.beginPath(); x.arc(tip.x,tip.y,16,0,Math.PI*2);
+      x.fillStyle='rgba(192,96,255,.4)'; x.fill();
+      x.strokeStyle='#fff'; x.lineWidth=2.5; x.stroke();
+    } else {
+      // Finger lifted — launch ball if held
+      if(ball.held){
+        ball.held=false; ball.launched=true;
+        ball.vx=tipVx*0.8; ball.vy=tipVy*0.8;
+        prevTip=null; tipVx=0; tipVy=0;
+      }
+    }
+
+    // Touch fallback
+    // (handled by touchstart/end events below)
+
+    // Particles
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.25*dt; p.life-=dt*0.04;
+      if(p.life<=0){particles.splice(i,1);continue;}
+      x.globalAlpha=p.life; x.fillStyle=p.color;
+      x.beginPath(); x.arc(p.x,p.y,p.r,0,Math.PI*2); x.fill(); x.globalAlpha=1;
+    }
+
+    // Launch guide arrow when ball is held
+    if(ball.held && G.lastHand){
+      const tx=hoopX-ball.x, ty=hoopY-ball.y;
+      const dist2=Math.sqrt(tx*tx+ty*ty);
+      x.setLineDash([8,6]);
+      x.strokeStyle='rgba(255,255,255,0.35)'; x.lineWidth=2;
+      x.beginPath(); x.moveTo(ball.x,ball.y);
+      x.lineTo(ball.x+tx/dist2*80,ball.y+ty/dist2*80); x.stroke();
+      x.setLineDash([]);
+    }
+
+    drawHoop();
+    if(!ball.launched || ball.held) drawBall(ball.x, ball.y, ball.r);
+    else drawBall(ball.x, ball.y, ball.r);
+
+    if(!G.lastHand){
+      x.fillStyle='rgba(255,255,255,0.6)'; x.font='14px Poppins,sans-serif'; x.textAlign='center';
+      x.fillText('✋ Agarra la pelota con el índice',c.width/2,c.height-20);
+    }
+    showHUD(score);
+    G.frameId=requestAnimationFrame(loop);
+  }
+
+  // Touch fallback
+  let touchHeld=false;
+  c.addEventListener('touchstart',e=>{
+    if(G.lastHand)return; e.preventDefault();
+    const rect=c.getBoundingClientRect(),t=e.touches[0];
+    const px=(t.clientX-rect.left)*(c.width/rect.width);
+    const py=(t.clientY-rect.top)*(c.height/rect.height);
+    const dx=px-ball.x,dy=py-ball.y;
+    if(Math.sqrt(dx*dx+dy*dy)<ball.r*1.8){ball.held=true;ball.launched=false;touchHeld=true;lastBallX=px;lastBallY=py;}
+  },{passive:false});
+  c.addEventListener('touchmove',e=>{
+    if(!touchHeld||G.lastHand)return; e.preventDefault();
+    const rect=c.getBoundingClientRect(),t=e.touches[0];
+    const px=(t.clientX-rect.left)*(c.width/rect.width);
+    const py=(t.clientY-rect.top)*(c.height/rect.height);
+    tipVx=px-ball.x; tipVy=py-ball.y;
+    ball.x=px; ball.y=py;
+    lastBallX=px; lastBallY=py;
+  },{passive:false});
+  c.addEventListener('touchend',e=>{
+    if(!touchHeld||G.lastHand)return;
+    ball.held=false; ball.launched=true;
+    ball.vx=tipVx*0.5; ball.vy=tipVy*0.5;
+    touchHeld=false;
+  });
+
+  G.frameId=requestAnimationFrame(loop);
+}
+
+// ══════════════════════════ GAME RESULT ════════════════════════════════════
 function showGameResult(myScore, partnerScore) {
-  const won = myScore > partnerScore;
-  const tied = myScore === partnerScore;
-  document.getElementById('result-emoji').textContent = tied ? '🤝' : won ? '🏆' : '😅';
-  document.getElementById('result-winner').textContent = tied ? '¡Empate!' : won ? '¡GANASTE! 🎉' : '¡Ganó tu compañero!';
-  document.getElementById('result-winner').style.color = tied ? '#F59E0B' : won ? '#A020F0' : '#EF4444';
+  const won = myScore>partnerScore, tied = myScore===partnerScore;
+  document.getElementById('result-emoji').textContent = tied?'🤝':won?'🏆':'😅';
+  document.getElementById('result-winner').textContent = tied?'¡Empate!':won?'🎉 ¡GANASTE!':'Tu compañero ganó';
+  document.getElementById('result-winner').style.color = tied?'#F59E0B':won?'#A020F0':'#EF4444';
   document.getElementById('result-score').textContent = `Tú: ${myScore} pts — Compañero: ${partnerScore} pts`;
   document.getElementById('game-result').classList.add('show');
 }
