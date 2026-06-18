@@ -241,15 +241,39 @@ textarea.fc{resize:vertical;min-height:70px}
 .req-avatar{width:40px;height:40px;border-radius:50%;background:var(--pu-g);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .req-btns{display:flex;gap:6px}
 
-/* GAME OVERLAY */
-.game-overlay{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:500;display:none;flex-direction:column}
-.game-overlay.active{display:flex}
-.game-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bd);flex-shrink:0}
-.game-header h2{font-family:'Poppins',sans-serif;font-weight:800;font-size:18px}
-#game-canvas{flex:1;width:100%;display:block;touch-action:none}
-.game-result{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.9);text-align:center;padding:30px}
+/* GAME OVERLAY - transparent canvas OVER the video */
+.game-overlay{
+  position:fixed;inset:0;z-index:500;display:none;flex-direction:column;
+  background:transparent;pointer-events:none;
+}
+.game-overlay.active{display:flex;pointer-events:auto}
+.game-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;
+  background:rgba(8,0,16,.85);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--bd);flex-shrink:0;
+}
+.game-header h2{font-family:'Poppins',sans-serif;font-weight:800;font-size:16px}
+#game-canvas{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  display:block;touch-action:none;
+  /* transparent background so video shows through */
+  background:transparent;
+}
+.game-canvas-wrap{position:relative;flex:1;overflow:hidden}
+.game-result{
+  position:absolute;inset:0;display:none;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:rgba(8,0,16,.88);backdrop-filter:blur(12px);
+  text-align:center;padding:30px;z-index:10;
+}
 .game-result.show{display:flex}
-.result-winner{font-family:'Poppins',sans-serif;font-weight:900;font-size:clamp(36px,8vw,60px);color:var(--pu-l);text-shadow:0 0 30px rgba(160,32,240,.8);animation:pulse-big 1s infinite}
+.result-winner{
+  font-family:'Poppins',sans-serif;font-weight:900;
+  font-size:clamp(36px,8vw,60px);color:var(--pu-l);
+  text-shadow:0 0 30px rgba(160,32,240,.8),0 0 60px rgba(160,32,240,.4);
+  animation:pulse-big 1s infinite;
+}
 @keyframes pulse-big{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
 .result-score{font-size:18px;color:var(--gray-l);margin-top:10px}
 
@@ -450,11 +474,9 @@ textarea.fc{resize:vertical;min-height:70px}
       </div>
       <div class="vid-overlay hidden" id="ov-conn" style="background:transparent;pointer-events:none"></div>
     </div>
-    <div class="timer-bar" id="timer-bar">
-      <span class="timer-lbl">⏱</span>
-      <div class="timer-track"><div class="timer-fill" id="timer-fill" style="width:100%"></div></div>
-      <span class="timer-disp" id="timer-disp">1:00</span>
-      <span class="timer-lbl" id="timer-type">Gratis</span>
+    <!-- No timer - unlimited for all -->
+    <div id="timer-bar" style="display:none">
+      <span id="timer-disp"></span><span id="timer-fill"></span><span id="timer-type"></span>
     </div>
     <div class="chat-ctrls">
       <button class="ctrl-btn mic" id="btn-mic" onclick="toggleMic()">🎤</button>
@@ -711,7 +733,7 @@ textarea.fc{resize:vertical;min-height:70px}
       <button class="btn btn-ghost btn-sm" onclick="closeGame()">✕ Cerrar</button>
     </div>
   </div>
-  <div style="position:relative;flex:1">
+  <div class="game-canvas-wrap">
     <canvas id="game-canvas"></canvas>
     <div class="game-result" id="game-result">
       <div style="font-size:56px;margin-bottom:10px" id="result-emoji">🏆</div>
@@ -1014,16 +1036,8 @@ function leaveChat(){
 }
 
 // ── Timer ─────────────────────────────────────────────────────────────────────
-function startTimer(){
-  stopTimer();
-  const bar=document.getElementById('timer-bar'),fill=document.getElementById('timer-fill'),disp=document.getElementById('timer-disp'),lbl=document.getElementById('timer-type');
-  bar.style.display='flex';
-  // Everyone gets unlimited - just show elapsed time
-  lbl.textContent=app.isPremium?'⭐ Premium':'🎥 En llamada';
-  let el=0;disp.textContent='0:00';fill.style.width='100%';
-  app.timerInterval=setInterval(()=>{el++;const m=Math.floor(el/60),s=el%60;disp.textContent=`${m}:${s.toString().padStart(2,'0')}`;},1000);
-}
-function stopTimer(){if(app.timerInterval){clearInterval(app.timerInterval);app.timerInterval=null;}document.getElementById('timer-bar').style.display='none';}
+function startTimer(){} // No time limit - unlimited for all
+function stopTimer(){if(app.timerInterval){clearInterval(app.timerInterval);app.timerInterval=null;}}
 function timeUp(){} // No time limit
 function showOv(t){['idle','search','conn'].forEach(n=>{document.getElementById('ov-'+n).classList.toggle('hidden',n!==t);});}
 
@@ -1316,128 +1330,179 @@ function startMyTurn() {
 
 function startFruitNinja() {
   const canvas = document.getElementById('game-canvas');
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.offsetWidth || window.innerWidth;
+  canvas.height = wrap.offsetHeight || window.innerHeight - 60;
   const ctx = canvas.getContext('2d');
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
-  fruits = [];
-  sliceTrail = [];
-  let score = 0, missed = 0;
+  fruits = []; sliceTrail = [];
+  let score = 0, missed = 0, lastX = -1, lastY = -1;
   const MAX_MISS = 3;
-  let lastTime = 0;
+  let lastSpawn = 0, frameId = null;
 
   function spawnFruit() {
-    const emoji = FRUITS_LIST[Math.floor(Math.random()*FRUITS_LIST.length)];
-    const isBomb = Math.random() < 0.12;
+    const isBomb = Math.random() < 0.1;
+    const emoji = isBomb ? '💣' : FRUITS_LIST[Math.floor(Math.random()*FRUITS_LIST.length)];
     fruits.push({
-      x: 80 + Math.random()*(canvas.width-160),
-      y: canvas.height + 60,
-      vx: (Math.random()-0.5)*4,
-      vy: -(12+Math.random()*6),
-      rot: Math.random()*360,
-      rotV: (Math.random()-0.5)*8,
-      emoji: isBomb?'💣':emoji,
-      isBomb, size:52, sliced:false
+      x: 60 + Math.random() * (canvas.width - 120),
+      y: canvas.height + 50,
+      vx: (Math.random()-0.5) * 5,
+      vy: -(canvas.height * 0.025 + Math.random() * 4),
+      rot: 0, rotV: (Math.random()-0.5) * 6,
+      emoji, isBomb, size: 48, sliced: false,
+      particles: []
     });
   }
 
-  let spawnTimer=0;
-  function gameLoop(ts) {
-    const dt = Math.min((ts-lastTime)/16, 3); lastTime=ts;
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+  let lastTs = 0;
+  function loop(ts) {
+    const dt = Math.min((ts - lastTs) / 16, 2.5); lastTs = ts;
+    // CLEAR with transparency - video shows through!
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Background
-    ctx.fillStyle='rgba(5,0,8,0.95)';ctx.fillRect(0,0,canvas.width,canvas.height);
+    // HUD - score panel (semi-transparent)
+    ctx.fillStyle = 'rgba(8,0,16,0.6)';
+    ctx.beginPath();ctx.roundRect(10,10,120,44,10);ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 22px Poppins,sans-serif';
+    ctx.textAlign = 'left'; ctx.fillText(`✂️ ${score}`, 20, 38);
+    if (missed > 0) {
+      ctx.fillStyle = 'rgba(8,0,16,0.6)';
+      ctx.beginPath();ctx.roundRect(canvas.width-110,10,100,44,10);ctx.fill();
+      ctx.fillStyle = '#EF4444'; ctx.textAlign = 'right';
+      ctx.fillText(`❌ ${missed}/${MAX_MISS}`, canvas.width-20, 38);
+    }
 
-    // Timer bar
-    const pct = gameState.timeLeft/30;
-    ctx.fillStyle='rgba(160,32,240,0.2)';ctx.fillRect(0,0,canvas.width,8);
-    ctx.fillStyle=pct>0.4?'#A020F0':'#EF4444';
-    ctx.fillRect(0,0,canvas.width*pct,8);
-
-    // Score
-    ctx.fillStyle='#fff';ctx.font='bold 20px Poppins,sans-serif';
-    ctx.fillText(`✂️ ${score}`,16,38);
-    if(missed>0){ctx.fillStyle='#EF4444';ctx.fillText(`❌ ${missed}/${MAX_MISS}`,canvas.width-90,38);}
+    // Timer arc
+    const pct = gameState.timeLeft / 30;
+    ctx.strokeStyle = 'rgba(160,32,240,0.3)'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(canvas.width/2, 30, 22, 0, Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = pct > 0.4 ? '#A020F0' : '#EF4444';
+    ctx.beginPath(); ctx.arc(canvas.width/2, 30, 22, -Math.PI/2, -Math.PI/2 + pct*Math.PI*2); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold 14px Poppins'; ctx.textAlign='center';
+    ctx.fillText(gameState.timeLeft, canvas.width/2, 36);
 
     // Slice trail
-    ctx.strokeStyle='rgba(192,96,255,0.7)';ctx.lineWidth=3;ctx.lineCap='round';
-    if(sliceTrail.length>1){
-      ctx.beginPath();ctx.moveTo(sliceTrail[0].x,sliceTrail[0].y);
-      sliceTrail.forEach(p=>ctx.lineTo(p.x,p.y));ctx.stroke();
+    if (sliceTrail.length > 1) {
+      const now = Date.now();
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (let i = 1; i < sliceTrail.length; i++) {
+        const age = (now - sliceTrail[i].t) / 150;
+        ctx.globalAlpha = Math.max(0, 1 - age);
+        ctx.strokeStyle = `hsl(${280 + i*5},100%,${60+age*20}%)`;
+        ctx.lineWidth = Math.max(1, 5 - age * 4);
+        ctx.beginPath();
+        ctx.moveTo(sliceTrail[i-1].x, sliceTrail[i-1].y);
+        ctx.lineTo(sliceTrail[i].x, sliceTrail[i].y);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
     }
-    sliceTrail = sliceTrail.filter(p=>Date.now()-p.t<120);
+    sliceTrail = sliceTrail.filter(p => Date.now() - p.t < 200);
 
-    // Fruits
-    spawnTimer+=dt;
-    if(spawnTimer>22){spawnFruit();spawnTimer=0;}
-    fruits = fruits.filter(f=>{
-      if(f.sliced) return false;
-      f.x+=f.vx*dt; f.y+=f.vy*dt; f.vy+=0.4*dt; f.rot+=f.rotV*dt;
-      if(f.y>canvas.height+80){if(!f.isBomb){missed++;if(missed>=MAX_MISS){endFruitTurn(score);return false;}}  return false;}
-      ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.rot*Math.PI/180);
-      ctx.font=`${f.size}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText(f.emoji,0,0);ctx.restore();
+    // Spawn fruits
+    lastSpawn += dt;
+    if (lastSpawn > 25) { spawnFruit(); lastSpawn = 0; }
+
+    // Draw fruits
+    fruits = fruits.filter(f => {
+      if (f.sliced) {
+        // Draw particles
+        f.particles = f.particles.filter(p => { p.life -= dt*0.05; return p.life > 0; });
+        f.particles.forEach(p => {
+          p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 0.2*dt;
+          ctx.globalAlpha = p.life;
+          ctx.fillStyle = p.color;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+          ctx.globalAlpha = 1;
+        });
+        return f.particles.length > 0;
+      }
+      f.x += f.vx * dt; f.y += f.vy * dt;
+      f.vy += 0.45 * dt; f.rot += f.rotV * dt;
+      if (f.y > canvas.height + 80) {
+        if (!f.isBomb) { missed++; if (missed >= MAX_MISS) { endFruitTurn(score); return false; } }
+        return false;
+      }
+      // Glow behind fruit
+      ctx.save();
+      ctx.translate(f.x, f.y); ctx.rotate(f.rot * Math.PI / 180);
+      if (!f.isBomb) {
+        ctx.shadowColor = 'rgba(255,200,0,0.6)'; ctx.shadowBlur = 12;
+      } else {
+        ctx.shadowColor = 'rgba(255,60,0,0.8)'; ctx.shadowBlur = 16;
+      }
+      ctx.font = `${f.size}px serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(f.emoji, 0, 0);
+      ctx.restore();
       return true;
     });
-    if(gameState.phase==='myTurn') animFrame=requestAnimationFrame(gameLoop);
-  }
-  animFrame=requestAnimationFrame(gameLoop);
 
-  // Touch/mouse slice
-  function onMove(e) {
-    const rect=canvas.getBoundingClientRect();
-    const touches = e.touches||[e];
-    for(const t of touches){
-      const x=t.clientX-rect.left, y=t.clientY-rect.top;
-      sliceTrail.push({x,y,t:Date.now()});
-      fruits.forEach(f=>{
-        if(f.sliced)return;
-        const dx=x-f.x,dy=y-f.y;
-        if(Math.sqrt(dx*dx+dy*dy)<f.size/2){
-          if(f.isBomb){endFruitTurn(score);return;}
-          f.sliced=true;score++;
-          showSliceEffect(ctx,f.x,f.y,f.emoji);
-        }
+    if (gameState.phase === 'myTurn') frameId = requestAnimationFrame(loop);
+  }
+
+  function addParticles(f) {
+    for (let i = 0; i < 10; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 2 + Math.random() * 4;
+      f.particles.push({
+        x: f.x, y: f.y,
+        vx: Math.cos(angle)*spd, vy: Math.sin(angle)*spd - 2,
+        r: 4 + Math.random() * 4,
+        life: 1,
+        color: `hsl(${Math.random()*60+20},100%,${55+Math.random()*20}%)`
       });
     }
   }
-  canvas.addEventListener('touchmove',onMove,{passive:true});
-  canvas.addEventListener('mousemove',e=>{if(e.buttons)onMove(e);});
 
-  // 30s timer
-  gameState.interval=setInterval(()=>{
-    gameState.timeLeft--;
-    document.getElementById('game-status').textContent=`🎮 Tu turno — ${gameState.timeLeft}s`;
-    if(gameState.timeLeft<=0){clearInterval(gameState.interval);endFruitTurn(score);}
-  },1000);
-}
+  frameId = requestAnimationFrame(loop);
 
-function showSliceEffect(ctx,x,y,emoji) {
-  // Particle burst (simple)
-  for(let i=0;i<6;i++){
-    const angle=(i/6)*Math.PI*2;
-    ctx.fillStyle=`hsl(${Math.random()*360},100%,60%)`;
-    ctx.beginPath();ctx.arc(x+Math.cos(angle)*20,y+Math.sin(angle)*20,4,0,Math.PI*2);ctx.fill();
+  function onSlice(e) {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const pts = e.touches ? Array.from(e.touches) : [e];
+    pts.forEach(t => {
+      const x = (t.clientX - rect.left) * (canvas.width / rect.width);
+      const y = (t.clientY - rect.top) * (canvas.height / rect.height);
+      sliceTrail.push({x, y, t: Date.now()});
+      fruits.forEach(f => {
+        if (f.sliced) return;
+        const dx = x - f.x, dy = y - f.y;
+        if (Math.sqrt(dx*dx + dy*dy) < f.size * 0.6) {
+          if (f.isBomb) { endFruitTurn(score); return; }
+          f.sliced = true;
+          addParticles(f);
+          score++;
+        }
+      });
+    });
   }
-}
 
-function endFruitTurn(score) {
-  if(animFrame){cancelAnimationFrame(animFrame);animFrame=null;}
-  clearInterval(gameState.interval);
-  gameState.myScore=score;
-  // Tell partner their turn
-  if(app.socket) app.socket.emit('game_score',{score,type:currentGame});
-  gameState.phase='partnerTurn';
-  document.getElementById('game-status').textContent=`⌛ Turno de tu compañero...`;
-  // Draw waiting screen
-  const canvas=document.getElementById('game-canvas');
-  const ctx=canvas.getContext('2d');
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='rgba(5,0,8,0.95)';ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#fff';ctx.font='bold 28px Poppins,sans-serif';ctx.textAlign='center';
-  ctx.fillText(`Tu puntuación: ${score} 🍉`,canvas.width/2,canvas.height/2-20);
-  ctx.fillStyle='var(--gray-l)';ctx.font='18px Inter,sans-serif';
-  ctx.fillText('Esperando el turno de tu compañero...',canvas.width/2,canvas.height/2+30);
+  canvas.addEventListener('touchmove', onSlice, {passive: false});
+  canvas.addEventListener('touchstart', onSlice, {passive: false});
+  canvas.addEventListener('mousemove', e => { if (e.buttons) onSlice(e); });
+
+  gameState.interval = setInterval(() => {
+    gameState.timeLeft--;
+    document.getElementById('game-status').textContent = `🍉 Tu turno — ${gameState.timeLeft}s`;
+    if (gameState.timeLeft <= 0) { clearInterval(gameState.interval); endFruitTurn(score); }
+  }, 1000);
+
+  function endFruitTurn(sc) {
+    cancelAnimationFrame(frameId); frameId = null;
+    clearInterval(gameState.interval);
+    gameState.myScore = sc;
+    if (app.socket) app.socket.emit('game_score', {score: sc, type: currentGame});
+    gameState.phase = 'partnerTurn';
+    document.getElementById('game-status').textContent = `⌛ Esperando compañero... (Tú: ${sc}🍉)`;
+    // Show waiting on transparent canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(8,0,16,0.7)';
+    ctx.beginPath(); ctx.roundRect(canvas.width/2-140, canvas.height/2-40, 280, 80, 16); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 22px Poppins,sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`Tu puntuación: ${sc} 🍉`, canvas.width/2, canvas.height/2);
+    ctx.fillStyle = 'var(--gray-l)'; ctx.font = '14px Inter,sans-serif';
+    ctx.fillText('Turno de tu compañero...', canvas.width/2, canvas.height/2 + 30);
+  }
 }
 
 // ─ TARGET GAME ───────────────────────────────────────────────────────────────
@@ -1445,8 +1510,10 @@ let targets=[], targetAnimFrame=null;
 
 function startTargetGame() {
   const canvas=document.getElementById('game-canvas');
+  const wrap=canvas.parentElement;
+  canvas.width=wrap.offsetWidth||window.innerWidth;
+  canvas.height=wrap.offsetHeight||window.innerHeight-60;
   const ctx=canvas.getContext('2d');
-  canvas.width=canvas.offsetWidth;canvas.height=canvas.offsetHeight;
   targets=[]; let score=0; let lastTime2=0;
 
   function spawnTarget() {
@@ -1463,7 +1530,7 @@ function startTargetGame() {
   function tloop(ts){
     const dt=Math.min((ts-lastTime2)/16,3);lastTime2=ts;
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle='rgba(5,0,8,0.95)';ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.clearRect(0,0,canvas.width,canvas.height); // transparent
 
     // Timer bar
     const pct=gameState.timeLeft/30;
@@ -1525,15 +1592,17 @@ function endTargetTurn(score){
   gameState.myScore=score;
   if(app.socket)app.socket.emit('game_score',{score,type:currentGame});
   gameState.phase='partnerTurn';
-  document.getElementById('game-status').textContent='⌛ Turno de tu compañero...';
+  document.getElementById('game-status').textContent=`⌛ Esperando compañero... (Tú: ${score}🎯)`;
   const canvas=document.getElementById('game-canvas');
   const ctx=canvas.getContext('2d');
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='rgba(5,0,8,0.95)';ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#fff';ctx.font='bold 28px Poppins,sans-serif';ctx.textAlign='center';
-  ctx.fillText(`Tu puntuación: ${score} 🎯`,canvas.width/2,canvas.height/2-20);
-  ctx.fillStyle='#C8A8E0';ctx.font='18px Inter,sans-serif';
-  ctx.fillText('Esperando el turno de tu compañero...',canvas.width/2,canvas.height/2+30);
+  // Semi-transparent overlay
+  ctx.fillStyle='rgba(8,0,16,0.7)';
+  ctx.beginPath();ctx.roundRect(canvas.width/2-140,canvas.height/2-40,280,80,16);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 22px Poppins,sans-serif';ctx.textAlign='center';
+  ctx.fillText(`Tu puntuación: ${score} 🎯`,canvas.width/2,canvas.height/2);
+  ctx.fillStyle='#C8A8E0';ctx.font='14px Inter,sans-serif';
+  ctx.fillText('Turno de tu compañero...',canvas.width/2,canvas.height/2+30);
 }
 
 function showGameResult(myScore, partnerScore){
