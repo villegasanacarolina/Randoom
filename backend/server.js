@@ -187,8 +187,8 @@ const uploadAvatar = multer({ storage: makeStorage(AVATAR_DIR), limits: { fileSi
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 const ADMIN_EMAIL    = 'admin@randoom.com';
-const ADMIN_PASSWORD = 'Randoom2024!';
-const JWT_SECRET     = 'randoom-super-secret-jwt-key-2024';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Randoom2024!';
+const JWT_SECRET     = process.env.JWT_SECRET || 'randoom-super-secret-jwt-key-2024';
 
 // ── MercadoPago ────────────────────────────────────────────────────────────────
 function mpRequest(method, mpPath, body) {
@@ -398,7 +398,7 @@ app.post('/api/auth/verify', async (req, res) => {
     await pool.query('DELETE FROM pending_codes WHERE email=$1', [email]);
     const user = rowToUser((await pool.query('SELECT * FROM users WHERE email=$1', [email])).rows[0]);
     const token = jwt.sign({ email, name: user.name, isAdmin: false }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, user, needsINE: true });
+    res.json({ token, user });
   } catch(e) { console.error(e); res.status(500).json({ error: 'Error del servidor' }); }
 });
 
@@ -436,7 +436,18 @@ app.get('/api/auth/me', authUser, async (req, res) => {
   try {
     const r = await pool.query('SELECT * FROM users WHERE email=$1', [req.user.email]);
     if (!r.rows.length) return res.status(404).json({ error: 'No encontrado' });
-    res.json(rowToUser(r.rows[0]));
+    const u = rowToUser(r.rows[0]);
+    // Include profile data so frontend doesn't need a second request
+    const p = await pool.query('SELECT avatar_url,bio,zodiac,display_name,interests FROM profiles WHERE email=$1', [req.user.email]);
+    if (p.rows.length) {
+      const pr = p.rows[0];
+      u.avatar_url   = pr.avatar_url;
+      u.bio          = pr.bio;
+      u.zodiac       = pr.zodiac;
+      u.display_name = pr.display_name;
+      u.interests    = pr.interests;
+    }
+    res.json(u);
   } catch(e) { res.status(500).json({ error: 'Error del servidor' }); }
 });
 
@@ -968,7 +979,7 @@ io.on('connection', socket => {
       activeSockets[socket.id] = {
         socketId: socket.id, email: d.email, name: u.name, age: u.age,
         gender: u.gender, country: u.country, isPremium: u.is_premium,
-        filters: {}, mode: 'pareja', partnerId: null, sessionStart: null
+        filters: {}, mode: null, partnerId: null, sessionStart: null
       };
       await pool.query('UPDATE users SET total_sessions=total_sessions+1, last_seen=NOW() WHERE email=$1', [d.email]);
       socket.emit('joined', { isPremium: u.is_premium, ineVerified: u.ine_verified, ineStatus: u.ine_status, approved: u.approved });
@@ -1015,7 +1026,7 @@ io.on('connection', socket => {
     const target = Object.entries(activeSockets).find(([,s]) => s.email === d.toEmail);
     if (target) io.to(target[0]).emit('call_accepted_direct', { from: activeSockets[socket.id]?.email });
   });
-  socket.on('set_mode',    d => { const u=activeSockets[socket.id]; if(u?.partnerId && u.isPremium) u.mode=d.mode; });
+  // set_mode handled above
 
   // ── Live socket events ──────────────────────────────────────────────────────
   socket.on('live_start', ({ title, liveId: existingLiveId }) => {
@@ -1079,9 +1090,10 @@ io.on('connection', socket => {
   });
 
   socket.on('live_comment', ({ liveId, text }) => {
-    const u = activeSockets[socket.id]; if (!u || !text) return;
+    if (!text || !text.trim()) return;
     const live = activeLives.get(liveId); if (!live) return;
-    const payload = { from: u.name || 'Anónimo', text: text.slice(0, 200), ts: Date.now() };
+    const u = activeSockets[socket.id];
+    const payload = { from: (u?.name) || 'Viewer', text: text.slice(0, 200), ts: Date.now() };
     io.to(`live:${liveId}`).emit('live_comment', payload);
     // Also relay to videocall partner of host (so both see comments in chat)
     const hostSock = Object.entries(activeSockets).find(([,s]) => s.email === live.hostEmail);
@@ -1097,7 +1109,15 @@ io.on('connection', socket => {
     io.to(live.hostSocketId).emit('live_viewer_requesting', { viewerSocketId: socket.id });
   });
   socket.on('live_offer',     ({ viewerSocketId, offer })     => io.to(viewerSocketId).emit('live_offer', { offer }));
-  socket.on('live_answer',    ({ hostSocketId, answer })      => io.to(hostSocketId).emit('live_answer', { answer }));
+  socket.on('live_answer', ({ answer, liveId: aLiveId }) => {
+    // Find the live's host socket and send answer
+    for (const [, live] of activeLives) {
+      if (live.viewers.has(socket.id) || aLiveId === live.id) {
+        if (live.hostSocketId) io.to(live.hostSocketId).emit('live_answer', { answer });
+        break;
+      }
+    }
+  });
   socket.on('live_ice',       ({ targetId, candidate })       => io.to(targetId).emit('live_ice', { candidate }));
 
   socket.on('disconnect', async () => {
@@ -1115,6 +1135,15 @@ io.on('connection', socket => {
         }
       }
       if (u.partnerId) { io.to(u.partnerId).emit('partner_disconnected'); if(activeSockets[u.partnerId]) activeSockets[u.partnerId].partnerId=null; }
+      // Notify friends this user went offline
+      try {
+        const friendsR2 = await pool.query('SELECT email1,email2 FROM friends WHERE email1=$1 OR email2=$1',[u.email]);
+        friendsR2.rows.forEach(row => {
+          const friendEmail = row.email1 === u.email ? row.email2 : row.email1;
+          const fSock2 = Object.entries(activeSockets).find(([,s]) => s.email === friendEmail);
+          if (fSock2) io.to(fSock2[0]).emit('friend_online', { email: u.email, online: false });
+        });
+      } catch(e) {}
       if (u.sessionStart) {
         const mins = Math.floor((Date.now()-u.sessionStart)/60000);
         if (mins > 0) pool.query('UPDATE users SET total_minutes=total_minutes+$1 WHERE email=$2', [mins, u.email]).catch(()=>{});

@@ -1170,9 +1170,13 @@ function initSocket(){
   app.socket.on('connect',()=>{app.socket.emit('join',{token:app.token});pollStats();requestMedia();});
   app.socket.on('joined',({isPremium,ineStatus,approved})=>{
     app.isPremium=isPremium;app.ineStatus=ineStatus;app.approved=approved;updateChatUI();
-    // If we have a pending mood, set it and search
-    if(app._mood) app.socket.emit('set_mode',{mode:app._mood});
-    app.socket.emit('find_partner');
+    // Only auto-search if we're on the chat screen and explicitly searching
+    if(app._searchOnJoin){
+      app._searchOnJoin=false;
+      if(app._mood) app.socket.emit('set_mode',{mode:app._mood});
+      if(app._filters) app.socket.emit('set_filters',app._filters);
+      app.socket.emit('find_partner');
+    }
   });
   app.socket.on('searching',()=>{
     showOv('search');
@@ -1559,6 +1563,7 @@ async function saveUsername() {
 function doLogout() {
   if (app.socket) { app.socket.disconnect(); app.socket = null; }
   app.token = null; app.user = null; app.isPremium = false; app.partnerEmail = null;
+  app._mood = null; app._filters = null; // reset mood on logout
   localStorage.removeItem('rd_token');
   // Reset nav
   const lb  = document.getElementById('nav-login-btn');
@@ -1905,7 +1910,12 @@ async function sendFriendReq() {
 
 // ── Sound System ─────────────────────────────────────────────────────────────
 let _AC = null;
-function _ac() { if (!_AC) _AC = new (window.AudioContext||window.webkitAudioContext)(); return _AC; }
+function _ac() {
+  if (!_AC) _AC = new (window.AudioContext||window.webkitAudioContext)();
+  // iOS: resume context if suspended (requires user gesture to have happened)
+  if (_AC.state === 'suspended') _AC.resume().catch(()=>{});
+  return _AC;
+}
 function _snd(type) {
   try {
     const ac = _ac();
@@ -2635,6 +2645,7 @@ function _enterChat(mood) {
     app.socket.emit('find_partner');
   };
   if(!app.socket){
+    app._searchOnJoin = true; // will auto-search after joined event
     initSocket();
   } else if(!app.localStream){
     requestMedia().then(go).catch(()=>{});
