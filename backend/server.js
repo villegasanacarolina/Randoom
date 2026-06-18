@@ -139,7 +139,30 @@ async function initDB() {
       created_at      TIMESTAMPTZ DEFAULT NOW(),
       ended_at        TIMESTAMPTZ
     );
+
+    CREATE TABLE IF NOT EXISTS call_invites (
+      id           TEXT PRIMARY KEY,
+      from_email   TEXT NOT NULL,
+      to_email     TEXT NOT NULL,
+      status       TEXT DEFAULT 'pending',
+      created_at   TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
+
+  // ── Migrate existing DB: add columns that may not exist yet ──────────────────
+  const migrations = [
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS total_sessions INT DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS total_minutes INT DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ DEFAULT NOW()`,
+    `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS zodiac TEXT DEFAULT ''`,
+    `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS interests TEXT[] DEFAULT '{}'`,
+  ];
+  for (const m of migrations) {
+    await pool.query(m).catch(e => console.log('Migration skip:', e.message));
+  }
+
   console.log('Base de datos inicializada ✅');
 }
 
@@ -561,7 +584,7 @@ app.post('/api/admin/users/:email/username', authAdmin, async (req, res) => {
     if (exists.rows.length) return res.status(409).json({ error: 'Username ya en uso' });
     await pool.query('UPDATE users SET username=$1 WHERE email=$2', [clean, email]);
     res.json({ ok: true, username: clean });
-  } catch(e) { res.status(500).json({ error: 'Error' }); }
+  } catch(e) { console.error('Username update error:', e.message); res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/users/:email/ban', authAdmin, async (req, res) => {
