@@ -222,7 +222,7 @@ textarea.fc{resize:vertical;min-height:70px}
 .mp-logo{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:4px 9px;font-size:11px;font-weight:600;color:var(--gray-l)}
 
 /* PROFILE */
-#s-profile{align-items:flex-start;padding:0;overflow-y:auto}
+#s-profile{align-items:center;padding:0;overflow-y:auto}
 .profile-header{background:linear-gradient(135deg,rgba(160,32,240,.2),rgba(107,0,204,.1));padding:28px 20px 20px;text-align:center;border-bottom:1px solid var(--bd)}
 .avatar-wrap{position:relative;display:inline-block;margin-bottom:12px}
 .avatar-img{width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid var(--pu);background:var(--pu-g);display:flex;align-items:center;justify-content:center;font-size:36px}
@@ -233,7 +233,7 @@ textarea.fc{resize:vertical;min-height:70px}
 .pstat{text-align:center}
 .pstat-n{font-family:'Poppins',sans-serif;font-weight:800;font-size:20px;color:var(--pu-l)}
 .pstat-l{font-size:11px;color:var(--gray-l)}
-.profile-body{padding:16px}
+.profile-body{padding:16px;max-width:500px;margin:0 auto;width:100%}
 .interests-wrap{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
 .interest-tag{background:var(--pu-g);border:1px solid rgba(160,32,240,.3);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:500;color:var(--pu-l)}
 .req-item{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:10px}
@@ -250,8 +250,9 @@ textarea.fc{resize:vertical;min-height:70px}
 .game-header{
   display:flex;align-items:center;justify-content:space-between;
   padding:10px 16px;
-  background:rgba(8,0,16,.85);backdrop-filter:blur(10px);
+  background:rgba(8,0,16,.88);backdrop-filter:blur(10px);
   border-bottom:1px solid var(--bd);flex-shrink:0;
+  flex-wrap:nowrap;gap:6px;
 }
 .game-header h2{font-family:'Poppins',sans-serif;font-weight:800;font-size:16px}
 #game-canvas{
@@ -664,7 +665,7 @@ textarea.fc{resize:vertical;min-height:70px}
     <div class="logo" onclick="goHome()"><div class="logo-icon">RD</div><span class="logo-txt">Rand<span>oom</span></span></div>
     <button class="btn btn-ghost btn-sm" onclick="backFromProfile()">← Volver</button>
   </nav>
-  <div id="profile-view">
+  <div id="profile-view" style="width:100%;max-width:500px;margin:0 auto">
     <div class="profile-header">
       <div class="avatar-wrap">
         <div class="avatar-img" id="profile-avatar-display">👤</div>
@@ -1379,7 +1380,7 @@ function _drawMsg(text, color) {
   const c = G.canvas, x = G.ctx;
   if (!c || !x) return;
   x.clearRect(0,0,c.width,c.height);
-  x.fillStyle = 'rgba(8,0,16,.9)'; x.fillRect(0,0,c.width,c.height);
+  x.fillStyle = 'rgba(8,0,16,.78)'; x.fillRect(0,0,c.width,c.height);
   const lines = text.split('\n');
   x.textAlign = 'center';
   lines.forEach((line, i) => {
@@ -1438,16 +1439,17 @@ function _startMyTurn() {
   document.getElementById('game-result').classList.remove('show');
   const lbl = {fruit:'🍉 ¡Corta!',target:'🎯 ¡Apunta!',basket:'🏀 ¡Encesta!'};
   document.getElementById('game-status').textContent = (lbl[G.type]||'Tu turno') + ' — 30s';
-  if      (G.type==='fruit')  _runFruit();
-  else if (G.type==='target') _runTarget();
-  else if (G.type==='basket') _runBasket();
+  // Start timer FIRST so it's always exactly 30s regardless of game load time
   G.timerInt = setInterval(() => {
-    if (G.phase !== 'my_turn') return;
+    if (G.phase !== 'my_turn') { clearInterval(G.timerInt); G.timerInt = null; return; }
     G.timeLeft--;
     const ic = {fruit:'🍉',target:'🎯',basket:'🏀'};
     document.getElementById('game-status').textContent = `${ic[G.type]||''} Tu turno — ${G.timeLeft}s`;
-    if (G.timeLeft <= 0) _finishMyTurn();
+    if (G.timeLeft <= 0) { clearInterval(G.timerInt); G.timerInt = null; _finishMyTurn(); }
   }, 1000);
+  if      (G.type==='fruit')  _runFruit();
+  else if (G.type==='target') _runTarget();
+  else if (G.type==='basket') _runBasket();
 }
 
 function _finishMyTurn() {
@@ -1455,7 +1457,23 @@ function _finishMyTurn() {
   _stop(); G.phase = 'waiting';
   if (app.socket) app.socket.emit('game_score', { score: G.myScore, type: G.type });
   document.getElementById('game-status').textContent = `⌛ Tu compañero juega… (Tú: ${G.myScore})`;
-  _drawMsg(`✅ Tu puntuación: ${G.myScore} pts\n⌛ Esperando compañero…`);
+  _drawMsg2(G.myScore);
+}
+
+function _drawMsg2(score) {
+  const c = G.canvas, x = G.ctx;
+  if (!c || !x) return;
+  const W = c.width, H = c.height;
+  x.clearRect(0,0,W,H);
+  x.fillStyle='rgba(8,0,16,.78)'; x.fillRect(0,0,W,H);
+  // Score big
+  const sz = Math.min(36, W * 0.07);
+  x.font = `bold ${sz}px Poppins,sans-serif`;
+  x.fillStyle = '#A020F0'; x.textAlign = 'center';
+  x.fillText(`✅ ${score} pts`, W/2, H/2 - 14);
+  x.font = `15px Inter,sans-serif`;
+  x.fillStyle = '#C8A8E0';
+  x.fillText('⌛ Esperando compañero...', W/2, H/2 + 22);
 }
 
 function closeGame() {
@@ -1492,7 +1510,7 @@ function _runFruit() {
     if (!alive || G.phase!=='my_turn') return;
     const dt = Math.min((now-ts)/16,2.5); ts=now;
     x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,10,.85)'; x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,10,.12)'; x.fillRect(0,0,c.width,c.height); // light overlay only
 
     // Trail
     const t0 = Date.now();
@@ -1584,7 +1602,7 @@ function _runTarget() {
     if(!alive||G.phase!=='my_turn')return;
     const dt=Math.min((now-ts)/16,2.5);ts=now;
     x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,10,.85)';x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,10,.12)';x.fillRect(0,0,c.width,c.height);
     sTick+=dt; if(sTick>30&&tgts.length<8){spawn();sTick=0;}
     if(!tgts.length)spawn();
     for(let i=tgts.length-1;i>=0;i--){
@@ -1662,7 +1680,7 @@ function _runBasket() {
     if(!alive||G.phase!=='my_turn')return;
     const dt=Math.min((now-ts)/16,2.5);ts=now;
     x.clearRect(0,0,c.width,c.height);
-    x.fillStyle='rgba(5,0,10,.85)';x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='rgba(5,0,10,.12)';x.fillRect(0,0,c.width,c.height);
     if(ball.free&&!drag){
       ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;ball.vy+=.55*dt;ball.vx*=.997;
       if(ball.x-ball.r<0){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*.5;}
