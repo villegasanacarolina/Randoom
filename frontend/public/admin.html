@@ -454,33 +454,16 @@ function renderReports() {
   `).join('');
 }
 
-let _editUsernameEmail = '';
-function editUsername(email, currentUsername) {
-  _editUsernameEmail = email;
-  document.getElementById('edit-username-for').textContent = email;
-  document.getElementById('edit-username-input').value = currentUsername || '';
-  document.getElementById('edit-username-modal').classList.add('open');
-}
-
-async function saveAdminUsername() {
-  const val = document.getElementById('edit-username-input').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
-  if (!val || val.length < 3) { toast('Mínimo 3 caracteres','err'); return; }
-  try {
-    await api(`/api/admin/users/${encodeURIComponent(_editUsernameEmail)}/username`, 'POST', { username: val });
-    toast('✅ Username actualizado','ok');
-    closeModal('edit-username-modal');
-    refreshAll();
-  } catch(e) { toast(e.message,'err'); }
-}
-
-function editUsername(email, current) {
-  const nu = prompt(`Nuevo @username para ${email}:`, current||'');
-  if (nu === null) return; // cancelled
+async function editUsername(email, current) {
+  const nu = prompt(`Nuevo @usuario para ${email}:\nActual: @${current||'(sin usuario)'}`, current||'');
+  if (nu === null || nu.trim() === '') return;
   const clean = nu.toLowerCase().trim().replace(/[^a-z0-9_]/g,'');
-  if (clean.length < 3) { alert('Mínimo 3 caracteres'); return; }
-  api(`/api/admin/users/${encodeURIComponent(email)}/username`, 'POST', { username: clean })
-    .then(() => { toast(`✅ @${clean} asignado`, 'ok'); refreshAll(); })
-    .catch(e => toast(e.message, 'err'));
+  if (clean.length < 3) { toast('Mínimo 3 caracteres','err'); return; }
+  try {
+    await api(`/api/admin/users/${encodeURIComponent(email)}/username`, 'POST', { username: clean });
+    toast(`✅ @${clean} asignado a ${email}`, 'ok');
+    refreshAll();
+  } catch(e) { toast(e.message||'Error al guardar','err'); }
 }
 
 async function setPremium(email, active) {
