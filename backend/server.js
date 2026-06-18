@@ -786,6 +786,7 @@ io.on('connection', socket => {
   socket.on('game_invite', d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_invite', d); });
   socket.on('game_score',  d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_score',  d); });
   socket.on('game_end',    d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_end',    d); });
+  socket.on('game_state',  d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_state',  d); });
   socket.on('set_mode',    d => { const u=activeSockets[socket.id]; if(u?.partnerId && u.isPremium) u.mode=d.mode; });
 
   socket.on('disconnect', async () => {

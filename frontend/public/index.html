@@ -27,7 +27,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--pu-l),var(--pu-d));border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;font-weight:900;font-size:14px;color:#fff;box-shadow:0 3px 14px rgba(160,32,240,.5);flex-shrink:0}
 .logo-txt{font-family:'Poppins',sans-serif;font-weight:800;font-size:18px;color:#fff;letter-spacing:-.5px}
 .logo-txt span{color:var(--pu-l)}
-.nav-actions{display:flex;align-items:center;gap:6px}
+.nav-actions{display:flex;align-items:center;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-shrink:0}
 
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:var(--r);font-family:'Poppins',sans-serif;font-weight:600;font-size:14px;border:none;cursor:pointer;transition:all .2s;text-decoration:none;white-space:nowrap;-webkit-user-select:none;user-select:none}
@@ -249,11 +249,12 @@ textarea.fc{resize:vertical;min-height:70px}
 .game-overlay.active{display:flex;pointer-events:auto}
 .game-header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:10px 16px;
-  background:rgba(8,0,16,.88);backdrop-filter:blur(10px);
+  padding:8px 12px;
+  background:rgba(8,0,16,.92);backdrop-filter:blur(10px);
   border-bottom:1px solid var(--bd);flex-shrink:0;
-  flex-wrap:nowrap;gap:6px;
+  gap:8px;
 }
+#game-status{font-size:12px;color:var(--pu-l);font-weight:700;font-family:'Poppins',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55vw}
 .game-header h2{font-family:'Poppins',sans-serif;font-weight:800;font-size:16px}
 #game-canvas{
   position:absolute;top:0;left:0;width:100%;height:100%;
@@ -1287,6 +1288,83 @@ async function sendFriendReq() {
   } catch(e) {toast(e.message,'err');}
 }
 
+// ── Sound System ────────────────────────────────────────────────────────────
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let _ac = null;
+function _getAC() { if (!_ac) _ac = new AudioCtx(); return _ac; }
+
+function _playSound(type) {
+  try {
+    const ac = _getAC();
+    const g = ac.createGain();
+    g.connect(ac.destination);
+    if (type === 'slice') {
+      // Woosh
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(800, ac.currentTime);
+      o.frequency.exponentialRampToValueAtTime(200, ac.currentTime + 0.15);
+      g.gain.setValueAtTime(0.3, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
+      o.connect(g); o.start(); o.stop(ac.currentTime + 0.15);
+    } else if (type === 'bomb') {
+      // Low boom
+      const o = ac.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(120, ac.currentTime);
+      o.frequency.exponentialRampToValueAtTime(30, ac.currentTime + 0.4);
+      g.gain.setValueAtTime(0.6, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.4);
+      o.connect(g); o.start(); o.stop(ac.currentTime + 0.4);
+    } else if (type === 'score') {
+      // Happy ding
+      [523, 659, 784].forEach((f, i) => {
+        const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const gi = ac.createGain();
+        gi.gain.setValueAtTime(0.3, ac.currentTime + i*0.07);
+        gi.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i*0.07 + 0.2);
+        o.connect(gi); gi.connect(ac.destination); o.start(ac.currentTime + i*0.07); o.stop(ac.currentTime + i*0.07 + 0.2);
+      });
+    } else if (type === 'hit') {
+      // Target hit pop
+      const o = ac.createOscillator(); o.type = 'square';
+      o.frequency.setValueAtTime(600, ac.currentTime);
+      o.frequency.exponentialRampToValueAtTime(300, ac.currentTime + 0.1);
+      g.gain.setValueAtTime(0.25, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.1);
+      o.connect(g); o.start(); o.stop(ac.currentTime + 0.1);
+    } else if (type === 'basket') {
+      // Swish
+      [440, 554, 659].forEach((f, i) => {
+        const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const gi = ac.createGain();
+        gi.gain.setValueAtTime(0.35, ac.currentTime + i*0.05);
+        gi.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i*0.05 + 0.3);
+        o.connect(gi); gi.connect(ac.destination); o.start(ac.currentTime + i*0.05); o.stop(ac.currentTime + i*0.05 + 0.3);
+      });
+    } else if (type === 'win') {
+      [523,659,784,1047].forEach((f,i) => {
+        const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const gi = ac.createGain();
+        gi.gain.setValueAtTime(0.4, ac.currentTime + i*0.12);
+        gi.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i*0.12 + 0.35);
+        o.connect(gi); gi.connect(ac.destination); o.start(ac.currentTime + i*0.12); o.stop(ac.currentTime + i*0.12 + 0.35);
+      });
+    } else if (type === 'lose') {
+      [400,300,200].forEach((f,i) => {
+        const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
+        const gi = ac.createGain();
+        gi.gain.setValueAtTime(0.35, ac.currentTime + i*0.15);
+        gi.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i*0.15 + 0.3);
+        o.connect(gi); gi.connect(ac.destination); o.start(ac.currentTime + i*0.15); o.stop(ac.currentTime + i*0.15 + 0.3);
+      });
+    } else if (type === 'countdown') {
+      const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = 440;
+      g.gain.setValueAtTime(0.2, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.1);
+      o.connect(g); o.start(); o.stop(ac.currentTime + 0.1);
+    }
+  } catch(e) {}
+}
+
 // ═══════════════════════════════════════════════════════
 // GAMES  – turn-based, 30s each, no canvas-clone bugs
 // ═══════════════════════════════════════════════════════
@@ -1339,6 +1417,7 @@ function onGameInvite(type, fromName) {
 }
 
 function onGameScore(partnerScore, type) {
+  _drawSpectator(partnerScore); // update spectator mini-view
   GS.partnerScore = partnerScore;
   if (type && !GS.type) GS.type = type;
   
@@ -1354,11 +1433,10 @@ function onGameScore(partnerScore, type) {
     // Kill any running loop first
     _killGame();
     GS.phase = 'partner_done';
-    // Show YOUR TURN screen
     _sizeCanvas();
     _msg('¡TU TURNO!', '#A020F0');
     _setStatus('¡Tu turno en 3s!');
-    // Start after 3 seconds
+    _hideSpectator();
     setTimeout(() => {
       if (GS.phase === 'partner_done') _beginMyTurn();
     }, 2500);
@@ -1452,6 +1530,31 @@ function _hud(score) {
   x.fillText(GS.timeLeft, cx, cy + 5);
 }
 
+function _showSpectator() {
+  const sc = document.getElementById('spectator-canvas');
+  const lb = document.getElementById('spectator-label');
+  if (sc) { sc.style.display = 'block'; _drawSpectator(0); }
+  if (lb) lb.style.display = 'block';
+}
+function _hideSpectator() {
+  const sc = document.getElementById('spectator-canvas');
+  const lb = document.getElementById('spectator-label');
+  if (sc) sc.style.display = 'none';
+  if (lb) lb.style.display = 'none';
+}
+function _drawSpectator(partnerScore) {
+  const sc = document.getElementById('spectator-canvas'); if (!sc) return;
+  sc.width = 120; sc.height = 90;
+  const x = sc.getContext('2d');
+  x.clearRect(0,0,120,90);
+  x.fillStyle='rgba(8,0,16,.7)'; x.fillRect(0,0,120,90);
+  x.fillStyle='#fff'; x.font='bold 11px Poppins,sans-serif'; x.textAlign='center';
+  const ic={fruit:'🍉',target:'🎯',basket:'🏀'};
+  x.fillText(`${ic[GS.type]||'🎮'} ${partnerScore} pts`, 60, 50);
+  x.fillStyle='#C8A8E0'; x.font='10px Inter,sans-serif';
+  x.fillText('Compañero jugando...', 60, 68);
+}
+
 function _showResult() {
   _killGame();
   GS.phase = 'result';
@@ -1462,6 +1565,7 @@ function _showResult() {
   document.getElementById('result-winner').style.color = tied?'#F59E0B':won?'#A020F0':'#EF4444';
   document.getElementById('result-score').textContent  = `Tú: ${my} pts — Compañero: ${th} pts`;
   document.getElementById('game-result').classList.add('show');
+  setTimeout(() => _playSound(tied?'hit':won?'win':'lose'), 100);
 }
 
 // ─────────────────────────────────────────────────────
@@ -1481,6 +1585,7 @@ function _beginMyTurn() {
     GS.timeLeft--;
     const ic = {fruit:'🍉',target:'🎯',basket:'🏀'};
     _setStatus(`${ic[GS.type]||''} Tu turno — ${GS.timeLeft}s`);
+    if (GS.timeLeft <= 5 && GS.timeLeft > 0) _playSound('countdown');
     if (GS.timeLeft <= 0) _endMyTurn();
   }, 1000);
 
@@ -1495,8 +1600,11 @@ function _endMyTurn() {
   _killGame();
   GS.phase = 'waiting';
   _setStatus(`⌛ Turno de tu compañero... (Tú: ${GS.myScore} pts)`);
+  _showSpectator();
   _msgWaiting(GS.myScore);
   if (app.socket) app.socket.emit('game_score', { score: GS.myScore, type: GS.type });
+  // Hide spectator canvas - game done
+  _hideSpectator();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1525,8 +1633,8 @@ function _fruit() {
       const f = items[i]; if (f.dead) continue;
       if (Math.hypot(px - f.x, py - f.y) < f.sz * .55) {
         f.dead = true;
-        if (f.bomb) { _endMyTurn(); return; }
-        score++; GS.myScore = score;
+        if (f.bomb) { score = Math.max(0, score - 3); GS.myScore = score; _playSound('bomb'); return; } // bomb = -3pts, don't end turn
+        score++; GS.myScore = score; _playSound('slice');
         for (let k = 0; k < 10; k++) {
           const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 5;
           sparks.push({ x: f.x, y: f.y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp-2, r: 4+Math.random()*4, l: 1, c: `hsl(${Math.random()*60+10},100%,55%)` });
@@ -1583,7 +1691,7 @@ function _fruit() {
       f.x += f.vx*dt; f.y += f.vy*dt; f.vy += .45*dt; f.rot += f.rv*dt;
       if (f.y > cv.height + 80) {
         items.splice(i,1);
-        if (!f.bomb) { lives--; if (lives <= 0) { _endMyTurn(); return; } }
+        if (!f.bomb) { lives = Math.max(0, lives - 1); } // no early end
         continue;
       }
       x.save(); x.translate(f.x, f.y); x.rotate(f.rot * Math.PI/180);
@@ -1624,7 +1732,7 @@ function _target() {
   function tap(px, py) {
     for (let i = tgts.length-1; i >= 0; i--) {
       const t = tgts[i]; if (t.hit) continue;
-      if (Math.hypot(px - t.x, py - t.y) < t.r) { t.hit = true; score++; GS.myScore = score; break; }
+      if (Math.hypot(px - t.x, py - t.y) < t.r) { t.hit = true; score++; GS.myScore = score; _playSound('hit'); break; }
     }
   }
 
@@ -1700,7 +1808,7 @@ function _basket() {
       if(ball.x+ball.r>cv.width){ball.x=cv.width-ball.r;ball.vx=-Math.abs(ball.vx)*.5;}
       if(ball.y+ball.r>cv.height-6){ball.y=cv.height-6-ball.r;ball.vy*=-.38;ball.vx*=.65;if(Math.abs(ball.vy)<1&&Math.abs(ball.vx)<.5)setTimeout(newBall,400);}
       if(!ball.scored&&ball.vy>0&&ball.y>HY&&ball.y<HY+34&&ball.x>HX-HW/2+ball.r*.25&&ball.x<HX+HW/2-ball.r*.25){
-        ball.scored=true;score++;GS.myScore=score;netW=1.4;
+        ball.scored=true;score++;GS.myScore=score;netW=1.4;_playSound('basket');
         for(let i=0;i<14;i++){const a=Math.random()*Math.PI*2,sp=3+Math.random()*6;parts.push({x:HX,y:HY,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,r:5+Math.random()*5,l:1,c:`hsl(${40+Math.random()*20},100%,60%)`});}
         setTimeout(newBall,900);
       }
