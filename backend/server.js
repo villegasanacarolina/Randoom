@@ -782,6 +782,12 @@ io.on('connection', socket => {
   socket.on('ice_candidate', d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('ice_candidate',d); });
   socket.on('chat_message',  d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('chat_message',{text:d.text,from:'partner'}); });
 
+  // ── Game relay — forward to partner ──────────────────────────────────────
+  socket.on('game_invite', d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_invite', d); });
+  socket.on('game_score',  d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_score',  d); });
+  socket.on('game_end',    d => { const u=activeSockets[socket.id]; if(u?.partnerId) io.to(u.partnerId).emit('game_end',    d); });
+  socket.on('set_mode',    d => { const u=activeSockets[socket.id]; if(u?.partnerId && u.isPremium) u.mode=d.mode; });
+
   socket.on('disconnect', async () => {
     const u = activeSockets[socket.id];
     if (u) {

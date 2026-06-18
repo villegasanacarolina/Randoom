@@ -945,8 +945,8 @@ function initSocket(){
   app.socket.on('game_invite', ({type, from}) => {
     onGameInvite(type, from || 'Tu compañero');
   });
-  app.socket.on('game_score', ({score, type}) => {
-    onGameScore(score, type);
+  app.socket.on('game_score', (d) => {
+    onGameScore(d.score, d.type);
   });
   app.socket.on('game_end', () => {
     onGameEnd();
@@ -1338,20 +1338,30 @@ function onGameInvite(type, fromName) {
   _setStatus('Turno de tu compañero...');
 }
 
-function onGameScore(partnerScore) {
+function onGameScore(partnerScore, type) {
   GS.partnerScore = partnerScore;
-  if (GS.phase === 'waiting') {
-    // I already played → show result now
+  if (type && !GS.type) GS.type = type;
+  
+  if (GS.phase === 'waiting' || GS.phase === 'result') {
+    // I already played → show result
     _showResult();
   } else {
-    // Partner finished first → my turn now
+    // Partner finished first → my turn
+    // Make sure overlay is open
     if (!document.getElementById('game-overlay').classList.contains('active')) {
-      _showOverlay(GS.type);
+      _showOverlay(GS.type || type);
     }
-    GS.phase = 'idle';
+    // Kill any running loop first
+    _killGame();
+    GS.phase = 'partner_done';
+    // Show YOUR TURN screen
+    _sizeCanvas();
     _msg('¡TU TURNO!', '#A020F0');
-    _setStatus('¡Tu turno comienza en 3s!');
-    setTimeout(_beginMyTurn, 2500);
+    _setStatus('¡Tu turno en 3s!');
+    // Start after 3 seconds
+    setTimeout(() => {
+      if (GS.phase === 'partner_done') _beginMyTurn();
+    }, 2500);
   }
 }
 
@@ -1544,7 +1554,7 @@ function _fruit() {
     const cv = _canvas(), x = _ctx(); if (!cv || !x) return;
     x.clearRect(0, 0, cv.width, cv.height);
     // Transparent bg (camera shows through)
-    x.fillStyle = 'rgba(5,0,12,.08)'; x.fillRect(0, 0, cv.width, cv.height);
+    // No fill — transparent canvas, camera shows through
 
     // Slice trail
     const now2 = Date.now();
@@ -1629,7 +1639,7 @@ function _target() {
     const dt = Math.min((now - ts)/16, 2.5); ts = now;
     const cv = _canvas(), x = _ctx(); if (!cv||!x) return;
     x.clearRect(0,0,cv.width,cv.height);
-    x.fillStyle='rgba(5,0,12,.08)'; x.fillRect(0,0,cv.width,cv.height);
+    // No fill — transparent canvas
 
     spawnT += dt; if (spawnT > 30 && tgts.length < 8) { spawn(); spawnT = 0; }
 
@@ -1681,7 +1691,7 @@ function _basket() {
     const dt = Math.min((now-ts)/16,2.5); ts=now;
     const x = _ctx(); if(!x) return;
     x.clearRect(0,0,cv.width,cv.height);
-    x.fillStyle='rgba(5,0,12,.08)'; x.fillRect(0,0,cv.width,cv.height);
+    // No fill — transparent canvas
 
     // Physics
     if (ball.free && !drag) {
