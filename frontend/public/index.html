@@ -689,8 +689,8 @@ textarea.fc{resize:vertical;min-height:70px}
   <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px">
     <div style="width:100%;max-width:420px;text-align:center">
       <div style="font-size:56px;margin-bottom:14px">⏳</div>
-      <h2 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:24px;margin-bottom:8px">Llegaste a tu límite de conexiones</h2>
-      <p style="color:var(--gray-l);font-size:14px;margin-bottom:20px">Conectaste con 20 personas. Espera el tiempo restante o compra estrellas para seguir ahora mismo.</p>
+      <h2 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:24px;margin-bottom:8px">Te quedaste sin estrellas ⭐</h2>
+      <p style="color:var(--gray-l);font-size:14px;margin-bottom:20px">Cada llamada cuesta 1 estrella. Espera el tiempo restante o compra más para seguir ahora mismo.</p>
 
       <div style="background:var(--card);border:1.5px solid var(--bd);border-radius:18px;padding:24px;margin-bottom:18px">
         <div style="font-size:11px;color:var(--gray-l);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Tiempo restante</div>
@@ -1169,9 +1169,9 @@ function initSocket(){
   app.socket.on('partner_disconnected',()=>{addSys('❌ Tu amigo se desconectó');stopTimer();hidePartnerInfo();closePC();stopRecording();document.getElementById('remoteVid').srcObject=null;document.getElementById('btn-report').style.display='none';app.partnerEmail=null;showOv('idle');});
   app.socket.on('chat_message',({text})=>addMsg(text,'partner'));
   app.socket.on('stars_purchased',({stars})=>{
+    // Fires after buying stars, admin grant, or unblock — update silently, just refresh the counter
     app.stars=stars; app.blockedUntil=null;
-    updateChatUI();
-    toast(`⭐ ¡${stars} estrellas disponibles!`,'ok');
+    updateChatUi_starsOnly();
   });
   app.socket.on('connection_unblocked',()=>{
     app.blockedUntil=null; updateChatUI();
@@ -1179,12 +1179,19 @@ function initSocket(){
   });
   app.socket.on('connection_blocked',({blockedUntil})=>{
     app.blockedUntil=blockedUntil;
+    showOv('idle');
     showStars(blockedUntil);
   });
   app.socket.on('connection_limit_reached',({blockedUntil})=>{
     app.blockedUntil=blockedUntil;
-    toast('⏳ Llegaste a tu límite de conexiones','info');
+    toast('⏳ Te quedaste sin estrellas','info');
+    showOv('idle');
     showStars(blockedUntil);
+  });
+  app.socket.on('out_of_stars',({blockedUntil})=>{
+    // Used the last star on THIS call — show a heads-up but let the call continue
+    app.blockedUntil=blockedUntil;
+    toast('⭐ Era tu última estrella — al terminar esta llamada tendrás que esperar 12h o comprar más','info');
   });
 
   app.socket.on('account_banned',({reason})=>{toast('Cuenta suspendida: '+reason,'err');setTimeout(()=>{leaveChat();goHome();},2500);});
@@ -1510,6 +1517,9 @@ function getFilters(){
   };
 }
 function applyFilters(){if(!app.socket)return;app.socket.emit('set_filters',getFilters());toast('Filtros actualizados','info');}
+function updateChatUi_starsOnly(){
+  ['stars-count','stars-count-chat'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=app.stars||0;});
+}
 function updateChatUI(){
   const chip=document.getElementById('user-chip'),badge=document.getElementById('prem-badge');
   if(app.user)chip.textContent='👤 '+app.user.name;

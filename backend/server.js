@@ -52,7 +52,8 @@ async function initDB() {
       gender        TEXT NOT NULL,
       country       TEXT DEFAULT 'MX',
       is_premium    BOOLEAN DEFAULT FALSE,
-      stars         INT DEFAULT 0,
+      stars         INT DEFAULT 20,
+      stars_initialized BOOLEAN DEFAULT FALSE,
       connections_count INT DEFAULT 0,
       blocked_until TIMESTAMPTZ,
       banned        BOOLEAN DEFAULT FALSE,
@@ -163,7 +164,8 @@ async function initDB() {
 
   // ── Migrate existing DB: add columns that may not exist yet ──────────────────
   const migrations = [
-    `ALTER TABLE users ADD COLUMN IF NOT EXISTS stars INT DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS stars INT DEFAULT 20`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS stars_initialized BOOLEAN DEFAULT FALSE`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS connections_count INT DEFAULT 0`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked_until TIMESTAMPTZ`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE`,
@@ -177,6 +179,13 @@ async function initDB() {
   for (const m of migrations) {
     await pool.query(m).catch(e => console.log('Migration skip:', e.message));
   }
+
+  // One-time per user: grant 20 stars to everyone who hasn't been initialized yet
+  // (covers both pre-existing users and any edge case on fresh deploys)
+  await pool.query(`
+    UPDATE users SET stars = 20, stars_initialized = TRUE
+    WHERE stars_initialized = FALSE
+  `).catch(e => console.log('Stars migration skip:', e.message));
 
   console.log('Base de datos inicializada ✅');
 }
@@ -384,8 +393,8 @@ app.post('/api/auth/verify', async (req, res) => {
     if (pending.code !== code.trim()) return res.status(401).json({ error: 'Código incorrecto' });
     const d = pending.data;
     await pool.query(
-      `INSERT INTO users(email,password_hash,name,username,age,gender,country,email_verified,approved)
-       VALUES($1,$2,$3,$4,$5,$6,$7,true,true)
+      `INSERT INTO users(email,password_hash,name,username,age,gender,country,email_verified,approved,stars,stars_initialized)
+       VALUES($1,$2,$3,$4,$5,$6,$7,true,true,20,true)
        ON CONFLICT(email) DO NOTHING`,
       [d.email, d.passwordHash || d.password_hash, d.name, d.username||null, d.age, d.gender, d.country]
     );
@@ -463,10 +472,9 @@ app.get('/api/auth/me', authUser, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // MERCADOPAGO
 // ══════════════════════════════════════════════════════════════════════════════
-// ── Comprar estrellas (desbloquea conexiones, 20 estrellas = $69 MXN) ────────
+// ── Sistema de estrellas: 1 estrella = 1 llamada. Sin estrellas → 12h de espera o comprar 20 por $69 MXN ──
 const STARS_PRICE_MXN = parseFloat(process.env.STARS_PRICE_MXN) || 69;
 const STARS_PER_PURCHASE = 20;
-const FREE_CONNECTIONS_LIMIT = 20;
 const BLOCK_HOURS = 12;
 
 app.post('/api/payments/create-preference', authUser, async (req, res) => {
@@ -499,9 +507,9 @@ app.post('/api/payments/webhook', async (req, res) => {
     const result = await mpRequest('GET', `/v1/payments/${data.id}`);
     if (result.data.status === 'approved') {
       const email = result.data.external_reference;
-      // Add stars, reset connection block
+      // Add stars and clear any active block
       await pool.query(
-        'UPDATE users SET stars=stars+$1, connections_count=0, blocked_until=NULL WHERE email=$2',
+        'UPDATE users SET stars=stars+$1, blocked_until=NULL WHERE email=$2',
         [STARS_PER_PURCHASE, email]
       );
       const u = (await pool.query('SELECT name,stars FROM users WHERE email=$1', [email])).rows[0];
@@ -511,18 +519,16 @@ app.post('/api/payments/webhook', async (req, res) => {
   } catch(e) { console.error('Webhook error:', e.message); }
 });
 
-// ── Verificar si el usuario puede conectarse (límite de 20 conexiones) ───────
+// ── Verificar si el usuario puede conectarse (le quedan estrellas o sigue bloqueado) ──
 app.get('/api/connections/status', authUser, async (req, res) => {
   try {
-    const r = await pool.query('SELECT connections_count, blocked_until, stars FROM users WHERE email=$1', [req.user.email]);
+    const r = await pool.query('SELECT blocked_until, stars FROM users WHERE email=$1', [req.user.email]);
     if (!r.rows.length) return res.status(404).json({ error: 'No encontrado' });
     const u = r.rows[0];
     const now = new Date();
     const blockedUntil = u.blocked_until ? new Date(u.blocked_until) : null;
     const isBlocked = blockedUntil && blockedUntil > now;
     res.json({
-      connectionsCount: u.connections_count || 0,
-      limit: FREE_CONNECTIONS_LIMIT,
       isBlocked: !!isBlocked,
       blockedUntil: isBlocked ? blockedUntil.toISOString() : null,
       stars: u.stars || 0,
@@ -614,11 +620,16 @@ app.post('/api/admin/users/:email/stars', authAdmin, async (req, res) => {
   const email = decodeURIComponent(req.params.email);
   const amount = parseInt(req.body.amount) || 0;
   try {
-    await pool.query('UPDATE users SET stars = GREATEST(0, stars + $1) WHERE email=$2', [amount, email]);
+    // Giving stars also clears any active block so the user can use them right away
+    await pool.query(
+      'UPDATE users SET stars = GREATEST(0, stars + $1), blocked_until = NULL WHERE email=$2',
+      [amount, email]
+    );
     const s = Object.entries(activeSockets).find(([,s]) => s.email === email);
     if (s) {
       const r = await pool.query('SELECT stars FROM users WHERE email=$1', [email]);
       io.to(s[0]).emit('stars_purchased', { stars: r.rows[0]?.stars||0 });
+      io.to(s[0]).emit('connection_unblocked');
     }
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: 'Error' }); }
@@ -627,9 +638,17 @@ app.post('/api/admin/users/:email/stars', authAdmin, async (req, res) => {
 app.post('/api/admin/users/:email/unblock', authAdmin, async (req, res) => {
   const email = decodeURIComponent(req.params.email);
   try {
-    await pool.query('UPDATE users SET blocked_until=NULL, connections_count=0 WHERE email=$1', [email]);
+    // Unblocking also gives a fresh 20 stars, otherwise the next call re-blocks instantly
+    await pool.query(
+      'UPDATE users SET blocked_until=NULL, stars = GREATEST(stars, $1) WHERE email=$2',
+      [STARS_PER_PURCHASE, email]
+    );
     const s = Object.entries(activeSockets).find(([,s]) => s.email === email);
-    if (s) io.to(s[0]).emit('connection_unblocked');
+    if (s) {
+      const r = await pool.query('SELECT stars FROM users WHERE email=$1', [email]);
+      io.to(s[0]).emit('connection_unblocked');
+      io.to(s[0]).emit('stars_purchased', { stars: r.rows[0]?.stars||0 });
+    }
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
@@ -1107,24 +1126,34 @@ io.on('connection', socket => {
   socket.on('find_partner', async () => {
     const u = activeSockets[socket.id]; if (!u) return;
 
-    // ── Check connection limit (20 free connections, then 12h block or pay) ──
+    // ── Check stars + block status BEFORE searching ───────────────────────────
     try {
-      const r = await pool.query('SELECT connections_count, blocked_until FROM users WHERE email=$1', [u.email]);
+      const r = await pool.query('SELECT stars, blocked_until FROM users WHERE email=$1', [u.email]);
       const row = r.rows[0];
-      if (row) {
-        const now = new Date();
-        const blockedUntil = row.blocked_until ? new Date(row.blocked_until) : null;
-        if (blockedUntil && blockedUntil > now) {
-          // Still blocked — tell client and stop
-          socket.emit('connection_blocked', { blockedUntil: blockedUntil.toISOString() });
-          return;
-        }
-        // If block expired, reset it
-        if (blockedUntil && blockedUntil <= now) {
-          await pool.query('UPDATE users SET connections_count=0, blocked_until=NULL WHERE email=$1', [u.email]);
-        }
+      if (!row) return;
+
+      const now = new Date();
+      const blockedUntil = row.blocked_until ? new Date(row.blocked_until) : null;
+      const isStillBlocked = blockedUntil && blockedUntil > now;
+
+      if (isStillBlocked) {
+        // Blocked and waiting out the 12h — buying stars is the only way out
+        socket.emit('connection_blocked', { blockedUntil: blockedUntil.toISOString() });
+        return;
       }
-    } catch(e) { console.error('Connection limit check error:', e.message); }
+      if (blockedUntil && !isStillBlocked) {
+        // 12h passed naturally — give 20 fresh stars and clear the block
+        await pool.query('UPDATE users SET stars=$1, blocked_until=NULL WHERE email=$2', [STARS_PER_PURCHASE, u.email]);
+        socket.emit('stars_purchased', { stars: STARS_PER_PURCHASE });
+      }
+      if (row.stars <= 0 && !blockedUntil) {
+        // Out of stars, not yet blocked — start the 12h block now
+        const newBlockedUntil = new Date(Date.now() + BLOCK_HOURS * 3600 * 1000);
+        await pool.query('UPDATE users SET blocked_until=$1 WHERE email=$2', [newBlockedUntil, u.email]);
+        socket.emit('connection_limit_reached', { blockedUntil: newBlockedUntil.toISOString() });
+        return;
+      }
+    } catch(e) { console.error('Stars check error:', e.message); return; }
 
     if (u.partnerId) { io.to(u.partnerId).emit('partner_disconnected'); if (activeSockets[u.partnerId]) activeSockets[u.partnerId].partnerId=null; u.partnerId=null; }
     const idx = waitingPool.indexOf(socket.id); if (idx!==-1) waitingPool.splice(idx,1);
@@ -1134,27 +1163,25 @@ io.on('connection', socket => {
       u.sessionStart=activeSockets[mid].sessionStart=Date.now();
       const pu=activeSockets[mid];
 
-      // ── Increment connection count for BOTH users ──────────────────────────
+      // ── Spend 1 star per call, for BOTH users ───────────────────────────────
       try {
         for (const email of [u.email, pu.email]) {
           const r2 = await pool.query(
-            'UPDATE users SET connections_count = connections_count + 1 WHERE email=$1 RETURNING connections_count, stars',
+            'UPDATE users SET stars = stars - 1 WHERE email=$1 RETURNING stars',
             [email]
           );
-          const newCount = r2.rows[0]?.connections_count || 0;
-          const stars = r2.rows[0]?.stars || 0;
-          if (newCount >= FREE_CONNECTIONS_LIMIT && stars <= 0) {
-            // Hit the limit — block for 12h (unless they have stars to spend)
+          const remaining = r2.rows[0]?.stars ?? 0;
+          const targetSock = Object.entries(activeSockets).find(([,s]) => s.email === email);
+          if (targetSock) io.to(targetSock[0]).emit('stars_purchased', { stars: remaining });
+
+          if (remaining <= 0) {
+            // Just ran out — start the 12h block for next time
             const blockedUntil = new Date(Date.now() + BLOCK_HOURS * 3600 * 1000);
             await pool.query('UPDATE users SET blocked_until=$1 WHERE email=$2', [blockedUntil, email]);
-            const targetSock = Object.entries(activeSockets).find(([,s]) => s.email === email);
-            if (targetSock) io.to(targetSock[0]).emit('connection_limit_reached', { blockedUntil: blockedUntil.toISOString() });
-          } else if (newCount >= FREE_CONNECTIONS_LIMIT && stars > 0) {
-            // Use a star instead of blocking
-            await pool.query('UPDATE users SET stars=stars-1, connections_count=connections_count-1 WHERE email=$1', [email]);
+            if (targetSock) io.to(targetSock[0]).emit('out_of_stars', { blockedUntil: blockedUntil.toISOString() });
           }
         }
-      } catch(e) { console.error('Connection count error:', e.message); }
+      } catch(e) { console.error('Star spend error:', e.message); }
 
       socket.emit('partner_found',{partner:{name:pu.name,age:pu.age,gender:pu.gender,country:pu.country,email:pu.email},initiator:true});
       io.to(mid).emit('partner_found',{partner:{name:u.name,age:u.age,gender:u.gender,country:u.country,email:u.email},initiator:false});
