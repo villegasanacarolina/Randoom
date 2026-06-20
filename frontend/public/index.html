@@ -199,8 +199,8 @@ textarea.fc{resize:vertical;min-height:70px}
 .chat-inp input::placeholder{color:var(--gray)}
 .send-btn{width:38px;height:38px;background:linear-gradient(135deg,var(--pu-l),var(--pu-d));border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
 
-/* PREMIUM */
-#s-premium{align-items:center;padding:16px 14px;overflow-y:auto}
+/* STARS / BLOCKED */
+#s-stars{align-items:center;padding:16px 14px;overflow-y:auto}
 .prem-wrap{width:100%;max-width:720px;margin:0 auto}
 .prem-hdr{text-align:center;margin-bottom:20px}
 .prem-hdr h2{font-family:'Poppins',sans-serif;font-weight:900;font-size:clamp(26px,6vw,36px);margin-bottom:8px}
@@ -381,7 +381,7 @@ textarea.fc{resize:vertical;min-height:70px}
     <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
     <div class="nav-actions">
       <button class="btn btn-ghost btn-sm" onclick="showSearch()" id="nav-search-btn" style="display:none;padding:8px 10px" title="Buscar usuarios">🔍</button>
-      <button class="btn btn-outline btn-sm" onclick="showPremium()">⭐ Premium</button>
+      <div id="stars-display" class="btn btn-ghost btn-sm" style="display:none;cursor:default;gap:4px"><span>⭐</span><span id="stars-count">0</span></div>
       <button class="btn btn-primary btn-sm" onclick="showAuth()" id="nav-login-btn">Log in</button>
       <span class="btn btn-ghost btn-sm" id="nav-user-btn" style="display:none;cursor:pointer" onclick="showProfile()">👤</span>
       <button class="btn btn-ghost btn-sm" id="nav-logout-btn" style="display:none;color:var(--gray-l);font-size:12px" onclick="doLogout()">Log out</button>
@@ -394,7 +394,7 @@ textarea.fc{resize:vertical;min-height:70px}
       <p>Videochat aleatorio verificado. Comunidad segura, divertida y anónima.</p>
       <div class="hero-cta">
         <button class="btn btn-primary btn-lg" onclick="goToChat()">🎥 Comenzar ahora</button>
-        <button class="btn btn-outline btn-lg" onclick="showPremium()">⭐ Ver Premium</button>
+        
       </div>
     </div>
     <div class="stats">
@@ -406,7 +406,7 @@ textarea.fc{resize:vertical;min-height:70px}
     <div class="feat-grid" style="padding:0 0 20px;width:100%">
       <div class="feat-card"><div class="feat-icon">🎥</div><h3>Video en tiempo real</h3><p>WebRTC directo en tu navegador.</p></div>
       <div class="feat-card"><div class="feat-icon">📡</div><h3>Lives en vivo</h3><p>Haz streaming para todos o únete a un live.</p></div>
-      <div class="feat-card"><div class="feat-icon">⭐</div><h3>Filtros Premium</h3><p>Elige género, edad y país.</p></div>
+      <div class="feat-card"><div class="feat-icon">🎯</div><h3>Filtros de búsqueda</h3><p>Elige género, edad, país y mood.</p></div>
       <div class="feat-card"><div class="feat-icon">💕</div><h3>Elige tu modo</h3><p>Pareja, amigos o negocios.</p></div>
     </div>
   </div>
@@ -517,7 +517,7 @@ textarea.fc{resize:vertical;min-height:70px}
     <nav class="nav">
       <div class="logo" onclick="leaveChat()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
       <div class="nav-actions">
-        <span id="prem-badge" class="hidden" style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase">⭐ Premium</span>
+        <div id="stars-display-chat" class="btn btn-ghost btn-sm" style="cursor:default;gap:4px"><span>⭐</span><span id="stars-count-chat">0</span></div>
         <button class="btn btn-ghost btn-sm" onclick="showSearch()" style="padding:8px 10px;font-size:13px" title="Buscar usuarios">🔍</button>
         <span class="btn btn-ghost btn-sm" id="user-chip" style="font-size:11px;cursor:pointer" onclick="showProfile()">👤</span>
         <button class="btn btn-ghost btn-sm" onclick="leaveChat()" style="padding:8px 10px">✕</button>
@@ -598,7 +598,7 @@ textarea.fc{resize:vertical;min-height:70px}
     </div>
     <div class="partner-bar" id="partner-bar"><h4>Conectado con</h4><div class="ptags" id="ptags"></div></div>
     <div class="mode-selector" id="mode-selector">
-      <div class="mode-badge">⭐ Premium</div>
+      <div class="mode-badge">🎯 Filtros activos</div>
       <h4>Modo de búsqueda</h4>
       <div class="mode-btns">
         <button class="mode-btn active" onclick="setMode('pareja',this)">💕 Pareja</button>
@@ -607,7 +607,7 @@ textarea.fc{resize:vertical;min-height:70px}
       </div>
     </div>
     <div class="prem-filters" id="prem-filters">
-      <h4>⭐ Filtros Premium</h4>
+      <h4>🎯 Filtros de búsqueda</h4>
       <div class="frow"><label>Género</label>
         <select class="fc" id="f-gender" onchange="applyFilters()">
           <option value="any">Cualquiera</option><option value="male">Hombre</option><option value="female">Mujer</option>
@@ -625,8 +625,7 @@ textarea.fc{resize:vertical;min-height:70px}
       </div>
     </div>
     <div class="upgrade-bar" id="upgrade-bar">
-      <p style="font-size:12px;margin-bottom:6px;color:var(--gray-l)">⭐ <strong style="color:#fff">Premium</strong> — filtros de género, país, edad y modo de búsqueda</p>
-      <button class="btn btn-primary btn-sm btn-full" onclick="showPremium()">Ver planes</button>
+      <p style="font-size:12px;margin-bottom:6px;color:var(--gray-l)">🎯 <strong style="color:#fff">Filtros de búsqueda</strong> — género, país, edad y mood, disponibles para todos</p>
     </div>
     <div class="msgs" id="msgs"><div class="msg sys">Conecta para chatear 🔮</div></div>
     <div class="chat-inp">
@@ -643,7 +642,7 @@ textarea.fc{resize:vertical;min-height:70px}
     </div>
     <div class="partner-bar" id="partner-bar-d"><h4>Conectado con</h4><div class="ptags" id="ptags-d"></div></div>
     <div class="mode-selector" id="mode-selector-d">
-      <div class="mode-badge">⭐ Premium</div>
+      <div class="mode-badge">🎯 Filtros activos</div>
       <h4>Modo de búsqueda</h4>
       <div class="mode-btns">
         <button class="mode-btn active" onclick="setMode('pareja',this)">💕 Pareja</button>
@@ -652,7 +651,7 @@ textarea.fc{resize:vertical;min-height:70px}
       </div>
     </div>
     <div class="prem-filters" id="prem-filters-d">
-      <h4>⭐ Filtros Premium</h4>
+      <h4>🎯 Filtros de búsqueda</h4>
       <div class="frow"><label>Género</label>
         <select class="fc" id="f-gender-d" onchange="applyFilters()">
           <option value="any">Cualquiera</option><option value="male">Hombre</option><option value="female">Mujer</option>
@@ -670,8 +669,7 @@ textarea.fc{resize:vertical;min-height:70px}
       </div>
     </div>
     <div class="upgrade-bar" id="upgrade-bar-d">
-      <p style="font-size:12px;margin-bottom:6px;color:var(--gray-l)">⭐ <strong style="color:#fff">Premium</strong> — filtros de género, país, edad y modo de búsqueda</p>
-      <button class="btn btn-primary btn-sm btn-full" onclick="showPremium()">Ver planes</button>
+      <p style="font-size:12px;margin-bottom:6px;color:var(--gray-l)">🎯 <strong style="color:#fff">Filtros de búsqueda</strong> — género, país, edad y mood, disponibles para todos</p>
     </div>
     <div class="msgs" id="msgs-d"><div class="msg sys">Conecta para chatear 🔮</div></div>
     <div class="chat-inp">
@@ -681,55 +679,34 @@ textarea.fc{resize:vertical;min-height:70px}
   </div>
 </div>
 
-<!-- ═══ PREMIUM ═══ -->
-<div id="s-premium" class="screen">
+<!-- ═══ STARS / BLOCKED ═══ -->
+<!-- ═══ STARS / BLOCKED SCREEN ═══ -->
+<div id="s-stars" class="screen">
   <nav class="nav">
     <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
-    <button class="btn btn-ghost btn-sm" onclick="backFromPremium()">← Volver</button>
+    <button class="btn btn-ghost btn-sm" onclick="goHome()">← Volver</button>
   </nav>
-  <div style="flex:1;padding:16px 14px;overflow-y:auto">
-    <div class="prem-wrap">
-      <div class="prem-hdr">
-        <div style="font-size:48px;margin-bottom:12px">👑</div>
-        <h2>Randoom <span class="pu">Premium</span></h2>
-        <p style="color:var(--gray-l);font-size:13px">Filtros avanzados y modo de búsqueda personalizado</p>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px">
+    <div style="width:100%;max-width:420px;text-align:center">
+      <div style="font-size:56px;margin-bottom:14px">⏳</div>
+      <h2 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:24px;margin-bottom:8px">Llegaste a tu límite de conexiones</h2>
+      <p style="color:var(--gray-l);font-size:14px;margin-bottom:20px">Conectaste con 20 personas. Espera el tiempo restante o compra estrellas para seguir ahora mismo.</p>
+
+      <div style="background:var(--card);border:1.5px solid var(--bd);border-radius:18px;padding:24px;margin-bottom:18px">
+        <div style="font-size:11px;color:var(--gray-l);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Tiempo restante</div>
+        <div id="block-countdown" style="font-family:'Poppins',sans-serif;font-weight:900;font-size:42px;color:var(--pu-l)">12:00:00</div>
+        <div style="font-size:12px;color:var(--gray-l);margin-top:6px">Se reactivan tus llamadas automáticamente</div>
       </div>
-      <div class="plans">
-        <div class="plan">
-          <div class="plan-name">Gratis</div>
-          <div class="plan-price"><sup>$</sup>0<sub>/mes</sub></div>
-          <div class="plan-period">Para siempre</div>
-          <ul class="plan-feats">
-            <li><span class="ck">✓</span> Videollamadas aleatorias</li>
-            <li><span class="ck">✓</span> Chat de texto</li>
-            <li><span class="ck">✓</span> Llamadas ilimitadas</li>
-            <li><span class="cx">✗</span> <s>Filtros avanzados</s></li>
-          </ul>
-          <button class="btn btn-ghost btn-full" onclick="goToChat()">Continuar gratis</button>
-        </div>
-        <div class="plan feat">
-          <div class="plan-badge">🔥 Popular</div>
-          <div class="plan-name">Premium</div>
-          <div class="plan-price"><sup>$</sup>149<sub> MXN/mes</sub></div>
-          <div class="plan-period">Pago único mensual</div>
-          <ul class="plan-feats">
-            <li><span class="ck">✓</span> Llamadas ilimitadas</li>
-            <li><span class="ck">✓</span> Filtro de género, país y edad</li>
-            <li><span class="ck">✓</span> 💕 Modo Pareja</li>
-            <li><span class="ck">✓</span> 👋 Modo Amigos / 💼 Negocios</li>
-          </ul>
-          <button class="btn btn-primary btn-full" onclick="startMPPayment()" id="btn-pay-mp">💳 Pagar con MercadoPago</button>
-        </div>
+
+      <div style="background:var(--card);border:1.5px solid var(--pu);border-radius:18px;padding:22px;margin-bottom:14px">
+        <div style="font-size:34px;margin-bottom:8px">⭐</div>
+        <div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:18px;margin-bottom:4px">20 Estrellas</div>
+        <div style="font-size:13px;color:var(--gray-l);margin-bottom:16px">Sigue conectando ahora mismo, sin esperar</div>
+        <div style="font-family:'Poppins',sans-serif;font-weight:900;font-size:30px;color:#fff;margin-bottom:16px"><sup style="font-size:16px">$</sup>69<sub style="font-size:13px;color:var(--gray-l)"> MXN</sub></div>
+        <button class="btn btn-primary btn-full" onclick="buyStars()" id="btn-buy-stars" style="padding:14px;font-size:15px">💳 Pagar con MercadoPago</button>
       </div>
-      <div class="mp-box">
-        <h4>💳 Pago seguro con MercadoPago</h4>
-        <p>Acepta tarjetas de crédito, débito, OXXO y SPEI. Tu pago es 100% seguro.</p>
-        <div class="mp-logos">
-          <span class="mp-logo">Visa</span><span class="mp-logo">Mastercard</span>
-          <span class="mp-logo">OXXO</span><span class="mp-logo">SPEI</span>
-        </div>
-        <div style="font-size:11px;color:var(--gray-l)">🔒 SSL · PCI DSS · 3D Secure</div>
-      </div>
+
+      <p style="font-size:11px;color:var(--gray-l)">🔒 Pago seguro · Visa · Mastercard · OXXO · SPEI</p>
     </div>
   </div>
 </div>
@@ -741,7 +718,7 @@ textarea.fc{resize:vertical;min-height:70px}
     <div class="confirm-wrap">
       <div class="confirm-ico">✓</div>
       <h2>¡Pago procesado!</h2>
-      <p>MercadoPago confirmó tu pago. Tu cuenta Premium estará activa en unos momentos.</p>
+      <p>MercadoPago confirmó tu pago. Tus 20 estrellas estarán disponibles en unos momentos.</p>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="goToChat()">🎥 Ir al chat</button>
         <button class="btn btn-ghost" onclick="goHome()">Inicio</button>
@@ -786,7 +763,7 @@ textarea.fc{resize:vertical;min-height:70px}
   </div>
 </div>
 
-<!-- ═══ MOOD SELECT (premium only) ═══ -->
+<!-- ═══ MOOD SELECT (todos los usuarios) ═══ -->
 <div id="s-mood" class="screen">
   <nav class="nav">
     <div class="logo" onclick="goHome()"><img src="/logo.png" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="Randoom"/><span class="logo-txt">Rand<span>oom</span></span></div>
@@ -797,10 +774,10 @@ textarea.fc{resize:vertical;min-height:70px}
   <div id="mood-step1" style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px;overflow-y:auto">
     <div style="width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px">
       <div style="text-align:center;margin-bottom:4px">
-        <span style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:11px;font-weight:700;padding:3px 14px;border-radius:20px">⭐ PREMIUM · Paso 1 de 2</span>
+        <span style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:11px;font-weight:700;padding:3px 14px;border-radius:20px">🎯 Paso 1 de 2</span>
       </div>
       <h2 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:24px;text-align:center;margin:0 0 2px">¿Cuál es tu mood hoy?</h2>
-      <p style="text-align:center;color:var(--gray-l);font-size:13px;margin:0 0 8px">Solo conectarás con usuarios en el mismo mood</p>
+      <p style="text-align:center;color:var(--gray-l);font-size:13px;margin:0 0 8px">Conectarás con usuarios en el mismo mood</p>
 
       <button onclick="pickMood('pareja')" class="mood-btn-card" style="background:rgba(236,72,153,.12);border:1.5px solid rgba(236,72,153,.4)">
         <span style="font-size:40px">💕</span>
@@ -825,7 +802,7 @@ textarea.fc{resize:vertical;min-height:70px}
   <div id="mood-step2" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;overflow-y:auto">
     <div style="width:100%;max-width:400px;display:flex;flex-direction:column;gap:16px">
       <div style="text-align:center;margin-bottom:4px">
-        <span style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:11px;font-weight:700;padding:3px 14px;border-radius:20px">⭐ PREMIUM · Paso 2 de 2</span>
+        <span style="background:linear-gradient(135deg,var(--pu-l),var(--pu-d));color:#fff;font-size:11px;font-weight:700;padding:3px 14px;border-radius:20px">🎯 Paso 2 de 2</span>
       </div>
       <h2 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:24px;text-align:center;margin:0 0 2px">Filtros de búsqueda</h2>
       <p style="text-align:center;color:var(--gray-l);font-size:13px;margin:0 0 8px">Opcional — deja en blanco para cualquiera</p>
@@ -956,22 +933,56 @@ const COUNTRIES=[
   {c:'IT',n:'Italia'},{c:'GB',n:'Reino Unido'},{c:'PT',n:'Portugal'},{c:'RU',n:'Rusia'},
   {c:'JP',n:'Japón'},{c:'KR',n:'Corea del Sur'},{c:'AU',n:'Australia'},{c:'PH',n:'Filipinas'}
 ];
-const app={token:null,user:null,isPremium:false,ineStatus:'none',approved:false,socket:null,localStream:null,pc:null,micOn:true,camOn:true,timerInterval:null,timerSec:60,partnerEmail:null,mediaRecorder:null,recordedChunks:[],recordingReportId:null};
+const app={token:null,user:null,stars:0,blockedUntil:null,ineStatus:'none',approved:false,socket:null,localStream:null,pc:null,micOn:true,camOn:true,timerInterval:null,timerSec:60,partnerEmail:null,mediaRecorder:null,recordedChunks:[],recordingReportId:null,_mood:null,_filters:null};
 
 // ── Screens ──────────────────────────────────────────────────────────────────
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id)?.classList.add('active');}
 function goHome(){if(app.socket)leaveChat();showScreen('s-landing');}
 function showAuth(){showScreen('s-auth');switchTab('login');}
-function showPremium(){if(!app.token){showAuth();return;}showScreen('s-premium');}
-function backFromPremium(){if(app.token)goToChat();else showScreen('s-landing');}
+function showStars(blockedUntil){
+  if(!app.token){showAuth();return;}
+  showScreen('s-stars');
+  if(blockedUntil) startBlockCountdown(blockedUntil);
+}
+let _countdownInt=null;
+function startBlockCountdown(blockedUntilISO){
+  if(_countdownInt) clearInterval(_countdownInt);
+  const target = new Date(blockedUntilISO).getTime();
+  function tick(){
+    const diff = target - Date.now();
+    if(diff <= 0){
+      clearInterval(_countdownInt);
+      document.getElementById('block-countdown').textContent = '¡Ya puedes continuar!';
+      app.blockedUntil = null;
+      return;
+    }
+    const h = Math.floor(diff/3600000);
+    const m = Math.floor((diff%3600000)/60000);
+    const sec = Math.floor((diff%60000)/1000);
+    const el = document.getElementById('block-countdown');
+    if(el) el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  }
+  tick();
+  _countdownInt = setInterval(tick, 1000);
+}
+async function buyStars(){
+  try{
+    const r = await api('/api/payments/create-preference','POST',{});
+    if(r.init_point) window.location.href = r.init_point;
+  }catch(e){ toast(e.message||'Error al procesar pago','err'); }
+}
 function goToChat(){
   if(!app.token){showAuth();return;}
-  // Premium users without a mood → ask first
-  if(app.isPremium && !app._mood){
-    showScreen('s-mood');
+  // Check if user is blocked (hit connection limit)
+  if(app.blockedUntil && new Date(app.blockedUntil) > new Date()){
+    showStars(app.blockedUntil);
     return;
   }
-  _enterChat(app._mood||null);
+  // Everyone now picks mood + filters before connecting
+  app._mood = null;
+  app._filters = null;
+  showScreen('s-mood');
+  showMoodStep(1);
 }
 function showPendingScreen(){goToChat();}
 
@@ -1017,7 +1028,7 @@ async function doLogin(){
   try{
     const r=await api('/api/auth/login','POST',{email,password:pass});
     if(r.isAdmin){window.location.href='/admin.html';return;}
-    app.token=r.token;app.user=r.user;app.isPremium=r.user.isPremium;app.ineStatus=r.user.ineStatus;app.approved=r.user.approved;
+    app.token=r.token;app.user=r.user;app.stars=r.user.stars||0;app.blockedUntil=r.user.blockedUntil||null;app.ineStatus=r.user.ineStatus;app.approved=r.user.approved;
     localStorage.setItem('rd_token',r.token);
     toast(`Bienvenido, ${r.user.name} 👋`,'ok');
     goToChat();
@@ -1058,7 +1069,7 @@ async function doVerify(){
   if(!pendingEmail){toast('Error: vuelve a registrarte','err');return;}
   try{
     const r=await api('/api/auth/verify','POST',{email:pendingEmail,code});
-    app.token=r.token;app.user=r.user;app.isPremium=false;app.ineStatus='none';app.approved=true;
+    app.token=r.token;app.user=r.user;app.stars=0;app.blockedUntil=null;app.ineStatus='none';app.approved=true;
     localStorage.setItem('rd_token',r.token);
     toast('🎉 ¡Bienvenido a Randoom!','ok');
     goToChat();
@@ -1083,8 +1094,8 @@ async function doResend(){
 function initSocket(){
   app.socket=io(SERVER);
   app.socket.on('connect',()=>{app.socket.emit('join',{token:app.token});pollStats();requestMedia();});
-  app.socket.on('joined',({isPremium,ineStatus,approved})=>{
-    app.isPremium=isPremium;app.ineStatus=ineStatus;app.approved=approved;updateChatUI();
+  app.socket.on('joined',({ineStatus,approved,stars})=>{
+    app.ineStatus=ineStatus;app.approved=approved;if(typeof stars==='number')app.stars=stars;updateChatUI();
     // Only auto-search if we're on the chat screen and explicitly searching
     if(app._searchOnJoin){
       app._searchOnJoin=false;
@@ -1101,9 +1112,9 @@ function initSocket(){
       negocios: '💼 Encontrando partners...'
     };
     const moodSub = {
-      pareja:   'Conectando con usuarios premium buscando pareja',
-      amigos:   'Conectando con usuarios premium buscando amigos',
-      negocios: 'Conectando con usuarios premium para networking'
+      pareja:   'Conectando con usuarios buscando pareja',
+      amigos:   'Conectando con usuarios buscando amigos',
+      negocios: 'Conectando con usuarios para networking'
     };
     const t = document.getElementById('search-title');
     const p = document.getElementById('search-sub');
@@ -1157,8 +1168,24 @@ function initSocket(){
   app.socket.on('ice_candidate',async({candidate})=>{if(app.pc&&candidate)try{await app.pc.addIceCandidate(new RTCIceCandidate(candidate));}catch(e){}});
   app.socket.on('partner_disconnected',()=>{addSys('❌ Tu amigo se desconectó');stopTimer();hidePartnerInfo();closePC();stopRecording();document.getElementById('remoteVid').srcObject=null;document.getElementById('btn-report').style.display='none';app.partnerEmail=null;showOv('idle');});
   app.socket.on('chat_message',({text})=>addMsg(text,'partner'));
-  app.socket.on('premium_activated',()=>{app.isPremium=true;updateChatUI();toast('⭐ ¡Premium activado!','ok');});
-  app.socket.on('premium_removed',()=>{app.isPremium=false;updateChatUI();});
+  app.socket.on('stars_purchased',({stars})=>{
+    app.stars=stars; app.blockedUntil=null;
+    updateChatUI();
+    toast(`⭐ ¡${stars} estrellas disponibles!`,'ok');
+  });
+  app.socket.on('connection_unblocked',()=>{
+    app.blockedUntil=null; updateChatUI();
+    toast('✅ Ya puedes seguir conectando','ok');
+  });
+  app.socket.on('connection_blocked',({blockedUntil})=>{
+    app.blockedUntil=blockedUntil;
+    showStars(blockedUntil);
+  });
+  app.socket.on('connection_limit_reached',({blockedUntil})=>{
+    app.blockedUntil=blockedUntil;
+    toast('⏳ Llegaste a tu límite de conexiones','info');
+    showStars(blockedUntil);
+  });
 
   app.socket.on('account_banned',({reason})=>{toast('Cuenta suspendida: '+reason,'err');setTimeout(()=>{leaveChat();goHome();},2500);});
   app.socket.on('start_recording',({reportId})=>{startRecording(reportId);});
@@ -1366,7 +1393,7 @@ async function saveUsername() {
 
 function doLogout() {
   if (app.socket) { app.socket.disconnect(); app.socket = null; }
-  app.token = null; app.user = null; app.isPremium = false; app.partnerEmail = null;
+  app.token = null; app.user = null; app.stars = 0; app.blockedUntil = null; app.partnerEmail = null;
   app._mood = null; app._filters = null; // reset mood on logout
   localStorage.removeItem('rd_token');
   // Reset nav
@@ -1482,13 +1509,17 @@ function getFilters(){
     ageMax:document.getElementById(isMobile?'f-age-max':'f-age-max-d')?.value||''
   };
 }
-function applyFilters(){if(!app.isPremium||!app.socket)return;app.socket.emit('set_filters',getFilters());toast('Filtros actualizados','info');}
+function applyFilters(){if(!app.socket)return;app.socket.emit('set_filters',getFilters());toast('Filtros actualizados','info');}
 function updateChatUI(){
   const chip=document.getElementById('user-chip'),badge=document.getElementById('prem-badge');
   if(app.user)chip.textContent='👤 '+app.user.name;
-  badge.classList.toggle('hidden',!app.isPremium);
-  ['prem-filters','prem-filters-d'].forEach(id=>{const el=document.getElementById(id);if(el){if(app.isPremium)el.classList.add('show');else el.classList.remove('show');}});
-  ['upgrade-bar','upgrade-bar-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=app.isPremium?'none':'block';});
+  // Filters are now available to everyone — always show them
+  ['prem-filters','prem-filters-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('show');});
+  ['upgrade-bar','upgrade-bar-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  // Update stars display
+  ['stars-count','stars-count-chat'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=app.stars||0;});
+  const sd = document.getElementById('stars-display');
+  if(sd) sd.style.display = app.token ? 'flex' : 'none';
 }
 async function pollStats(){
   try{const r=await fetch(SERVER+'/api/health');const d=await r.json();const n=d.online||0;['online-num','online-num-d','online-num-m'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=n;});}catch(e){}
@@ -1529,12 +1560,6 @@ async function uploadRecording(reportId){
 }
 
 // ── MercadoPago ───────────────────────────────────────────────────────────────
-async function startMPPayment(){
-  if(!app.token){showAuth();return;}
-  const btn=document.getElementById('btn-pay-mp');btn.textContent='⌛ Cargando…';btn.disabled=true;
-  try{const r=await api('/api/payments/create-preference','POST',{});window.location.href=r.init_point;}
-  catch(e){toast('Error al iniciar el pago: '+e.message,'err');btn.textContent='💳 Pagar con MercadoPago';btn.disabled=false;}
-}
 (function checkPaymentResult(){
   const params=new URLSearchParams(window.location.search);
   if(params.get('payment')==='success'||params.get('status')==='approved'){
@@ -2397,9 +2422,20 @@ function showMoodSelect() {
 function showMoodStep(step) {
   document.getElementById('mood-step1').style.display = step===1 ? 'flex' : 'none';
   document.getElementById('mood-step2').style.display = step===2 ? 'flex' : 'none';
-  document.getElementById('mood-back-btn').onclick = step===1
-    ? ()=>{ app._mood=null; showScreen('s-mode'); }
+  const backBtn = document.getElementById('mood-back-btn');
+  if(backBtn) backBtn.onclick = step===1
+    ? ()=>{ app._mood=null; goHome(); }
     : ()=>showMoodStep(1);
+  // When showing step 2, reset filter pills to default
+  if(step===2){
+    document.querySelectorAll('.filter-pill').forEach(p=>{
+      p.classList.toggle('active', p.dataset.val==='any');
+    });
+    const ageMin = document.getElementById('mf-age-min');
+    const ageMax = document.getElementById('mf-age-max');
+    if(ageMin) ageMin.value='';
+    if(ageMax) ageMax.value='';
+  }
 }
 function pickMood(mood) {
   app._mood = mood;
@@ -2501,7 +2537,7 @@ function swapCameras() {
 // ── Auto-login ────────────────────────────────────────────────────────────────
 (async()=>{
   const t=localStorage.getItem('rd_token');
-  if(t){try{app.token=t;const u=await api('/api/auth/me','GET');app.user=u;app.isPremium=u.isPremium;app.ineStatus=u.ineStatus;app.approved=u.approved;}catch(e){localStorage.removeItem('rd_token');app.token=null;}}
+  if(t){try{app.token=t;const u=await api('/api/auth/me','GET');app.user=u;app.stars=u.stars||0;app.blockedUntil=u.blockedUntil||null;app.ineStatus=u.ineStatus;app.approved=u.approved;updateChatUI();}catch(e){localStorage.removeItem('rd_token');app.token=null;}}
   showScreen('s-landing');
 })();
 </script>

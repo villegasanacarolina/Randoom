@@ -52,6 +52,9 @@ async function initDB() {
       gender        TEXT NOT NULL,
       country       TEXT DEFAULT 'MX',
       is_premium    BOOLEAN DEFAULT FALSE,
+      stars         INT DEFAULT 0,
+      connections_count INT DEFAULT 0,
+      blocked_until TIMESTAMPTZ,
       banned        BOOLEAN DEFAULT FALSE,
       ban_reason    TEXT DEFAULT '',
       approved      BOOLEAN DEFAULT FALSE,
@@ -160,6 +163,9 @@ async function initDB() {
 
   // ── Migrate existing DB: add columns that may not exist yet ──────────────────
   const migrations = [
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS stars INT DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS connections_count INT DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked_until TIMESTAMPTZ`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS total_sessions INT DEFAULT 0`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS total_minutes INT DEFAULT 0`,
@@ -302,20 +308,6 @@ const sendRejectionEmail = (email, name, note) => sendEmail(email, '❌ Verifica
     <p style="color:#FCA5A5;font-size:13px;margin:0;"><strong>Motivo:</strong> ${note}</p></div>` : ''}
 `));
 
-const sendPremiumEmail = (email, name) => sendEmail(email, '⭐ ¡Premium activado! — Randoom', tpl(`
-  <div style="text-align:center;font-size:52px;margin-bottom:16px;">👑</div>
-  <h2 style="color:#fff;text-align:center;margin:0 0 12px;">¡Ya eres Premium!</h2>
-  <p style="color:#C8A8E0;font-size:14px;text-align:center;margin:0 0 20px;">
-    Hola <strong style="color:#fff">${name}</strong>, tu pago fue confirmado. Disfruta sin límites.
-  </p>
-  <div style="text-align:center;">
-    <a href="${process.env.FRONTEND_URL||'https://randoom-zeta.vercel.app'}"
-       style="background:linear-gradient(135deg,#9B30FF,#5B00CC);color:#fff;padding:14px 32px;border-radius:14px;text-decoration:none;font-weight:700;">
-      Ir al chat →
-    </a>
-  </div>
-`));
-
 // ── Active sockets ─────────────────────────────────────────────────────────────
 const activeSockets = {};
 const waitingPool   = [];
@@ -346,7 +338,8 @@ function rowToUser(r) {
   if (!r) return null;
   return {
     email: r.email, name: r.name, username: r.username, age: r.age, gender: r.gender,
-    country: r.country, isPremium: r.is_premium, banned: r.banned,
+    country: r.country, stars: r.stars||0, connectionsCount: r.connections_count||0,
+    blockedUntil: r.blocked_until, banned: r.banned,
     banReason: r.ban_reason, approved: r.approved, ineStatus: r.ine_status,
     ineVerified: r.ine_verified, emailVerified: r.email_verified,
     totalSessions: r.total_sessions, totalMinutes: r.total_minutes,
@@ -470,12 +463,18 @@ app.get('/api/auth/me', authUser, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // MERCADOPAGO
 // ══════════════════════════════════════════════════════════════════════════════
+// ── Comprar estrellas (desbloquea conexiones, 20 estrellas = $69 MXN) ────────
+const STARS_PRICE_MXN = parseFloat(process.env.STARS_PRICE_MXN) || 69;
+const STARS_PER_PURCHASE = 20;
+const FREE_CONNECTIONS_LIMIT = 20;
+const BLOCK_HOURS = 12;
+
 app.post('/api/payments/create-preference', authUser, async (req, res) => {
   try {
     const u = (await pool.query('SELECT name,email FROM users WHERE email=$1', [req.user.email])).rows[0];
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
     const preference = {
-      items: [{ title:'Randoom Premium — 1 mes ($149 MXN)', quantity:1, unit_price: parseFloat(process.env.PREMIUM_PRICE_MXN)||149, currency_id:'MXN' }],
+      items: [{ title:`${STARS_PER_PURCHASE} Estrellas Randoom`, quantity:1, unit_price: STARS_PRICE_MXN, currency_id:'MXN' }],
       payer: { email: u.email, name: u.name },
       back_urls: {
         success: `${process.env.FRONTEND_URL||'https://randoom-zeta.vercel.app'}/?payment=success`,
@@ -500,13 +499,35 @@ app.post('/api/payments/webhook', async (req, res) => {
     const result = await mpRequest('GET', `/v1/payments/${data.id}`);
     if (result.data.status === 'approved') {
       const email = result.data.external_reference;
-      await pool.query('UPDATE users SET is_premium=true WHERE email=$1', [email]);
-      const u = (await pool.query('SELECT name FROM users WHERE email=$1', [email])).rows[0];
+      // Add stars, reset connection block
+      await pool.query(
+        'UPDATE users SET stars=stars+$1, connections_count=0, blocked_until=NULL WHERE email=$2',
+        [STARS_PER_PURCHASE, email]
+      );
+      const u = (await pool.query('SELECT name,stars FROM users WHERE email=$1', [email])).rows[0];
       const s = Object.entries(activeSockets).find(([,s]) => s.email === email);
-      if (s) io.to(s[0]).emit('premium_activated');
-      if (u) sendPremiumEmail(email, u.name).catch(() => {});
+      if (s) io.to(s[0]).emit('stars_purchased', { stars: u?.stars||0 });
     }
   } catch(e) { console.error('Webhook error:', e.message); }
+});
+
+// ── Verificar si el usuario puede conectarse (límite de 20 conexiones) ───────
+app.get('/api/connections/status', authUser, async (req, res) => {
+  try {
+    const r = await pool.query('SELECT connections_count, blocked_until, stars FROM users WHERE email=$1', [req.user.email]);
+    if (!r.rows.length) return res.status(404).json({ error: 'No encontrado' });
+    const u = r.rows[0];
+    const now = new Date();
+    const blockedUntil = u.blocked_until ? new Date(u.blocked_until) : null;
+    const isBlocked = blockedUntil && blockedUntil > now;
+    res.json({
+      connectionsCount: u.connections_count || 0,
+      limit: FREE_CONNECTIONS_LIMIT,
+      isBlocked: !!isBlocked,
+      blockedUntil: isBlocked ? blockedUntil.toISOString() : null,
+      stars: u.stars || 0,
+    });
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -559,20 +580,22 @@ app.post('/api/recordings/upload', authUser, uploadRec.single('recording'), asyn
 // ══════════════════════════════════════════════════════════════════════════════
 app.get('/api/admin/stats', authAdmin, async (req, res) => {
   try {
-    const [total, approved, premium, banned, pendingReports] = await Promise.all([
+    const [total, approved, blocked, banned, pendingReports, starsSold] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM users'),
       pool.query('SELECT COUNT(*) FROM users WHERE approved=true'),
-      pool.query('SELECT COUNT(*) FROM users WHERE is_premium=true'),
+      pool.query('SELECT COUNT(*) FROM users WHERE blocked_until > NOW()'),
       pool.query('SELECT COUNT(*) FROM users WHERE banned=true'),
-      pool.query("SELECT COUNT(*) FROM reports WHERE status='pending'")
+      pool.query("SELECT COUNT(*) FROM reports WHERE status='pending'"),
+      pool.query('SELECT COALESCE(SUM(stars),0) as total FROM users')
     ]);
     res.json({
       total:          parseInt(total.rows[0].count),
       approved:       parseInt(approved.rows[0].count),
-      premium:        parseInt(premium.rows[0].count),
+      blocked:        parseInt(blocked.rows[0].count),
       banned:         parseInt(banned.rows[0].count),
       online:         Object.keys(activeSockets).length,
-      pendingReports: parseInt(pendingReports.rows[0].count)
+      pendingReports: parseInt(pendingReports.rows[0].count),
+      starsInCirculation: parseInt(starsSold.rows[0].total)
     });
   } catch(e) { console.error('Stats error:',e.message); res.status(500).json({ error: 'Error' }); }
 });
@@ -587,16 +610,26 @@ app.get('/api/admin/users', authAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
 
-app.post('/api/admin/users/:email/premium', authAdmin, async (req, res) => {
+app.post('/api/admin/users/:email/stars', authAdmin, async (req, res) => {
+  const email = decodeURIComponent(req.params.email);
+  const amount = parseInt(req.body.amount) || 0;
+  try {
+    await pool.query('UPDATE users SET stars = GREATEST(0, stars + $1) WHERE email=$2', [amount, email]);
+    const s = Object.entries(activeSockets).find(([,s]) => s.email === email);
+    if (s) {
+      const r = await pool.query('SELECT stars FROM users WHERE email=$1', [email]);
+      io.to(s[0]).emit('stars_purchased', { stars: r.rows[0]?.stars||0 });
+    }
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.post('/api/admin/users/:email/unblock', authAdmin, async (req, res) => {
   const email = decodeURIComponent(req.params.email);
   try {
-    await pool.query('UPDATE users SET is_premium=$1 WHERE email=$2', [req.body.active, email]);
+    await pool.query('UPDATE users SET blocked_until=NULL, connections_count=0 WHERE email=$1', [email]);
     const s = Object.entries(activeSockets).find(([,s]) => s.email === email);
-    if (s) io.to(s[0]).emit(req.body.active ? 'premium_activated' : 'premium_removed');
-    if (req.body.active) {
-      const u = (await pool.query('SELECT name FROM users WHERE email=$1', [email])).rows[0];
-      if (u) sendPremiumEmail(email, u.name).catch(() => {});
-    }
+    if (s) io.to(s[0]).emit('connection_unblocked');
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: 'Error' }); }
 });
@@ -676,7 +709,7 @@ app.get('/api/profile/:email', authUser, async (req, res) => {
   try {
     const email = decodeURIComponent(req.params.email);
     const [user, profile, friends] = await Promise.all([
-      pool.query('SELECT name,age,gender,country,is_premium FROM users WHERE email=$1', [email]),
+      pool.query('SELECT name,age,gender,country,stars FROM users WHERE email=$1', [email]),
       pool.query('SELECT * FROM profiles WHERE email=$1', [email]),
       pool.query('SELECT COUNT(*) FROM friends WHERE email1=$1 OR email2=$1', [email])
     ]);
@@ -687,7 +720,7 @@ app.get('/api/profile/:email', authUser, async (req, res) => {
       age: user.rows[0].age,
       gender: user.rows[0].gender,
       country: user.rows[0].country,
-      isPremium: user.rows[0].is_premium,
+      stars: user.rows[0].stars||0,
       ...profile.rows[0],
       friendCount: parseInt(friends.rows[0].count)
     });
@@ -714,7 +747,7 @@ app.get('/api/profile/me/full', authUser, async (req, res) => {
     );
     res.json({
       email, name: u.name, username: u.username, age: u.age, gender: u.gender,
-      country: u.country, isPremium: u.is_premium,
+      country: u.country, stars: u.stars||0,
       ...profile.rows[0],
       friendCount: parseInt(friends.rows[0].count),
       pendingRequests: pendingReqs.rows
@@ -1019,10 +1052,10 @@ function matchesFilters(a, b) {
   const sm = s.mode || null;
   const cm = c.mode || null;
   if (sm || cm) {
-    // Both need to have a mood, and it must match
     if (!sm || !cm || sm !== cm) return false;
   }
 
+  // Filters apply to everyone now (no premium gate)
   const check = (f, t) => {
     if (!f) return true;
     if (f.gender  && f.gender  !== 'any' && t.gender  !== f.gender)  return false;
@@ -1031,7 +1064,7 @@ function matchesFilters(a, b) {
     if (f.ageMax  && t.age > parseInt(f.ageMax)) return false;
     return true;
   };
-  return (s.isPremium ? check(s.filters, c) : true) && (c.isPremium ? check(c.filters, s) : true);
+  return check(s.filters, c) && check(c.filters, s);
 }
 
 function findMatch(id) {
@@ -1053,11 +1086,11 @@ io.on('connection', socket => {
       if (u.banned) { socket.emit('error', { message: 'Cuenta suspendida' }); return; }
       activeSockets[socket.id] = {
         socketId: socket.id, email: d.email, name: u.name, age: u.age,
-        gender: u.gender, country: u.country, isPremium: u.is_premium,
+        gender: u.gender, country: u.country,
         filters: {}, mode: null, partnerId: null, sessionStart: null
       };
       await pool.query('UPDATE users SET total_sessions=total_sessions+1, last_seen=NOW() WHERE email=$1', [d.email]);
-      socket.emit('joined', { isPremium: u.is_premium, ineVerified: u.ine_verified, ineStatus: u.ine_status, approved: u.approved });
+      socket.emit('joined', { ineVerified: u.ine_verified, ineStatus: u.ine_status, approved: u.approved, stars: u.stars||0 });
       // Broadcast online status to friends
       const friendsR = await pool.query('SELECT email1,email2 FROM friends WHERE email1=$1 OR email2=$1',[u.email]);
       friendsR.rows.forEach(row => {
@@ -1068,11 +1101,31 @@ io.on('connection', socket => {
     } catch(e) { socket.emit('error', { message: 'Token inválido' }); }
   });
 
-  socket.on('set_filters', f => { if (activeSockets[socket.id]?.isPremium) activeSockets[socket.id].filters = f; });
-  socket.on('set_mode', ({mode}) => { if (activeSockets[socket.id]?.isPremium) activeSockets[socket.id].mode = mode; });
+  socket.on('set_filters', f => { if (activeSockets[socket.id]) activeSockets[socket.id].filters = f; });
+  socket.on('set_mode', ({mode}) => { if (activeSockets[socket.id]) activeSockets[socket.id].mode = mode; });
 
-  socket.on('find_partner', () => {
+  socket.on('find_partner', async () => {
     const u = activeSockets[socket.id]; if (!u) return;
+
+    // ── Check connection limit (20 free connections, then 12h block or pay) ──
+    try {
+      const r = await pool.query('SELECT connections_count, blocked_until FROM users WHERE email=$1', [u.email]);
+      const row = r.rows[0];
+      if (row) {
+        const now = new Date();
+        const blockedUntil = row.blocked_until ? new Date(row.blocked_until) : null;
+        if (blockedUntil && blockedUntil > now) {
+          // Still blocked — tell client and stop
+          socket.emit('connection_blocked', { blockedUntil: blockedUntil.toISOString() });
+          return;
+        }
+        // If block expired, reset it
+        if (blockedUntil && blockedUntil <= now) {
+          await pool.query('UPDATE users SET connections_count=0, blocked_until=NULL WHERE email=$1', [u.email]);
+        }
+      }
+    } catch(e) { console.error('Connection limit check error:', e.message); }
+
     if (u.partnerId) { io.to(u.partnerId).emit('partner_disconnected'); if (activeSockets[u.partnerId]) activeSockets[u.partnerId].partnerId=null; u.partnerId=null; }
     const idx = waitingPool.indexOf(socket.id); if (idx!==-1) waitingPool.splice(idx,1);
     const mid = findMatch(socket.id);
@@ -1080,6 +1133,29 @@ io.on('connection', socket => {
       u.partnerId=mid; activeSockets[mid].partnerId=socket.id;
       u.sessionStart=activeSockets[mid].sessionStart=Date.now();
       const pu=activeSockets[mid];
+
+      // ── Increment connection count for BOTH users ──────────────────────────
+      try {
+        for (const email of [u.email, pu.email]) {
+          const r2 = await pool.query(
+            'UPDATE users SET connections_count = connections_count + 1 WHERE email=$1 RETURNING connections_count, stars',
+            [email]
+          );
+          const newCount = r2.rows[0]?.connections_count || 0;
+          const stars = r2.rows[0]?.stars || 0;
+          if (newCount >= FREE_CONNECTIONS_LIMIT && stars <= 0) {
+            // Hit the limit — block for 12h (unless they have stars to spend)
+            const blockedUntil = new Date(Date.now() + BLOCK_HOURS * 3600 * 1000);
+            await pool.query('UPDATE users SET blocked_until=$1 WHERE email=$2', [blockedUntil, email]);
+            const targetSock = Object.entries(activeSockets).find(([,s]) => s.email === email);
+            if (targetSock) io.to(targetSock[0]).emit('connection_limit_reached', { blockedUntil: blockedUntil.toISOString() });
+          } else if (newCount >= FREE_CONNECTIONS_LIMIT && stars > 0) {
+            // Use a star instead of blocking
+            await pool.query('UPDATE users SET stars=stars-1, connections_count=connections_count-1 WHERE email=$1', [email]);
+          }
+        }
+      } catch(e) { console.error('Connection count error:', e.message); }
+
       socket.emit('partner_found',{partner:{name:pu.name,age:pu.age,gender:pu.gender,country:pu.country,email:pu.email},initiator:true});
       io.to(mid).emit('partner_found',{partner:{name:u.name,age:u.age,gender:u.gender,country:u.country,email:u.email},initiator:false});
     } else { waitingPool.push(socket.id); socket.emit('searching'); }

@@ -102,7 +102,7 @@ tr:hover td{background:rgba(160,32,240,.04)}
 .pill.approved{background:rgba(34,197,94,.15);color:#22C55E;border:1px solid rgba(34,197,94,.3)}
 .pill.rejected{background:rgba(239,68,68,.15);color:#EF4444;border:1px solid rgba(239,68,68,.3)}
 .pill.online{background:rgba(59,130,246,.15);color:#3B82F6;border:1px solid rgba(59,130,246,.3)}
-.pill.premium{background:var(--pu-g);color:var(--pu-l);border:1px solid rgba(160,32,240,.3)}
+.pill.stars{background:var(--pu-g);color:var(--pu-l);border:1px solid rgba(160,32,240,.3)}
 .pill.banned{background:rgba(239,68,68,.15);color:#EF4444;border:1px solid rgba(239,68,68,.3)}
 .pill.verified{background:rgba(34,197,94,.15);color:#22C55E;border:1px solid rgba(34,197,94,.3)}
 .pill.active{background:rgba(34,197,94,.1);color:#22C55E;border:1px solid rgba(34,197,94,.25)}
@@ -202,7 +202,7 @@ tr:hover td{background:rgba(160,32,240,.04)}
           <div class="stat-card teal"><div class="stat-icon">✅</div><div class="stat-val" id="s-approved">—</div><div class="stat-lbl">Aprobados</div></div>
 
           <div class="stat-card green"><div class="stat-icon">🟢</div><div class="stat-val" id="s-online">—</div><div class="stat-lbl">En línea</div></div>
-          <div class="stat-card purple"><div class="stat-icon">⭐</div><div class="stat-val" id="s-premium">—</div><div class="stat-lbl">Premium</div></div>
+          <div class="stat-card purple"><div class="stat-icon">⏳</div><div class="stat-val" id="s-blocked">—</div><div class="stat-lbl">Bloqueados</div></div>
           <div class="stat-card red"><div class="stat-icon">🚫</div><div class="stat-val" id="s-banned">—</div><div class="stat-lbl">Baneados</div></div>
         </div>
         <div class="dash-grid">
@@ -224,7 +224,7 @@ tr:hover td{background:rgba(160,32,240,.04)}
           <div class="filters-bar" style="padding:0 14px 10px">
             <button class="fbtn active" data-uf="all" onclick="setUF('all',this)">Todos</button>
             <button class="fbtn" data-uf="approved" onclick="setUF('approved',this)">✅ Aprobados</button>
-            <button class="fbtn" data-uf="premium" onclick="setUF('premium',this)">⭐ Premium</button>
+            <button class="fbtn" data-uf="blocked" onclick="setUF('blocked',this)">⏳ Bloqueados</button>
             <button class="fbtn" data-uf="banned" onclick="setUF('banned',this)">🚫 Baneados</button>
             <button class="fbtn" data-uf="online" onclick="setUF('online',this)">🟢 En línea</button>
           </div>
@@ -461,7 +461,7 @@ function updateStats(s){
 
   document.getElementById('s-online').textContent=s.online;
   document.getElementById('online-count').textContent=s.online;
-  document.getElementById('s-premium').textContent=s.premium;
+  document.getElementById('s-blocked').textContent=s.blocked;
   document.getElementById('s-banned').textContent=s.banned;
   const br=document.getElementById('badge-reports');
   if(br){br.textContent=s.pendingReports;br.style.display=s.pendingReports>0?'inline-block':'none';}
@@ -487,7 +487,7 @@ function renderUsers() {
     if (!u || !u.name || !u.email) return false;
     if (q && !u.name.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
     if (uf === 'approved' && !u.approved) return false;
-    if (uf === 'premium'  && !u.isPremium) return false;
+    if (uf === 'blocked'  && !(u.blockedUntil && new Date(u.blockedUntil) > new Date())) return false;
     if (uf === 'banned'   && !u.banned) return false;
     if (uf === 'online'   && !u.isOnline) return false;
     return true;
@@ -507,7 +507,8 @@ function renderUsers() {
       <td style="font-size:12px">${u.age||'—'} · ${u.gender||'—'}</td>
       <td style="font-size:11px;color:var(--gray-l)">${u.country||'—'}</td>
       <td>
-        ${u.isPremium ? '<span style="background:rgba(160,32,240,.2);color:var(--pu-l);font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700">⭐ Premium</span>' : '<span style="color:var(--gray-l);font-size:11px">Gratis</span>'}
+        <span style="background:rgba(160,32,240,.15);color:var(--pu-l);font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700">⭐ ${u.stars||0}</span>
+        ${(u.blockedUntil && new Date(u.blockedUntil) > new Date()) ? ' <span style="background:rgba(239,68,68,.15);color:#EF4444;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700">⏳ Bloqueado</span>' : ''}
         ${u.isOnline ? ' <span style="color:#22C55E;font-size:11px">🟢</span>' : ''}
       </td>
       <td style="font-size:11px;color:var(--gray-l)">${u.total_sessions||0}</td>
@@ -515,9 +516,10 @@ function renderUsers() {
       <td>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="editUsername('${u.email}','${u.username||''}')" title="Editar @usuario">✏️ @user</button>
-          ${u.isPremium
-            ? `<button class="btn btn-ghost btn-sm" onclick="setPremium('${u.email}',false)">✕ Quitar</button>`
-            : `<button class="btn btn-ghost btn-sm" onclick="setPremium('${u.email}',true)">⭐ Premium</button>`}
+          <button class="btn btn-ghost btn-sm" onclick="giveStars('${u.email}')">⭐ +20</button>
+          ${(u.blockedUntil && new Date(u.blockedUntil) > new Date())
+            ? `<button class="btn btn-success btn-sm" onclick="unblockUser('${u.email}')">✅ Desbloquear</button>`
+            : ''}
           ${u.banned
             ? `<button class="btn btn-success btn-sm" onclick="banUser('${u.email}',false)">✅ Desbanear</button>`
             : `<button class="btn btn-danger btn-sm" onclick="banUser('${u.email}',true)">🚫 Banear</button>`}
@@ -574,10 +576,18 @@ async function editUsername(email, current) {
   } catch(e) { toast(e.message||'Error al guardar','err'); }
 }
 
-async function setPremium(email, active) {
+async function giveStars(email) {
   try {
-    await api(`/api/admin/users/${encodeURIComponent(email)}/premium`, 'POST', { active });
-    toast(active ? '⭐ Premium dado' : '⭐ Premium quitado', 'ok');
+    await api(`/api/admin/users/${encodeURIComponent(email)}/stars`, 'POST', { amount: 20 });
+    toast('⭐ 20 estrellas otorgadas', 'ok');
+    refreshAll();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+async function unblockUser(email) {
+  try {
+    await api(`/api/admin/users/${encodeURIComponent(email)}/unblock`, 'POST', {});
+    toast('✅ Usuario desbloqueado', 'ok');
     refreshAll();
   } catch(e) { toast(e.message,'err'); }
 }
